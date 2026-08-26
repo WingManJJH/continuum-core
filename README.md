@@ -1,9 +1,15 @@
-# Continuum Core — Phases 1–3
+# Continuum Core — Phases 1–4
 
 This directory executes the **Immediate next steps** in §13 of *The Continuum Core Model*
 (`../Continuum Core Model.rtf`), the follow-on decisions ratified in [`DECISIONS.md`](DECISIONS.md),
-and the **Phase-2 governance** and **Phase-3 signal & agent** modules (§09). Each item is a
-concrete, runnable deliverable.
+and the four-phase roadmap of §09 (Phase 2 governance, Phase 3 signal & agent, Phase 4 enterprise
+connection). Each item is a concrete, runnable deliverable.
+
+> **Environment note:** every live enterprise connector (Notion, Teams, Slack, Outlook, Gmail) and
+> the pilot agent LLM require OAuth/network that this build does not have. Wherever that bites, the
+> capability is declared with its real interface and **stubbed with a clear error**, and a file
+> connector / fixtures stand in so the engine is exercised for real. These edges are called out
+> inline, in [`DECISIONS.md`](DECISIONS.md), and in each module README — never silently faked.
 
 **Phase 1 — Foundation (§13):**
 
@@ -30,6 +36,14 @@ concrete, runnable deliverable.
 | Enforcement Point built + wired to one pilot agent | real gate (execute only on allow; escalate/deny; rate limit) + pilot agent | [`enforcement/`](enforcement/README.md) |
 | Signal Layer (Notion/Outlook first) feeds Conformance Check (§06) | connector interface (+ file stand-in; live connectors need OAuth) + drift engine | [`signal/`](signal/README.md) |
 
+**Phase 4 — Continuous enterprise connection (§09):**
+
+| Phase-4 item | Deliverable | Where |
+|---|---|---|
+| Full guardrail enforcement across all agent-bound tasks | enforcement sweep over all 8 bindings (fail-closed) + §12 coverage | [`enforcement/sweep.py`](enforcement/sweep.py) |
+| Teams/Slack/Gmail signal (sequenced by sensitivity) | OAuth-gated connectors + enable-order (auth unavailable → file stand-in) | [`signal/connectors.py`](signal/connectors.py) |
+| Strategy-to-execution rollup dashboard as a standing report (§05) | rollup engine + web dashboard + §12 metric tiles | [`dashboard/`](dashboard/README.md) |
+
 ## Quick start
 
 ```bash
@@ -51,6 +65,11 @@ python3 enforcement/pilot_agent.py              # pilot agent; every action rout
 python3 enforcement/test_enforce.py             # 13 asserts: tool runs only on allow; escalate/deny; rate limit
 python3 signal/conformance.py                   # §06 Conformance Check: model vs. reality (drift report)
 python3 signal/test_conformance.py              # 8 asserts incl. "conformance never mutates the model"
+
+# Phase 4 — continuous enterprise connection
+python3 enforcement/sweep.py --keep             # full enforcement across all 8 agent-bound tasks (+ populates the log)
+python3 dashboard/app.py                         # http://localhost:8788 — the §05 standing report
+python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom-up / coverage / metrics
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -148,6 +167,28 @@ engine is exercised for real. Swap them in once authorized; the interface is unc
 
 Run: `python3 enforcement/pilot_agent.py && python3 signal/conformance.py`.
 
+## What Phase 4 proves (continuous enterprise connection)
+
+**Enforcement is universal, not a pilot.** [`enforcement/sweep.py`](enforcement/sweep.py) drives the
+Enforcement Point across **all 8 agent-bound tasks** — every one gated (execute / escalate / deny) —
+and reports §12 guardrail coverage. Fail-closed: a task with no effective guardrail is a defect, not
+a silent allow.
+
+**Strategy traces to the agent action, and back — as a standing report.** The
+[dashboard](dashboard/README.md) (§05) walks objective → KPI (live vs target) → process →
+agent-bound task → what the agent did, and rolls agent activity back up to the objective. Verified
+live in the browser. The §12 metric tiles are computed where derivable — **guardrail coverage 12%
+(1/8 reviewed — honest: only the signed-off KYC guardrail; the rest run under defaults)**,
+traceability 88%, agent-activity counts — and the two that need human disposition data (escalation
+precision, drift-to-update latency) are shown as **`needs data`, not fabricated**.
+
+**Honest edge:** the live Teams/Slack/Gmail (and Notion/Outlook) connectors need OAuth, unavailable
+here. They're declared with scopes and a sensitivity enable-order (`SENSITIVITY_ORDER`) and raise a
+clear error; the file connector stands in. This is the real-data half of Phase 4 — gated on
+connector auth, buildable the moment it's granted, with no downstream change.
+
+Run: `python3 enforcement/sweep.py --keep && python3 dashboard/app.py`.
+
 ## Layout
 
 ```
@@ -175,17 +216,24 @@ continuum-core/
 │   ├── test_store.py           #   write-path assertions
 │   ├── static/                 #   vanilla-JS three-pane editor (index.html/styles.css/app.js)
 │   └── README.md
-├── enforcement/                # Phase 3 — the Enforcement Point (§04 gate)
+├── enforcement/                # Phase 3 gate + Phase 4 full-coverage sweep
 │   ├── enforce.py              #   execute-only-on-allow, escalate/deny, rate limiting
 │   ├── pilot_agent.py          #   a pilot agent that can only act through the EP
+│   ├── sweep.py                #   Phase 4 — EP across ALL agent-bound tasks (fail-closed)
 │   ├── test_enforce.py         #   invariant + branch + rate-limit assertions
 │   └── README.md
-├── signal/                     # Phase 3 — Signal Layer + Conformance Check (§06)
-│   ├── connectors.py           #   SignalConnector + FileConnector (+ Notion/Outlook OAuth stubs)
+├── signal/                     # Phase 3 Conformance + Phase 4 connectors (§06)
+│   ├── connectors.py           #   SignalConnector + FileConnector + Notion/Outlook/Teams/Slack/Gmail OAuth stubs
 │   ├── conformance.py          #   drift engine: model vs. reality, human-review-only
 │   ├── signals.sample.jsonl    #   fixture external activity
 │   ├── agent_events.sample.jsonl # fixture agent-log events
 │   ├── test_conformance.py     #   drift-detection + non-mutation assertions
+│   └── README.md
+├── dashboard/                  # Phase 4 — §05 strategy→execution standing report
+│   ├── rollup.py               #   engine: top-down / bottom-up / coverage / §12 metrics
+│   ├── app.py                  #   stdlib HTTP server: /api/rollup + static dashboard
+│   ├── static/                 #   vanilla-JS leadership view
+│   ├── test_rollup.py          #   rollup / coverage / metrics assertions
 │   └── README.md
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json

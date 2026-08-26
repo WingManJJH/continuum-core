@@ -6,6 +6,33 @@ something concrete. Newest first.
 
 ---
 
+## 2026-08-26 — Phase 4 kickoff
+
+### D8 — Continuous enterprise connection, buildable slice (Phase 4 §09)
+**Context:** Phase 4 = full guardrail enforcement across all agent-bound tasks + Teams/Slack/Gmail
+signal + the §05 strategy-to-execution rollup dashboard as a standing report.
+**Decision & build:**
+- **Full enforcement across all agent-bound tasks** — `enforcement/sweep.py` drives the Enforcement
+  Point across every agent-bound task (8/8), each gated (execute/escalate/deny). Fail-closed: a task
+  with no effective guardrail is a coverage defect, surfaced by `dashboard/rollup.coverage()`.
+- **§05 rollup dashboard** — `dashboard/` (engine `rollup.py` + web app + UI): top-down
+  objective→KPI→process→agent-task with live activity, bottom-up agent-action→objective, §12
+  guardrail coverage (fail-closed), and the §12 success-metric tiles. Reads the same graph + agent
+  action log as everything else (one source of truth, read-only). Verified live in the browser. 13 asserts.
+- **Teams/Slack/Gmail connectors** — added to `signal/connectors.py` as OAuth-gated stubs with their
+  scopes, plus `SENSITIVITY_ORDER` (notion→teams→slack→outlook→gmail) for enable-sequencing.
+**Honest edges (explicit, not hidden):**
+- **All live connectors need OAuth, unavailable in this build** — the whole Phase-4 "enterprise
+  connection" real-data path is gated on connector auth. FileConnector stands in; the buildable-here
+  slice is the enforcement sweep + dashboard + engine, which are complete and tested.
+- **Two §12 metrics are `needs_data`, not fabricated:** escalation precision (needs human escalation
+  dispositions) and drift-to-update latency (needs finding + human-resolution timestamps). Guardrail
+  coverage (12%), traceability completeness (88%), and agent-activity counts are computed live.
+- Coverage is honestly **1/8 reviewed** — only the signed-off KYC guardrail; the other seven run
+  under defaults. That is the §12 coverage metric doing its job, not a gap to paper over.
+
+---
+
 ## 2026-08-26 — Phase 3 kickoff
 
 ### D7 — Signal & agent infrastructure shipped (Phase 3 §09)

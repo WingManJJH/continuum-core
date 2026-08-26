@@ -67,7 +67,36 @@ class OutlookConnector(_OAuthConnector):
     scopes = ["Mail.Read", "Calendars.Read"]
 
 
+# Phase 4 — full enterprise connection. Same OAuth-gated pattern.
+class TeamsConnector(_OAuthConnector):
+    name = "teams"
+    scopes = ["Chat.Read", "ChannelMessage.Read.All"]
+
+
+class SlackConnector(_OAuthConnector):
+    name = "slack"
+    scopes = ["channels:history", "groups:history"]
+
+
+class GmailConnector(_OAuthConnector):
+    name = "gmail"
+    scopes = ["gmail.readonly"]
+
+
+# Sequenced by sensitivity (per the business plan): least-sensitive first, so the
+# signal layer earns trust before it reaches a mailbox. This is the order to enable
+# connectors in as OAuth becomes available.
+SENSITIVITY_ORDER = ["notion", "teams", "slack", "outlook", "gmail"]
+
+LIVE_CONNECTORS = {
+    "notion": NotionConnector, "outlook": OutlookConnector,
+    "teams": TeamsConnector, "slack": SlackConnector, "gmail": GmailConnector,
+}
+
+
 def default_sources() -> list[SignalConnector]:
-    """Phase-3 sequencing: Notion/Outlook first (per §09). They need auth, so the
-    file connector stands in; swap them in once authorized."""
+    """Live connectors (Notion/Teams/Slack/Outlook/Gmail) all require OAuth, which
+    is unavailable in this build, so the file connector stands in for the whole set.
+    As each connector is authorized — in SENSITIVITY_ORDER — swap it in here; the
+    SignalConnector.read() interface is unchanged, so nothing downstream changes."""
     return [FileConnector()]
