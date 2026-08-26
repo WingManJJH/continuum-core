@@ -1,0 +1,517 @@
+<title>Continuum Core Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    /* light &mdash; cool neutrals with a faint blue bias toward the product accent */
+    --ground: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #eef1f6;
+    --ink: #1b2330;
+    --muted: #5f6b7a;
+    --line: #e2e7ef;
+    --accent: #2f6bff;
+    --accent-ink: #ffffff;
+    --code-bg: #0f141b;
+    --code-ink: #e7ecf3;
+    --code-line: #26303d;
+    --good: #1c7a4d;   --good-bg: #e7f6ee;
+    --warn: #9a6206;   --warn-bg: #fdf1dd;
+    --crit: #b3261e;   --crit-bg: #fdecea;
+    --shadow: 0 1px 2px rgba(20,30,50,.05), 0 6px 20px rgba(20,30,50,.06);
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f141b;
+      --surface: #161d27;
+      --surface-2: #1d2733;
+      --ink: #e7ecf3;
+      --muted: #93a0b4;
+      --line: #26303d;
+      --accent: #6f9bff;
+      --accent-ink: #0b1017;
+      --code-bg: #0b0f15;
+      --code-ink: #dbe4f0;
+      --code-line: #202a37;
+      --good: #57c98d;   --good-bg: #10281d;
+      --warn: #e5a447;   --warn-bg: #2b2110;
+      --crit: #f2837b;   --crit-bg: #2b1512;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f141b;
+    --surface: #161d27;
+    --surface-2: #1d2733;
+    --ink: #e7ecf3;
+    --muted: #93a0b4;
+    --line: #26303d;
+    --accent: #6f9bff;
+    --accent-ink: #0b1017;
+    --code-bg: #0b0f15;
+    --code-ink: #dbe4f0;
+    --code-line: #202a37;
+    --good: #57c98d;   --good-bg: #10281d;
+    --warn: #e5a447;   --warn-bg: #2b2110;
+    --crit: #f2837b;   --crit-bg: #2b1512;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* header */
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--ground) 86%, transparent);
+    backdrop-filter: saturate(140%) blur(8px);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 22px;
+  }
+  .mark {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-weight: 700; font-size: 15px;
+    box-shadow: var(--shadow);
+  }
+  .top .name { font-weight: 600; letter-spacing: -0.01em; }
+  .top .name span { color: var(--muted); font-weight: 500; }
+  .top .spacer { flex: 1; }
+  .toggle {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 11px; cursor: pointer;
+  }
+  .toggle:hover { color: var(--ink); border-color: var(--accent); }
+
+  /* shell */
+  .shell { max-width: 1180px; margin: 0 auto; padding: 0 22px;
+    display: grid; grid-template-columns: 232px minmax(0,1fr); gap: 48px; }
+  nav.toc { position: sticky; top: 70px; align-self: start; height: max-content;
+    padding: 30px 0; font-size: 13.5px; }
+  nav.toc .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none;
+    padding: 5px 12px; border-left: 2px solid var(--line); }
+  nav.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+  nav.toc a.mini { padding-left: 24px; font-size: 12.5px; }
+
+  main { padding: 30px 0 100px; min-width: 0; }
+  section { margin-bottom: 52px; scroll-margin-top: 72px; }
+
+  /* hero */
+  .hero { margin: 8px 0 44px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 4.5vw, 44px); line-height: 1.08; letter-spacing: -0.025em;
+    margin: 0 0 16px; text-wrap: balance; font-weight: 700; }
+  .lede { font-size: 18px; color: var(--muted); max-width: 60ch; margin: 0; }
+
+  h2 { font-size: 13px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 12px; }
+  h2 .no { color: var(--accent); font-weight: 600; }
+  h3 { font-size: 19px; letter-spacing: -0.01em; margin: 30px 0 8px; font-weight: 600; }
+  p { max-width: 68ch; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  code.inl { font-family: var(--mono); font-size: .88em; background: var(--surface-2);
+    padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); }
+
+  /* command block */
+  .cmd { position: relative; background: var(--code-bg); color: var(--code-ink);
+    border: 1px solid var(--code-line); border-radius: 11px; margin: 14px 0;
+    box-shadow: var(--shadow); overflow: hidden; }
+  .cmd .bar { display: flex; align-items: center; gap: 7px; padding: 9px 14px;
+    border-bottom: 1px solid var(--code-line); }
+  .cmd .dot { width: 9px; height: 9px; border-radius: 50%; background: #37414f; }
+  .cmd .tag { font-family: var(--mono); font-size: 11px; color: #7d8a9c;
+    margin-left: 6px; letter-spacing: .04em; }
+  .cmd .copy { margin-left: auto; font-family: var(--mono); font-size: 11px; color: #9fb0c6;
+    background: transparent; border: 1px solid var(--code-line); border-radius: 6px;
+    padding: 3px 9px; cursor: pointer; }
+  .cmd .copy:hover { color: #fff; border-color: var(--accent); }
+  .cmd pre { margin: 0; padding: 14px 16px; overflow-x: auto; }
+  .cmd code { font-family: var(--mono); font-size: 13.5px; line-height: 1.7; white-space: pre;
+    color: var(--code-ink); }
+  .cmd .c { color: #6f7f93; }         /* comment */
+  .cmd .p { color: #7fb0ff; }         /* python/exe */
+  .cmd .f { color: #c9a26a; }         /* flag/path */
+  .cmd .ok { color: #6fd39b; }        /* echo */
+
+  /* callout */
+  .note { border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--surface); border-radius: 10px; padding: 14px 18px; margin: 16px 0;
+    box-shadow: var(--shadow); }
+  .note.warn { border-left-color: var(--warn); }
+  .note .h { font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .note p { margin: 4px 0 0; max-width: none; }
+
+  /* tables */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px;
+    box-shadow: var(--shadow); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line);
+    vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; background: var(--surface-2); }
+  tr:last-child td { border-bottom: none; }
+  td code, th code { font-family: var(--mono); font-size: 12.5px; }
+  td.cmdcell { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11.5px; font-weight: 500;
+    padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+  .pill.good { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.crit { background: var(--crit-bg); color: var(--crit); }
+
+  /* phase cards */
+  .phase { border: 1px solid var(--line); border-radius: 13px; background: var(--surface);
+    padding: 22px 24px; margin: 16px 0; box-shadow: var(--shadow); }
+  .phase .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .phase .num { font-family: var(--mono); font-weight: 600; font-size: 13px; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 7px; padding: 2px 8px; }
+  .phase h3 { margin: 0; }
+  .phase .what { color: var(--muted); margin: 2px 0 10px; }
+  .look { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px;
+    background: var(--surface-2); border-radius: 9px; padding: 11px 14px; font-size: 14px; }
+  .look b { color: var(--ink); }
+  .look .eye { color: var(--accent); flex: none; font-family: var(--mono); font-size: 12px;
+    font-weight: 600; margin-top: 1px; }
+
+  ul.clean { margin: 8px 0; padding-left: 22px; }
+  ul.clean li { margin: 5px 0; max-width: 66ch; }
+
+  footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 0;
+    color: var(--muted); font-size: 13.5px; display: flex; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; gap: 0; }
+    nav.toc { display: none; }
+  }
+</style>
+
+<header class="top">
+  <div class="mark">C</div>
+  <div class="name">Continuum <span>&middot; Core Manual</span></div>
+  <div class="spacer"></div>
+  <button class="toggle" id="themeBtn" type="button" aria-label="Switch theme">theme: auto</button>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <p class="lbl">Contents</p>
+    <a href="#setup">Setup</a>
+    <a href="#tests">Run every test</a>
+    <a href="#phases">Using it, phase by phase</a>
+    <a href="#p1" class="mini">01 &middot; Model &amp; MCP</a>
+    <a href="#p2" class="mini">02 &middot; Govern guardrails</a>
+    <a href="#p3" class="mini">03 &middot; Enforce &amp; check</a>
+    <a href="#p4" class="mini">04 &middot; Standing report</a>
+    <a href="#apps">Web apps</a>
+    <a href="#reset">Data &amp; reset</a>
+    <a href="#limits">Known limits</a>
+    <a href="#trouble">Troubleshooting</a>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow">Operator's manual &middot; Phases 1&ndash;4</div>
+      <h1>Set up, run, and test Continuum Core</h1>
+      <p class="lede">The unified process-to-agent model, its guardrail enforcement, and the
+        governance and dashboard apps &mdash; how to stand them up and prove they work. Run every
+        command from the <code class="inl">continuum-core/</code> directory.</p>
+    </div>
+
+    <section id="setup">
+      <h2><span class="no">&sect;</span> Prerequisites &amp; one-time setup</h2>
+      <p>Python 3.10+ (developed on 3.14). The core engine is standard-library only; nothing in
+        this manual needs the network. Create a virtual environment and install the three
+        dependencies used by the server, harness, and apps.</p>
+      <div class="cmd">
+        <div class="bar"><span class="dot"></span><span class="tag">bash &middot; one-time</span>
+          <button class="copy" type="button">copy</button></div>
+        <pre><code><span class="p">cd</span> continuum-core
+<span class="p">python3</span> -m venv .venv
+<span class="p">.</span> .venv/bin/activate                 <span class="c"># Windows: .venv\Scripts\activate</span>
+<span class="p">pip</span> install -r mcp_server/requirements.txt   <span class="c"># mcp, tiktoken, jsonschema</span></code></pre>
+      </div>
+      <div class="note">
+        <p class="h">Prefer not to activate the venv?</p>
+        <p>Everything below assumes the venv is active. If you'd rather not activate it, replace
+          <code class="inl">python3</code> with <code class="inl">.venv/bin/python</code> in every command.</p>
+      </div>
+    </section>
+
+    <section id="tests">
+      <h2><span class="no">&sect;</span> Run every test</h2>
+      <p>The fastest way to confirm the whole system is healthy &mdash; 48 assertions plus 3 harness
+        checks. The chain ends with <code class="inl">ALL GREEN</code>.</p>
+      <div class="cmd">
+        <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+          <button class="copy" type="button">copy</button></div>
+        <pre><code><span class="p">python3</span> mcp_server/token_budget.py <span class="f">--validate</span> \
+  &amp;&amp; <span class="p">python3</span> mcp_server/traceability.py \
+  &amp;&amp; <span class="p">python3</span> mcp_server/scenario.py \
+  &amp;&amp; <span class="p">python3</span> governance/test_store.py \
+  &amp;&amp; <span class="p">python3</span> enforcement/test_enforce.py \
+  &amp;&amp; <span class="p">python3</span> signal/test_conformance.py \
+  &amp;&amp; <span class="p">python3</span> dashboard/test_rollup.py \
+  &amp;&amp; <span class="ok">echo "ALL GREEN"</span></code></pre>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Command</th><th>Expect</th></tr></thead>
+          <tbody>
+            <tr><td class="cmdcell">token_budget.py --validate</td><td><span class="pill good">ALL VALID</span> <span class="pill good">BUDGETS PASS</span> <span class="pill good">SWEEP UNDER BUDGET</span></td></tr>
+            <tr><td class="cmdcell">traceability.py</td><td><span class="pill good">0 error(s)</span> <span class="pill warn">3 warning(s)</span> &middot; 88% &mdash; the 3 warnings are planted on purpose</td></tr>
+            <tr><td class="cmdcell">scenario.py</td><td><span class="pill good">loop fits the budget on the wire</span></td></tr>
+            <tr><td class="cmdcell">governance/test_store.py</td><td><span class="pill good">14 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">enforcement/test_enforce.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">signal/test_conformance.py</td><td><span class="pill good">8 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">dashboard/test_rollup.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p class="h">About exit codes</p>
+        <p>All suites exit <code class="inl">0</code> on success. <code class="inl">traceability.py</code>
+          exits <code class="inl">1</code> <em>only</em> on a hard broken reference &mdash; never for the
+          expected 3 warnings, which represent deliberately planted data-quality defects.</p>
+      </div>
+    </section>
+
+    <section id="phases">
+      <h2><span class="no">&sect;</span> Using it, phase by phase</h2>
+
+      <div class="phase" id="p1">
+        <div class="head"><span class="num">01</span><h3>Model, MCP tools &amp; token budgets</h3></div>
+        <p class="what">The locked 8-entity data model, a hand-built 8-domain graph, and the three
+          agent-facing MCP tools &mdash; with &sect;08 token budgets validated by a real tokenizer.</p>
+        <div class="cmd">
+          <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+            <button class="copy" type="button">copy</button></div>
+          <pre><code><span class="p">python3</span> mcp_server/continuum_core.py        <span class="c"># the four agent payloads</span>
+<span class="p">python3</span> mcp_server/token_budget.py <span class="f">--validate</span>  <span class="c"># schemas + &sect;08 budgets</span>
+<span class="p">python3</span> mcp_server/traceability.py         <span class="c"># &sect;01/&sect;12 data-quality lint</span>
+<span class="p">python3</span> mcp_server/scenario.py             <span class="c"># agent tool loop, tokens on the wire</span></code></pre>
+        </div>
+        <div class="look"><span class="eye">LOOK</span><div><b>What to look for:</b> <code class="inl">scenario.py</code>
+          shows one agent going through allow / escalate / deny / out-of-scope, every response under
+          budget. <code class="inl">traceability.py</code> flags exactly 3 planted defects (2 orphan
+          KPIs + 1 process with no strategic parent) &mdash; proof the linter works.</div></div>
+        <h3>Register the MCP server with an agent</h3>
+        <p>Use the <b>venv</b> Python (so the <code class="inl">mcp</code> package is found) and
+          <b>absolute</b> paths. Running <code class="inl">server.py</code> directly just blocks
+          waiting on a client over stdio &mdash; that's expected.</p>
+        <div class="cmd">
+          <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+            <button class="copy" type="button">copy</button></div>
+          <pre><code><span class="p">claude</span> mcp add continuum -- \
+  <span class="f">/ABS/PATH/TO/continuum-core/.venv/bin/python</span> \
+  <span class="f">/ABS/PATH/TO/continuum-core/mcp_server/server.py</span></code></pre>
+        </div>
+      </div>
+
+      <div class="phase" id="p2">
+        <div class="head"><span class="num">02</span><h3>Govern the guardrails &mdash; edit without a deploy</h3></div>
+        <p class="what">A web app where a process owner edits a Guardrail Policy; the edit is
+          validated, versioned, and recorded (ISO 9001 &sect;7.5), and is instantly live for agents.</p>
+        <div class="cmd">
+          <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+            <button class="copy" type="button">copy</button></div>
+          <pre><code><span class="p">python3</span> governance/test_store.py   <span class="c"># prove the write path (14 asserts)</span>
+<span class="p">python3</span> governance/app.py          <span class="c"># open http://localhost:8787</span></code></pre>
+        </div>
+        <ul class="clean">
+          <li>Click a process (e.g. <code class="inl">CO.3.2.7</code>).</li>
+          <li>Change <b>Escalate if</b> from <code class="inl">risk_score &gt; 0.7</code> to <code class="inl">risk_score &gt; 0.95</code>.</li>
+          <li>Fill a <b>Reason for change</b> (required) and click <b>Save new version</b> &rarr; the badge goes <code class="inl">v3 &rarr; v4</code>.</li>
+          <li>Try an invalid condition like <code class="inl">risk_score &gt;&gt;&gt; 0.5</code> &rarr; it's <b>refused</b>, version unchanged. Bad policy can't reach agents.</li>
+        </ul>
+        <div class="look"><span class="eye">PROVE</span><div><b>One source of truth</b> &mdash; with the edit saved, an agent reading over the MCP core sees it immediately:
+          <div class="cmd" style="margin-top:10px">
+            <div class="bar"><span class="dot"></span><span class="tag">bash &middot; expect: 4 risk_score &gt; 0.95</span>
+              <button class="copy" type="button">copy</button></div>
+            <pre><code><span class="p">python3</span> -c <span class="f">"import sys; sys.path.insert(0,'mcp_server'); import continuum_core as c; g=c.Graph(); gr=g.get('GuardrailPolicy','gr.CO.3.2.7'); print(gr['version'], gr['escalate_if'])"</span></code></pre>
+          </div>
+          Reset with <code class="inl">rm data/edits.log.jsonl</code> (back to v3).</div></div>
+      </div>
+
+      <div class="phase" id="p3">
+        <div class="head"><span class="num">03</span><h3>Enforce the guardrail &amp; check the model against reality</h3></div>
+        <p class="what">The Enforcement Point (a real gate &mdash; the tool runs only on
+          <code class="inl">allow</code>) wired to a pilot agent, plus the Conformance Check that
+          compares the model to reality (&sect;06).</p>
+        <div class="cmd">
+          <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+            <button class="copy" type="button">copy</button></div>
+          <pre><code><span class="p">python3</span> enforcement/pilot_agent.py    <span class="c"># every action routed through the EP</span>
+<span class="p">python3</span> enforcement/test_enforce.py   <span class="c"># 13 asserts: tool runs ONLY on allow</span>
+<span class="p">python3</span> signal/conformance.py         <span class="c"># &sect;06 drift report (human-review-only)</span>
+<span class="p">python3</span> signal/test_conformance.py    <span class="c"># 8 asserts: never mutates the model</span></code></pre>
+        </div>
+        <div class="look"><span class="eye">LOOK</span><div><b>What to look for:</b> the pilot runs the tool
+          only on the allow case; escalate goes to a human queue; deny / out-of-scope / rate-limit block.
+          <code class="inl">conformance.py</code> reports 5 drift types &mdash; including an agent that ran
+          under a <b>stale guardrail</b> &mdash; each marked <em>needs human review</em>.</div></div>
+      </div>
+
+      <div class="phase" id="p4">
+        <div class="head"><span class="num">04</span><h3>Enforce everywhere &amp; read the standing report</h3></div>
+        <p class="what">Enforcement across <b>all</b> agent-bound tasks, and the &sect;05
+          strategy-to-execution dashboard.</p>
+        <div class="cmd">
+          <div class="bar"><span class="dot"></span><span class="tag">bash</span>
+            <button class="copy" type="button">copy</button></div>
+          <pre><code><span class="p">python3</span> enforcement/sweep.py <span class="f">--keep</span>   <span class="c"># all 8 bindings + keep the activity log</span>
+<span class="p">python3</span> dashboard/app.py             <span class="c"># open http://localhost:8788</span>
+<span class="p">python3</span> dashboard/test_rollup.py     <span class="c"># 13 asserts</span></code></pre>
+        </div>
+        <div class="look"><span class="eye">LOOK</span><div><b>On http://localhost:8788:</b> metric tiles
+          (guardrail coverage <span class="pill warn">12% &mdash; 1/8 reviewed</span>, honest; traceability 88%;
+          agent activity), each objective with its KPI status and the agent-bound tasks beneath it, the
+          coverage panel, and bottom-up traces. Two metrics read <span class="pill">needs data</span> on
+          purpose &mdash; see <a href="#limits">Known limits</a>.</div></div>
+        <div class="note warn">
+          <p class="h">The dashboard is empty until you populate it</p>
+          <p>Run <code class="inl">python3 enforcement/sweep.py --keep</code> (or <code class="inl">pilot_agent.py</code>)
+            first &mdash; the dashboard reads the agent action log those write.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="apps">
+      <h2><span class="no">&sect;</span> Web apps</h2>
+      <p>Two independent surfaces on different ports &mdash; run both at once. Each runs in the foreground;
+        stop with <code class="inl">Ctrl-C</code>, or background with a trailing <code class="inl">&amp;</code>.
+        Use <code class="inl">--port N</code> if a port is taken.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>App</th><th>Command</th><th>URL</th><th>What</th></tr></thead>
+          <tbody>
+            <tr><td>Governance editor</td><td class="cmdcell">governance/app.py</td><td><code>localhost:8787</code></td><td>edit guardrails (Phase 2)</td></tr>
+            <tr><td>Strategy dashboard</td><td class="cmdcell">dashboard/app.py</td><td><code>localhost:8788</code></td><td>standing report (Phase 4)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reset">
+      <h2><span class="no">&sect;</span> Data &amp; reset</h2>
+      <p>The model lives in <code class="inl">data/seed.json</code> (committed). Everything the running
+        system writes is runtime state, git-ignored, and safe to delete to reset.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Written by</th><th>Deleting it&hellip;</th></tr></thead>
+          <tbody>
+            <tr><td class="cmdcell">data/edits.log.jsonl</td><td>governance edits</td><td>reverts every guardrail to its <code class="inl">seed.json</code> version</td></tr>
+            <tr><td class="cmdcell">data/events.log.jsonl</td><td>agent actions</td><td>clears dashboard activity + the audit trail's agent side</td></tr>
+            <tr><td class="cmdcell">data/escalations.jsonl</td><td>escalations</td><td>empties the human escalation queue</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cmd">
+        <div class="bar"><span class="dot"></span><span class="tag">bash &middot; full reset to pristine</span>
+          <button class="copy" type="button">copy</button></div>
+        <pre><code><span class="p">rm</span> -f data/edits.log.jsonl data/events.log.jsonl data/escalations.jsonl</code></pre>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="no">&sect;</span> Known limits</h2>
+      <p>Each is gated on something this environment can't provide, and each is declared with a real
+        interface and a stand-in &mdash; never silently faked.</p>
+      <ul class="clean">
+        <li><b>Live enterprise connectors</b> (Notion, Teams, Slack, Outlook, Gmail) need OAuth. They
+          raise a clear error if called; <code class="inl">FileConnector</code> + the
+          <code class="inl">signal/*.sample.jsonl</code> fixtures stand in so the Conformance Check runs
+          for real. Enable order lives in <code class="inl">SENSITIVITY_ORDER</code>.</li>
+        <li><b>The pilot agent</b> is a deterministic Python loop, not a live LLM &mdash; it exercises the
+          Enforcement Point exactly as a real MCP/Claude agent would, without needing model access.</li>
+        <li><b>Two &sect;12 metrics show <span class="pill">needs data</span></b>: <em>escalation precision</em>
+          (needs humans to disposition escalations) and <em>drift-to-update latency</em> (needs finding +
+          resolution timestamps). Supply dispositions to <code class="inl">Rollup.metrics(...)</code> and
+          escalation precision computes.</li>
+        <li><b>Guardrail coverage is 12% (1/8)</b> by design: only the KYC guardrail was reviewed and
+          signed off; the rest run under defaults. That is the coverage metric working, not a bug.</li>
+      </ul>
+    </section>
+
+    <section id="trouble">
+      <h2><span class="no">&sect;</span> Troubleshooting</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>ModuleNotFoundError: mcp / tiktoken / jsonschema</code></td><td>venv not active or deps missing &rarr; <code class="inl">. .venv/bin/activate &amp;&amp; pip install -r mcp_server/requirements.txt</code></td></tr>
+            <tr><td><code>Address already in use</code> (8787/8788)</td><td>a server is already running &mdash; reuse it, or start with <code class="inl">--port 8790</code>. Stop the old one: <code class="inl">lsof -ti:8787 | xargs kill</code></td></tr>
+            <tr><td>The dashboard is empty</td><td>run <code class="inl">python3 enforcement/sweep.py --keep</code> first to populate the activity log</td></tr>
+            <tr><td>A guardrail shows an unexpected version</td><td>a prior governance edit is folded in &rarr; <code class="inl">rm data/edits.log.jsonl</code> resets to seed versions</td></tr>
+            <tr><td><code>traceability.py</code> exited 1</td><td>only on a hard broken reference &mdash; a ref in <code class="inl">data/seed.json</code> is dangling; the normal state is exit 0 with 3 warnings</td></tr>
+            <tr><td>Web app won't start from <code>.claude/launch.json</code></td><td>run it directly instead: <code class="inl">python3 governance/app.py</code> &mdash; the direct command is the supported path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>Continuum Core &middot; Phases 1&ndash;4</span>
+      <span>See <code class="inl">README.md</code> for architecture &middot; <code class="inl">DECISIONS.md</code> for rationale</span>
+    </footer>
+  </main>
+</div>
+
+<script>
+  // theme toggle: auto &rarr; light &rarr; dark, persisted per viewer
+  (function () {
+    var order = ["auto", "light", "dark"];
+    var root = document.documentElement;
+    var btn = document.getElementById("themeBtn");
+    var cur = "auto";
+    try { cur = localStorage.getItem("cc-theme") || "auto"; } catch (e) {}
+    function apply(t) {
+      if (t === "auto") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", t);
+      btn.textContent = "theme: " + t;
+      try { localStorage.setItem("cc-theme", t); } catch (e) {}
+    }
+    apply(cur);
+    btn.addEventListener("click", function () {
+      cur = order[(order.indexOf(cur) + 1) % order.length];
+      apply(cur);
+    });
+  })();
+
+  // copy buttons &mdash; try clipboard, fall back to selecting the text
+  document.querySelectorAll(".cmd .copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var pre = b.closest(".cmd").querySelector("pre");
+      var text = pre.innerText.replace(/ /g, " ");
+      var done = function () { var o = b.textContent; b.textContent = "copied"; setTimeout(function () { b.textContent = o; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { select(pre); });
+      } else { select(pre); }
+    });
+    function select(pre) {
+      var r = document.createRange(); r.selectNodeContents(pre);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      b.textContent = "press \u2318/Ctrl+C";
+      setTimeout(function () { b.textContent = "copy"; }, 1600);
+    }
+  });
+</script>
