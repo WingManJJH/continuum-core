@@ -5,6 +5,9 @@ This directory executes the **Immediate next steps** in §13 of *The Continuum C
 and the four-phase roadmap of §09 (Phase 2 governance, Phase 3 signal & agent, Phase 4 enterprise
 connection). Each item is a concrete, runnable deliverable.
 
+> **New here?** [`MANUAL.md`](MANUAL.md) is the step-by-step guide to setting up, running, and
+> testing everything below — start there.
+
 > **Environment note:** every live enterprise connector (Notion, Teams, Slack, Outlook, Gmail) and
 > the pilot agent LLM require OAuth/network that this build does not have. Wherever that bites, the
 > capability is declared with its real interface and **stubbed with a clear error**, and a file
