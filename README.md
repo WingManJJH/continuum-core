@@ -1,8 +1,9 @@
-# Continuum Core — Phases 1 & 2
+# Continuum Core — Phases 1–3
 
 This directory executes the **Immediate next steps** in §13 of *The Continuum Core Model*
 (`../Continuum Core Model.rtf`), the follow-on decisions ratified in [`DECISIONS.md`](DECISIONS.md),
-and the **Phase-2 governance module** (§09). Each item is a concrete, runnable deliverable.
+and the **Phase-2 governance** and **Phase-3 signal & agent** modules (§09). Each item is a
+concrete, runnable deliverable.
 
 **Phase 1 — Foundation (§13):**
 
@@ -21,6 +22,14 @@ and the **Phase-2 governance module** (§09). Each item is a concrete, runnable 
 | Risk / control linkage live | Linked Risk & Control panel in the editor | [`governance/`](governance/) |
 | Audit log finalized against ISO 9001 §7.5 | Change-control + agent-action trail; §7.5 requirement→mechanism map | [`schema/AUDIT-LOG.md`](schema/AUDIT-LOG.md) |
 
+**Phase 3 — Signal & agent infrastructure (§09):**
+
+| Phase-3 item | Deliverable | Where |
+|---|---|---|
+| MCP server ships (get_task_context / check_guardrail / log_action) | shipped in Phase 1, now fronted by the Enforcement Point | [`mcp_server/server.py`](mcp_server/server.py) |
+| Enforcement Point built + wired to one pilot agent | real gate (execute only on allow; escalate/deny; rate limit) + pilot agent | [`enforcement/`](enforcement/README.md) |
+| Signal Layer (Notion/Outlook first) feeds Conformance Check (§06) | connector interface (+ file stand-in; live connectors need OAuth) + drift engine | [`signal/`](signal/README.md) |
+
 ## Quick start
 
 ```bash
@@ -36,6 +45,12 @@ python3 mcp_server/scenario.py                  # walk an agent through the MCP 
 # Phase 2 — governance module (editable guardrails)
 python3 governance/test_store.py                # write-path assertions (versioning, §7.5 trail, one-source-of-truth)
 python3 governance/app.py                       # http://localhost:8787 — the editor UI
+
+# Phase 3 — signal & agent infrastructure
+python3 enforcement/pilot_agent.py              # pilot agent; every action routed through the Enforcement Point
+python3 enforcement/test_enforce.py             # 13 asserts: tool runs only on allow; escalate/deny; rate limit
+python3 signal/conformance.py                   # §06 Conformance Check: model vs. reality (drift report)
+python3 signal/test_conformance.py              # 8 asserts incl. "conformance never mutates the model"
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -113,6 +128,26 @@ design-partner demo from [`design-partner/validation-guide.md`](design-partner/v
 a retention-policy engine, and consolidating the two logs into one signed store. The §7.5
 *content* requirements are met; the tamper-evidence *hardening* is named, not assumed.
 
+## What Phase 3 proves (signal & agent infrastructure)
+
+**The guardrail is a gate, not advice.** The [Enforcement Point](enforcement/README.md) runs the
+underlying tool **only** on an `allow` decision — `escalate` queues for a human and runs nothing,
+`deny` blocks, and stateful rate limiting caps a looping agent. A pilot agent, whose only path to
+acting is `ep.act(...)`, demonstrated all branches; a test asserts the tool ran exactly on the allows
+(13 assertions). This is §11's "only sanctioned path" enforced in code, and it closes the Phase-1
+"rate limiting not enforced" note.
+
+**The model stays honest against reality.** The [Conformance Check](signal/README.md) (§06) compares
+the documented model with the agent execution log and external signals, surfacing five drift types —
+including an agent running against a **stale guardrail** (the §06 early-warning). Per §06 it only
+*surfaces*: every finding needs human review and the Check never writes to the model (asserted).
+
+**Honest edge:** live Notion/Outlook connectors need OAuth (unavailable in this build) — they're
+declared with their scopes and raise a clear error, while a file connector stands in so the drift
+engine is exercised for real. Swap them in once authorized; the interface is unchanged.
+
+Run: `python3 enforcement/pilot_agent.py && python3 signal/conformance.py`.
+
 ## Layout
 
 ```
@@ -139,6 +174,18 @@ continuum-core/
 │   ├── store.py                #   validated, versioned edit path (write backbone)
 │   ├── test_store.py           #   write-path assertions
 │   ├── static/                 #   vanilla-JS three-pane editor (index.html/styles.css/app.js)
+│   └── README.md
+├── enforcement/                # Phase 3 — the Enforcement Point (§04 gate)
+│   ├── enforce.py              #   execute-only-on-allow, escalate/deny, rate limiting
+│   ├── pilot_agent.py          #   a pilot agent that can only act through the EP
+│   ├── test_enforce.py         #   invariant + branch + rate-limit assertions
+│   └── README.md
+├── signal/                     # Phase 3 — Signal Layer + Conformance Check (§06)
+│   ├── connectors.py           #   SignalConnector + FileConnector (+ Notion/Outlook OAuth stubs)
+│   ├── conformance.py          #   drift engine: model vs. reality, human-review-only
+│   ├── signals.sample.jsonl    #   fixture external activity
+│   ├── agent_events.sample.jsonl # fixture agent-log events
+│   ├── test_conformance.py     #   drift-detection + non-mutation assertions
 │   └── README.md
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json

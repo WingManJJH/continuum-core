@@ -1,0 +1,3 @@
+{"ts": "2026-08-25T08:00:00Z", "entity_type": "Task", "entity_id": "CO.3.2.7.t3", "actor": {"kind": "agent", "id": "agent.kyc_verifier"}, "payload": {"action": "verify_document", "outcome": "success", "guardrail_version": "gr.CO.3.2.7.v2"}}
+{"ts": "2026-08-25T08:05:00Z", "entity_type": "Task", "entity_id": "CO.3.2.7.t3", "actor": {"kind": "agent", "id": "agent.kyc_verifier"}, "payload": {"action": "summarize_case", "outcome": "success", "guardrail_version": "gr.CO.3.2.7.v3"}}
+{"ts": "2026-08-25T08:10:00Z", "entity_type": "Task", "entity_id": "CO.3.2.7.t3", "actor": {"kind": "agent", "id": "agent.kyc_verifier"}, "payload": {"action": "verify_document", "outcome": "success", "guardrail_version": "gr.CO.3.2.7.v3"}}

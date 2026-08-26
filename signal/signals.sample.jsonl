@@ -1,0 +1,4 @@
+{"ts": "2026-08-25T09:00:00Z", "source": "notion", "process": "CO.3.2.7", "task": "CO.3.2.7.t3", "action": "verify_document", "actor": "role.ops.support_tier1"}
+{"ts": "2026-08-25T09:05:00Z", "source": "notion", "process": "CO.3.2.7", "task": "CO.3.2.7.t3", "action": "escalate_to_fraud_team", "actor": "role.ops.support_tier1"}
+{"ts": "2026-08-25T09:10:00Z", "source": "outlook", "process": "CO.3.2.7", "task": "CO.3.2.7.t5", "action": "send_welcome_email", "actor": "role.ops.support_tier1"}
+{"ts": "2026-08-25T09:15:00Z", "source": "slack", "process": "XX.9.9.9", "task": null, "action": "manual_refund", "actor": "role.ops.support_lead"}

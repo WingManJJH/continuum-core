@@ -6,6 +6,37 @@ something concrete. Newest first.
 
 ---
 
+## 2026-08-26 — Phase 3 kickoff
+
+### D7 — Signal & agent infrastructure shipped (Phase 3 §09)
+**Context:** Phase 3 = MCP server ships (done Phase 1) + Enforcement Point built and wired to a
+pilot agent + Signal Layer (Notion/Outlook first) feeding the Conformance Check (§06).
+**Decision & build:**
+- **Enforcement Point** (`enforcement/enforce.py`) — the generic gate of §04 Figure 3, now a real
+  mediator: the underlying tool runs ONLY on an `allow` decision; `escalate` queues for a human and
+  runs nothing; `deny` blocks and logs; stateful sliding-window **rate limiting** is enforced (closing
+  the Phase-1 "not enforced" note). It holds no policy — reads the guardrail via continuum_core — and
+  is the only sanctioned path to the tool (§11), enforced in code. Wired to a **pilot agent**
+  (`enforcement/pilot_agent.py`) that can only act through the EP. 13 assertions pass.
+- **Signal Layer + Conformance Check** (`signal/`) — `conformance.py` compares the documented model
+  against reality (external signals + the agent execution log) and surfaces five drift types
+  (stale_guardrail, off_model_action, coverage_gap, undocumented_step, shadow_process). Per §06 drift
+  is surfaced only — every finding `requires_human_review`, nothing writes to the model. 8 assertions
+  pass, including "conformance never mutates the model".
+**Sub-decisions / honest edges:**
+- **Live Notion/Outlook connectors need OAuth, unavailable in this build.** `signal/connectors.py`
+  declares them with their required scopes and raises a clear error; `FileConnector` stands in with
+  fixtures so the conformance engine is exercised for real. Swap connectors in once authorized —
+  the interface is unchanged.
+- Escalation queue (`data/escalations.jsonl`) and audit/edit logs are runtime state (git-ignored).
+- Rate-limit state is in-memory (fine for the pilot); a shared store is a later hardening.
+
+### D6 sequencing note
+Phase 3 followed Phase 2 at the user's direction; the design-partner calls (D5) remain the one open
+human action and are unblocked by — not dependent on — the agent infrastructure here.
+
+---
+
 ## 2026-08-26 — Phase 2 kickoff
 
 ### D6 — Governance module shipped (Phase 2 §09)
