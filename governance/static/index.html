@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Continuum · Governance</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Continuum <span>· Governance</span></div>
+    <div class="tagline">Edit what an agent is allowed to do — versioned, no engineering ticket.</div>
+  </header>
+
+  <main>
+    <!-- LEFT: processes -->
+    <aside id="processes" class="pane">
+      <h2>Processes</h2>
+      <ul id="proc-list" class="proc-list"><li class="muted">loading…</li></ul>
+    </aside>
+
+    <!-- CENTER: guardrail editor -->
+    <section id="editor" class="pane">
+      <div id="editor-empty" class="muted center">Select a process to edit its guardrail policy.</div>
+      <form id="editor-form" hidden>
+        <div class="editor-head">
+          <div>
+            <div id="gr-id" class="gr-id"></div>
+            <div id="gr-proc" class="muted small"></div>
+          </div>
+          <div id="gr-version" class="version-badge"></div>
+        </div>
+
+        <label>Allowed actions <span class="hint">agent may do these unattended · comma-separated</span>
+          <textarea id="f-allowed" rows="2"></textarea></label>
+
+        <label>Forbidden actions <span class="hint">explicit deny-list (audit sees deliberate exclusions)</span>
+          <textarea id="f-forbidden" rows="2"></textarea></label>
+
+        <label>Escalate if <span class="hint">condition routes to a human · e.g. risk_score &gt; 0.7</span>
+          <input id="f-escalate" type="text" autocomplete="off"></label>
+
+        <label>Data scope <span class="hint">exact fields the agent may touch · least privilege</span>
+          <textarea id="f-scope" rows="2"></textarea></label>
+
+        <div class="row">
+          <label class="half">Rate limit — actions
+            <input id="f-rate-max" type="number" min="1"></label>
+          <label class="half">per seconds
+            <input id="f-rate-per" type="number" min="1"></label>
+        </div>
+
+        <div class="row">
+          <label class="half">Escalation path <span class="hint">a role, not a person</span>
+            <input id="f-escpath" type="text"></label>
+          <label class="half">Audit requirement
+            <select id="f-audit">
+              <option value="timestamp_outcome">timestamp_outcome</option>
+              <option value="inputs_outputs">inputs_outputs</option>
+              <option value="full_capture">full_capture</option>
+            </select></label>
+        </div>
+
+        <fieldset class="review-box">
+          <legend>Change control <span class="hint">required · ISO 9001 §7.5</span></legend>
+          <div class="row">
+            <label class="half">Your role
+              <input id="f-actor" type="text" value="role.ops.support_lead"></label>
+            <label class="half">Reviewer role
+              <input id="f-reviewer" type="text" value="role.qms.iso_advisor"></label>
+          </div>
+          <label>Reason for change
+            <input id="f-reason" type="text" placeholder="why are you changing this policy?"></label>
+        </fieldset>
+
+        <div id="msg" class="msg" hidden></div>
+        <div class="actions">
+          <button type="button" id="btn-reset" class="ghost">Reset</button>
+          <button type="submit" id="btn-save">Save new version</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- RIGHT: risk / history / audit -->
+    <aside id="side" class="pane">
+      <nav class="tabs">
+        <button data-tab="risk" class="active">Risk &amp; Control</button>
+        <button data-tab="history">History</button>
+        <button data-tab="audit">Audit</button>
+      </nav>
+      <div id="tab-risk" class="tab"></div>
+      <div id="tab-history" class="tab" hidden></div>
+      <div id="tab-audit" class="tab" hidden></div>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

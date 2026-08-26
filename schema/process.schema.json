@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/process",
+  "title": "Process",
+  "description": "The ISO 9001 §4.4 process object and the join point for the whole graph (Core Model §02, §10). Its apqc_code is the canonical key a KPI, a guardrail, and an agent binding for the same process all reference. Every field here is one an ISO auditor reads AND one an agent's guardrail check reads — the same object, not a parallel artifact. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "apqc_code", "name", "owner_role", "inputs", "outputs", "guardrail_ref", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Canonical id == apqc_code. The stable id other objects reference, independent of renames.",
+      "pattern": "^[A-Z]{2}\\.[0-9]+(\\.[0-9]+)*$"
+    },
+    "apqc_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}\\.[0-9]+(\\.[0-9]+)*$",
+      "description": "Position in the APQC Process Classification Framework. Equals id; carried explicitly so the join semantics are self-documenting."
+    },
+    "name": {"type": "string", "maxLength": 160},
+    "owner_role": {
+      "type": "string",
+      "pattern": "^role\\.[a-z0-9_.]+$",
+      "description": "Single accountable owner (ISO 9001 §4.4). One role, never a team or list. A null owner is a flagged defect."
+    },
+    "inputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/typed_ref"},
+      "description": "Typed data/artifact references, not free text — this is what makes conformance checking possible (§06)."
+    },
+    "outputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/typed_ref"}
+    },
+    "interfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Upstream/downstream process handoffs (ISO 9001 §4.4 sequence & interaction).",
+      "properties": {
+        "upstream": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"}},
+        "downstream": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"}}
+      }
+    },
+    "kpi_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^kpi\\.[a-z0-9_.]+$"},
+      "description": "KPIs this process moves — and through them, the objectives above (§05 rollup path)."
+    },
+    "risk_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^rc\\.[a-z0-9_.]+$"}
+    },
+    "guardrail_ref": {
+      "type": "string",
+      "pattern": "^gr\\.[A-Z0-9._]+$",
+      "description": "The Guardrail Policy governing any automated action in this process (§04). Inherited by every task unless the task overrides it."
+    },
+    "maturity_score": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 5,
+      "description": "ISO 9004 self-assessment (1–5), tracked over versions."
+    },
+    "version": {"type": "integer", "minimum": 1, "description": "Every change is a new version, never an overwrite (ISO 9001 §7.5)."},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  },
+  "$defs": {
+    "typed_ref": {
+      "type": "object",
+      "required": ["ref", "type"],
+      "additionalProperties": false,
+      "description": "A typed handle to a data object/artifact, e.g. {ref:'customer.kyc_doc', type:'document'}.",
+      "properties": {
+        "ref": {"type": "string", "pattern": "^[a-z0-9_.]+$"},
+        "type": {"type": "string", "enum": ["document", "record", "field", "artifact", "signal", "decision"]}
+      }
+    }
+  }
+}

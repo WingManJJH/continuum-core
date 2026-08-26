@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/agent-binding",
+  "title": "Agent Binding",
+  "description": "The concrete 'an agent can be bound to a task' object (Core Model §02, business plan §6). Referenced as agent.* in a task's performed_by. The binding names the MCP tool and model; WHAT it may do is never on the binding — that lives on the Guardrail Policy the task resolves, so behavior changes by editing a policy, not redeploying a binding. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "task_ref", "mcp_tool", "model", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^agent\\.[a-z0-9_.]+$", "description": "e.g. agent.kyc_verifier."},
+    "task_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+\\.t[0-9]+$", "description": "The task this agent is bound to."},
+    "mcp_tool": {"type": "string", "description": "The MCP tool/server the agent acts through. For any guardrailed task this must be the only sanctioned path to the actionable system (§11 bypass risk)."},
+    "model": {"type": "string", "description": "Model identifier the binding runs on, e.g. claude-opus-4-8. Recorded for audit/repro, not for enforcement."},
+    "guardrail_ref": {
+      "type": ["string", "null"],
+      "pattern": "^gr\\.[A-Z0-9._]+$",
+      "description": "Usually null — the effective guardrail is resolved from the task/process. Set only to pin a binding-specific override."
+    },
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/task",
+  "title": "Task / Activity",
+  "description": "One step inside a process (Core Model §02). The unit an agent is actually bound to and the unit get_task_context() returns (§03, §07). data_scope here is the least-privilege boundary the guardrail enforces. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "process_ref", "seq", "name", "inputs", "outputs", "data_scope", "performed_by", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}\\.[0-9.]+\\.t[0-9]+$",
+      "description": "Fully-qualified task id, e.g. CO.3.2.7.t3 — process apqc_code + '.t' + step. Globally unique, self-locating."
+    },
+    "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$", "description": "The owning process (apqc_code)."},
+    "seq": {"type": "integer", "minimum": 1, "description": "Sequence position within the process."},
+    "name": {"type": "string", "maxLength": 160},
+    "inputs": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_.]+$"}, "description": "Data refs consumed. Flat ids in the agent package."},
+    "outputs": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_.]+$"}},
+    "data_scope": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9_.]+$"},
+      "description": "The exact fields/records any actor on this task may touch — least privilege. The guardrail's data_scope defaults to this."
+    },
+    "kpi_refs": {"type": "array", "items": {"type": "string", "pattern": "^kpi\\.[a-z0-9_.]+$"}},
+    "performed_by": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Who may perform this task — a human role, an agent binding, or (the common case) both, with the guardrail deciding per-action which is allowed.",
+      "items": {"type": "string", "pattern": "^(role|agent)\\.[a-z0-9_.]+$"}
+    },
+    "guardrail_ref": {
+      "type": ["string", "null"],
+      "pattern": "^gr\\.[A-Z0-9._]+$",
+      "description": "Task-level override. null = inherit the owning process's guardrail_ref (§02: inherit down unless overridden explicitly)."
+    },
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

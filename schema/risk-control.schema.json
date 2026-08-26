@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/risk-control",
+  "title": "Risk & Control",
+  "description": "A register entry attached at the process level (Core Model §02, 'carries'). Links the process to the risk it runs and the control mitigating it, so a guardrail's escalate_if can be traced to the risk it exists to contain. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "process_ref", "risk", "likelihood", "impact", "control", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^rc\\.[a-z0-9_.]+$", "description": "e.g. rc.kyc_false_verify."},
+    "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
+    "risk": {"type": "string", "description": "The risk statement."},
+    "likelihood": {"type": "integer", "minimum": 1, "maximum": 5},
+    "impact": {"type": "integer", "minimum": 1, "maximum": 5},
+    "control": {"type": "string", "description": "The mitigating control."},
+    "control_type": {"type": "string", "enum": ["preventive", "detective", "corrective"]},
+    "guardrail_ref": {
+      "type": ["string", "null"],
+      "pattern": "^gr\\.[A-Z0-9._]+$",
+      "description": "The guardrail that operationalizes this control for agent actions, if any — the concrete link between a risk register entry and enforcement."
+    },
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

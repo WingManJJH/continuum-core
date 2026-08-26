@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/guardrail-policy",
+  "title": "Guardrail Policy",
+  "description": "The model AS an enforcement layer (Core Model §04). Data, not code: a versioned object a process owner edits without a deploy, that a generic Enforcement Point reads to allow / escalate / deny an agent action before it executes. Every edit is a new version; every logged agent action cites the version it acted under, so a later dispute resolves against the policy that actually applied. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "attaches_to", "allowed_actions", "forbidden_actions", "escalate_if", "data_scope", "escalation_path", "audit_requirement", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^gr\\.[A-Z0-9._]+$",
+      "description": "Stable id, e.g. gr.CO.3.2.7. The version is a separate field; the agent-facing ref pins both (e.g. gr.CO.3.2.7.v3)."
+    },
+    "attaches_to": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "additionalProperties": false,
+      "description": "Where this policy hangs. process = inherited by all tasks beneath; task = an explicit override.",
+      "properties": {
+        "kind": {"type": "string", "enum": ["process", "task"]},
+        "ref": {"type": "string", "description": "apqc_code for a process, or full task id for a task."}
+      }
+    },
+    "allowed_actions": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+      "description": "Explicit allow-list of action types the agent may take unattended within this step. Everything not listed is implicitly denied; forbidden_actions makes specific exclusions auditable."
+    },
+    "forbidden_actions": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+      "description": "Explicit deny-list — kept separate from 'everything not allowed' so an audit shows what was deliberately excluded, not just omitted."
+    },
+    "escalate_if": {
+      "type": ["string", "null"],
+      "description": "Boolean condition expression over scoped fields (risk score, transaction size, tier, confidence) that routes to a human instead of auto-executing. null = never escalate on condition. Grammar in guardrail-template/DEFAULT-GUARDRAIL-TEMPLATE.md."
+    },
+    "data_scope": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9_.]+$"},
+      "description": "Exact fields/records the agent may read or write — least privilege by default, never 'the whole customer record'."
+    },
+    "rate_limit": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Bound on action frequency per agent per window — contains a looping/misbehaving agent automatically. null = inherit tenant default.",
+      "properties": {
+        "max_actions": {"type": "integer", "minimum": 1},
+        "per_seconds": {"type": "integer", "minimum": 1}
+      },
+      "required": ["max_actions", "per_seconds"]
+    },
+    "escalation_path": {
+      "type": "string",
+      "pattern": "^role\\.[a-z0-9_.]+$",
+      "description": "Who gets the escalation — a ROLE, not a person, so coverage survives staff turnover."
+    },
+    "audit_requirement": {
+      "type": "string",
+      "enum": ["timestamp_outcome", "inputs_outputs", "full_capture"],
+      "description": "What must be logged for this action class. timestamp_outcome = lightest; full_capture = full input/output + reasoning for high-stakes actions."
+    },
+    "version": {"type": "integer", "minimum": 1, "description": "Monotonic. Bumped on every edit. An in-flight agent session pins the version it read (§04 'why versioned, not just logged')."},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ISO 9001 §7.5 review/approval trail for this policy version.",
+      "properties": {
+        "reviewed_by": {"type": "string"},
+        "reviewed_at": {"type": "string", "format": "date-time"},
+        "note": {"type": "string"}
+      }
+    }
+  }
+}

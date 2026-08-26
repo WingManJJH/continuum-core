@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/human-role",
+  "title": "Human Role",
+  "description": "A role at the bottom of the spine (Core Model §02). Referenced as role.* by owners, performers, and escalation paths. A role, never a named individual — coverage survives turnover. LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["id", "name", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^role\\.[a-z0-9_.]+$", "description": "e.g. role.ops.support_tier1."},
+    "name": {"type": "string", "maxLength": 120},
+    "raci": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RACI standing this role tends to hold; per-task RACI is expressed via performed_by + ownership on the process/task.",
+      "properties": {
+        "responsible": {"type": "boolean"},
+        "accountable": {"type": "boolean"},
+        "consulted": {"type": "boolean"},
+        "informed": {"type": "boolean"}
+      }
+    },
+    "skills": {"type": "array", "items": {"type": "string"}, "description": "Human-facing capability tags. Not served in the agent package."},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

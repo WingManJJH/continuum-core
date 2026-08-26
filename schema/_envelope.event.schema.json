@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/event-envelope",
+  "title": "Event Envelope",
+  "description": "Every write to the object graph is an immutable event, never an in-place overwrite (ISO 9001 §7.5 document control + event-sourced engineering discipline, one mechanism serving both — Core Model §07). Current entity state is a fold over its event stream. This envelope is LOCKED for Phase 1.",
+  "type": "object",
+  "required": ["event_id", "ts", "entity_type", "entity_id", "op", "to_version", "actor", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt_[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID-style monotonic event id (evt_ prefix). Sortable by creation time."
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp the event was recorded."
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": ["StrategicObjective", "KPI", "Process", "Task", "HumanRole", "AgentBinding", "GuardrailPolicy", "RiskControl"],
+      "description": "Which entity kind this event mutates."
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "Stable id of the entity (e.g. process apqc_code CO.3.2.7, or gr.CO.3.2.7). Constant across all versions."
+    },
+    "op": {
+      "type": "string",
+      "enum": ["create", "update", "deprecate", "restore"],
+      "description": "create = first version; update = new version supersedes prior; deprecate = retire without deleting (records are never hard-deleted); restore = reinstate a deprecated entity as a new version."
+    },
+    "from_version": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "The version this event supersedes. null only for op=create."
+    },
+    "to_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The version this event produces. Monotonic per entity_id."
+    },
+    "actor": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "description": "Who caused the write. An agent action cites the guardrail version it acted under here or in the payload.",
+      "properties": {
+        "kind": {"type": "string", "enum": ["human", "agent", "system"]},
+        "id": {"type": "string", "description": "role.* for a human, agent binding id for an agent, or 'system' for a migration/job."}
+      }
+    },
+    "reason": {
+      "type": "string",
+      "description": "Free-text change note (ISO 9001 §7.5 review/approval trail). Not served to agents."
+    },
+    "payload": {
+      "type": "object",
+      "description": "The full entity body at to_version, validating against that entity_type's schema. Stored whole (snapshot-per-event) so any historical version is reconstructable without replaying deltas."
+    }
+  }
+}

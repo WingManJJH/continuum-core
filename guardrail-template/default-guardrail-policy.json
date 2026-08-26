@@ -1,0 +1,34 @@
+{
+  "id": "gr.DEFAULT",
+  "attaches_to": {"kind": "process", "ref": "TEMPLATE"},
+  "allowed_actions": [
+    "read_record",
+    "summarize",
+    "classify",
+    "add_note",
+    "request_information",
+    "flag_for_review",
+    "draft_response"
+  ],
+  "forbidden_actions": [
+    "approve",
+    "reject_final",
+    "disburse_funds",
+    "modify_permissions",
+    "delete_record",
+    "send_external",
+    "close_case"
+  ],
+  "escalate_if": "risk_score > 0.7 or confidence < 0.6",
+  "data_scope": [],
+  "rate_limit": {"max_actions": 60, "per_seconds": 60},
+  "escalation_path": "role.process_owner",
+  "audit_requirement": "inputs_outputs",
+  "version": 1,
+  "status": "active",
+  "review": {
+    "reviewed_by": "role.qms.iso_advisor",
+    "reviewed_at": "2026-08-26T00:00:00Z",
+    "note": "SIGNED OFF for Phase 1 by the fractional QMS/ISO advisor (2026-08-26). Permissive within a read/draft/flag action set that cannot mutate external state or make a final decision; every irreversible or outward-facing action is explicitly forbidden, not merely omitted, so an ISO 9001 audit sees deliberate exclusions. data_scope ships EMPTY: instantiation copies the target task's data_scope so the agent gets least privilege by construction, never the whole record. Tighten from observed incidents, never the reverse (Core Model §11)."
+  }
+}

@@ -1,0 +1,1759 @@
+{
+  "_note": "Hand-built Phase-1 seed graph: 8 processes across 8 APQC domains (Core Model \u00a713 step 4 \u2014 widen before UI). Includes deliberate variety for the harness: a financial-threshold escalate_if (FN/SC), a task-level guardrail override stricter than its process (IT.8.4.2.t3), an orphaned KPI (kpi.unused_metric), and a process with no strategic parent (HR.7.2.5 via kpi.applicant_pass_rate). CO.3.2.7.t3 + gr.CO.3.2.7 v3 reproduce the \u00a703 worked example verbatim.",
+  "model_sig": "2026-08-r2",
+  "StrategicObjective": [
+    {
+      "id": "obj.reduce_onboarding_friction",
+      "name": "Cut customer onboarding friction without loosening KYC",
+      "description": "Faster verified onboarding is the top FY26 growth lever; must not cost KYC accuracy.",
+      "owner_role": "role.ops.head_of_operations",
+      "horizon": "FY2026",
+      "target": {
+        "statement": "Median time-to-verify under 4h with error rate <= 1%",
+        "metric_value": 4,
+        "metric_unit": "hours"
+      },
+      "kpi_refs": [
+        "kpi.time_to_verify",
+        "kpi.error_rate"
+      ],
+      "version": 2,
+      "status": "active"
+    },
+    {
+      "id": "obj.improve_working_capital",
+      "name": "Improve working capital efficiency",
+      "owner_role": "role.finance.cfo",
+      "horizon": "FY2026",
+      "target": {
+        "statement": "Shorten expense and PO cycle times",
+        "metric_value": null,
+        "metric_unit": null
+      },
+      "kpi_refs": [
+        "kpi.expense_cycle_time",
+        "kpi.po_cycle_time"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "obj.grow_qualified_pipeline",
+      "name": "Grow qualified sales pipeline",
+      "owner_role": "role.sales.cro",
+      "horizon": "2026-Q4",
+      "target": {
+        "statement": "Lift inbound lead conversion to 25%",
+        "metric_value": 25,
+        "metric_unit": "percent"
+      },
+      "kpi_refs": [
+        "kpi.lead_conversion"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "obj.strengthen_security_posture",
+      "name": "Strengthen access-control posture",
+      "owner_role": "role.it.ciso",
+      "horizon": "FY2026",
+      "target": {
+        "statement": "Access reviews inside SLA >= 95%",
+        "metric_value": 95,
+        "metric_unit": "percent"
+      },
+      "kpi_refs": [
+        "kpi.access_review_sla"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "obj.raise_product_quality",
+      "name": "Raise product quality responsiveness",
+      "owner_role": "role.eng.vp",
+      "horizon": "FY2026",
+      "target": {
+        "statement": "Median defect resolution under 48h",
+        "metric_value": 48,
+        "metric_unit": "hours"
+      },
+      "kpi_refs": [
+        "kpi.defect_resolution_time"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "obj.accelerate_strategic_planning",
+      "name": "Accelerate the annual planning cycle",
+      "owner_role": "role.exec.ceo",
+      "horizon": "FY2026",
+      "target": {
+        "statement": "Close the annual plan in under 30 days",
+        "metric_value": 30,
+        "metric_unit": "days"
+      },
+      "kpi_refs": [
+        "kpi.strategy_cycle_time"
+      ],
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "KPI": [
+    {
+      "id": "kpi.time_to_verify",
+      "name": "Median time to verify KYC",
+      "formula": "median(verified_at - submitted_at) over rolling_30d",
+      "unit": "hours",
+      "direction": "lower_is_better",
+      "target": 4,
+      "live_value": 6.2,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.reduce_onboarding_friction"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.error_rate",
+      "name": "KYC verification error rate",
+      "formula": "count(reversed)/count(verifications)*100 over rolling_30d",
+      "unit": "percent",
+      "direction": "lower_is_better",
+      "target": 1.0,
+      "live_value": 0.7,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.reduce_onboarding_friction"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.expense_cycle_time",
+      "name": "Expense reimbursement cycle time",
+      "formula": "median(paid_at - submitted_at) over rolling_30d",
+      "unit": "days",
+      "direction": "lower_is_better",
+      "target": 3,
+      "live_value": 4.5,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.improve_working_capital"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.po_cycle_time",
+      "name": "Purchase-order approval cycle time",
+      "formula": "median(approved_at - raised_at) over rolling_30d",
+      "unit": "days",
+      "direction": "lower_is_better",
+      "target": 5,
+      "live_value": 4.2,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.improve_working_capital"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.lead_conversion",
+      "name": "Inbound lead conversion rate",
+      "formula": "count(converted)/count(qualified)*100 over rolling_90d",
+      "unit": "percent",
+      "direction": "higher_is_better",
+      "target": 25,
+      "live_value": 19,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.grow_qualified_pipeline"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.access_review_sla",
+      "name": "Access reviews completed within SLA",
+      "formula": "count(in_sla)/count(reviews)*100 over rolling_30d",
+      "unit": "percent",
+      "direction": "higher_is_better",
+      "target": 95,
+      "live_value": 97,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.strengthen_security_posture"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.defect_resolution_time",
+      "name": "Median defect resolution time",
+      "formula": "median(resolved_at - reported_at) over rolling_30d",
+      "unit": "hours",
+      "direction": "lower_is_better",
+      "target": 48,
+      "live_value": 61,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.raise_product_quality"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.strategy_cycle_time",
+      "name": "Annual planning cycle time",
+      "formula": "plan_closed_at - plan_started_at",
+      "unit": "days",
+      "direction": "lower_is_better",
+      "target": 30,
+      "live_value": 28,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [
+        "obj.accelerate_strategic_planning"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.applicant_pass_rate",
+      "name": "Applicant screen pass rate",
+      "formula": "count(advanced)/count(screened)*100 over rolling_90d",
+      "unit": "percent",
+      "direction": "higher_is_better",
+      "target": 40,
+      "live_value": 35,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "kpi.unused_metric",
+      "name": "Legacy metric (unreferenced)",
+      "formula": "legacy_formula",
+      "unit": "percent",
+      "direction": "higher_is_better",
+      "target": 50,
+      "live_value": null,
+      "as_of": "2026-08-24T00:00:00Z",
+      "objective_refs": [],
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "Process": [
+    {
+      "id": "CO.3.2.7",
+      "apqc_code": "CO.3.2.7",
+      "name": "Verify customer identity (KYC)",
+      "owner_role": "role.ops.support_lead",
+      "inputs": [
+        {
+          "ref": "customer.kyc_doc",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "customer.verified",
+          "type": "decision"
+        }
+      ],
+      "interfaces": {
+        "upstream": [
+          "CO.3.2.6"
+        ],
+        "downstream": [
+          "CO.3.2.8"
+        ]
+      },
+      "kpi_refs": [
+        "kpi.time_to_verify",
+        "kpi.error_rate"
+      ],
+      "risk_refs": [
+        "rc.kyc_false_verify"
+      ],
+      "guardrail_ref": "gr.CO.3.2.7",
+      "maturity_score": 3,
+      "version": 4,
+      "status": "active"
+    },
+    {
+      "id": "FN.9.3.1",
+      "apqc_code": "FN.9.3.1",
+      "name": "Process expense reimbursement",
+      "owner_role": "role.finance.ap_lead",
+      "inputs": [
+        {
+          "ref": "expense.claim",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "expense.payment_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.expense_cycle_time"
+      ],
+      "risk_refs": [
+        "rc.expense_fraud"
+      ],
+      "guardrail_ref": "gr.FN.9.3.1",
+      "maturity_score": 3,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SC.4.3.6",
+      "apqc_code": "SC.4.3.6",
+      "name": "Approve purchase order",
+      "owner_role": "role.ops.procurement_lead",
+      "inputs": [
+        {
+          "ref": "po.request",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "po.approval_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.po_cycle_time"
+      ],
+      "guardrail_ref": "gr.SC.4.3.6",
+      "maturity_score": 2,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "MS.3.5.2",
+      "apqc_code": "MS.3.5.2",
+      "name": "Qualify inbound lead",
+      "owner_role": "role.sales.sdr_manager",
+      "inputs": [
+        {
+          "ref": "lead.inbound",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "lead.routing_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.lead_conversion"
+      ],
+      "guardrail_ref": "gr.MS.3.5.2",
+      "maturity_score": 2,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "IT.8.4.2",
+      "apqc_code": "IT.8.4.2",
+      "name": "Grant system access request",
+      "owner_role": "role.it.security_lead",
+      "inputs": [
+        {
+          "ref": "request.access",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "request.grant_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.access_review_sla"
+      ],
+      "risk_refs": [
+        "rc.unauthorized_access"
+      ],
+      "guardrail_ref": "gr.IT.8.4.2",
+      "maturity_score": 3,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "PD.2.4.1",
+      "apqc_code": "PD.2.4.1",
+      "name": "Triage product defect report",
+      "owner_role": "role.eng.support_triage",
+      "inputs": [
+        {
+          "ref": "defect.report",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "defect.triage_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.defect_resolution_time"
+      ],
+      "guardrail_ref": "gr.PD.2.4.1",
+      "maturity_score": 3,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "HR.7.2.5",
+      "apqc_code": "HR.7.2.5",
+      "name": "Screen job applicant",
+      "owner_role": "role.people.recruiting_lead",
+      "inputs": [
+        {
+          "ref": "applicant.application",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "applicant.screen_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.applicant_pass_rate"
+      ],
+      "guardrail_ref": "gr.HR.7.2.5",
+      "maturity_score": 2,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SV.1.2.3",
+      "apqc_code": "SV.1.2.3",
+      "name": "Approve annual strategic plan",
+      "owner_role": "role.exec.coo",
+      "inputs": [
+        {
+          "ref": "plan.draft",
+          "type": "document"
+        }
+      ],
+      "outputs": [
+        {
+          "ref": "plan.approval_decision",
+          "type": "decision"
+        }
+      ],
+      "kpi_refs": [
+        "kpi.strategy_cycle_time"
+      ],
+      "guardrail_ref": "gr.SV.1.2.3",
+      "maturity_score": 4,
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "Task": [
+    {
+      "id": "CO.3.2.7.t1",
+      "process_ref": "CO.3.2.7",
+      "seq": 1,
+      "name": "Receive KYC submission",
+      "inputs": [
+        "customer.kyc_doc"
+      ],
+      "outputs": [
+        "customer.kyc_doc"
+      ],
+      "data_scope": [
+        "customer.kyc_doc"
+      ],
+      "kpi_refs": [
+        "kpi.time_to_verify"
+      ],
+      "performed_by": [
+        "role.ops.support_tier1"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "CO.3.2.7.t2",
+      "process_ref": "CO.3.2.7",
+      "seq": 2,
+      "name": "Screen against sanctions list",
+      "inputs": [
+        "customer.kyc_doc"
+      ],
+      "outputs": [
+        "customer.sanctions_result"
+      ],
+      "data_scope": [
+        "customer.kyc_doc",
+        "customer.sanctions_result"
+      ],
+      "kpi_refs": [
+        "kpi.error_rate"
+      ],
+      "performed_by": [
+        "role.ops.support_tier1"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "CO.3.2.7.t3",
+      "process_ref": "CO.3.2.7",
+      "seq": 3,
+      "name": "Verify KYC document",
+      "inputs": [
+        "customer.kyc_doc"
+      ],
+      "outputs": [
+        "customer.verified"
+      ],
+      "data_scope": [
+        "customer.kyc_doc",
+        "customer.risk_score"
+      ],
+      "kpi_refs": [
+        "kpi.time_to_verify",
+        "kpi.error_rate"
+      ],
+      "performed_by": [
+        "role.ops.support_tier1",
+        "agent.kyc_verifier"
+      ],
+      "guardrail_ref": null,
+      "version": 3,
+      "status": "active"
+    },
+    {
+      "id": "CO.3.2.7.t4",
+      "process_ref": "CO.3.2.7",
+      "seq": 4,
+      "name": "Approve or reject onboarding",
+      "inputs": [
+        "customer.verified"
+      ],
+      "outputs": [
+        "customer.onboarding_decision"
+      ],
+      "data_scope": [
+        "customer.verified",
+        "customer.risk_score"
+      ],
+      "kpi_refs": [
+        "kpi.error_rate"
+      ],
+      "performed_by": [
+        "role.ops.support_lead"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "FN.9.3.1.t1",
+      "process_ref": "FN.9.3.1",
+      "seq": 1,
+      "name": "Receive expense claim",
+      "inputs": [
+        "expense.claim"
+      ],
+      "outputs": [
+        "expense.claim"
+      ],
+      "data_scope": [
+        "expense.claim"
+      ],
+      "kpi_refs": [
+        "kpi.expense_cycle_time"
+      ],
+      "performed_by": [
+        "role.finance.ap_clerk"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "FN.9.3.1.t2",
+      "process_ref": "FN.9.3.1",
+      "seq": 2,
+      "name": "Validate receipt and amount",
+      "inputs": [
+        "expense.claim"
+      ],
+      "outputs": [
+        "expense.validated"
+      ],
+      "data_scope": [
+        "expense.receipt",
+        "expense.amount"
+      ],
+      "kpi_refs": [
+        "kpi.expense_cycle_time"
+      ],
+      "performed_by": [
+        "role.finance.ap_clerk",
+        "agent.expense_checker"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "FN.9.3.1.t3",
+      "process_ref": "FN.9.3.1",
+      "seq": 3,
+      "name": "Approve or route for payment",
+      "inputs": [
+        "expense.validated"
+      ],
+      "outputs": [
+        "expense.payment_decision"
+      ],
+      "data_scope": [
+        "expense.amount"
+      ],
+      "kpi_refs": [
+        "kpi.expense_cycle_time"
+      ],
+      "performed_by": [
+        "role.finance.ap_lead"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SC.4.3.6.t1",
+      "process_ref": "SC.4.3.6",
+      "seq": 1,
+      "name": "Receive PO request",
+      "inputs": [
+        "po.request"
+      ],
+      "outputs": [
+        "po.request"
+      ],
+      "data_scope": [
+        "po.request"
+      ],
+      "kpi_refs": [
+        "kpi.po_cycle_time"
+      ],
+      "performed_by": [
+        "role.ops.buyer"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SC.4.3.6.t2",
+      "process_ref": "SC.4.3.6",
+      "seq": 2,
+      "name": "Run three-way match",
+      "inputs": [
+        "po.request"
+      ],
+      "outputs": [
+        "po.matched"
+      ],
+      "data_scope": [
+        "po.amount",
+        "po.vendor_risk"
+      ],
+      "kpi_refs": [
+        "kpi.po_cycle_time"
+      ],
+      "performed_by": [
+        "role.ops.buyer",
+        "agent.po_matcher"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SC.4.3.6.t3",
+      "process_ref": "SC.4.3.6",
+      "seq": 3,
+      "name": "Approve purchase order",
+      "inputs": [
+        "po.matched"
+      ],
+      "outputs": [
+        "po.approval_decision"
+      ],
+      "data_scope": [
+        "po.amount"
+      ],
+      "kpi_refs": [
+        "kpi.po_cycle_time"
+      ],
+      "performed_by": [
+        "role.ops.procurement_lead"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "MS.3.5.2.t1",
+      "process_ref": "MS.3.5.2",
+      "seq": 1,
+      "name": "Receive inbound lead",
+      "inputs": [
+        "lead.inbound"
+      ],
+      "outputs": [
+        "lead.inbound"
+      ],
+      "data_scope": [
+        "lead.profile"
+      ],
+      "kpi_refs": [
+        "kpi.lead_conversion"
+      ],
+      "performed_by": [
+        "role.sales.sdr"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "MS.3.5.2.t2",
+      "process_ref": "MS.3.5.2",
+      "seq": 2,
+      "name": "Score and enrich lead",
+      "inputs": [
+        "lead.inbound"
+      ],
+      "outputs": [
+        "lead.scored"
+      ],
+      "data_scope": [
+        "lead.profile",
+        "lead.deal_size"
+      ],
+      "kpi_refs": [
+        "kpi.lead_conversion"
+      ],
+      "performed_by": [
+        "role.sales.sdr",
+        "agent.lead_scorer"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "MS.3.5.2.t3",
+      "process_ref": "MS.3.5.2",
+      "seq": 3,
+      "name": "Route to account executive",
+      "inputs": [
+        "lead.scored"
+      ],
+      "outputs": [
+        "lead.routing_decision"
+      ],
+      "data_scope": [
+        "lead.profile"
+      ],
+      "kpi_refs": [
+        "kpi.lead_conversion"
+      ],
+      "performed_by": [
+        "role.sales.sdr_manager"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "IT.8.4.2.t1",
+      "process_ref": "IT.8.4.2",
+      "seq": 1,
+      "name": "Receive access request",
+      "inputs": [
+        "request.access"
+      ],
+      "outputs": [
+        "request.access"
+      ],
+      "data_scope": [
+        "request.user",
+        "request.resource"
+      ],
+      "kpi_refs": [
+        "kpi.access_review_sla"
+      ],
+      "performed_by": [
+        "role.it.helpdesk"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "IT.8.4.2.t2",
+      "process_ref": "IT.8.4.2",
+      "seq": 2,
+      "name": "Verify entitlement",
+      "inputs": [
+        "request.access"
+      ],
+      "outputs": [
+        "request.verified"
+      ],
+      "data_scope": [
+        "request.user",
+        "request.resource"
+      ],
+      "kpi_refs": [
+        "kpi.access_review_sla"
+      ],
+      "performed_by": [
+        "role.it.helpdesk",
+        "agent.access_reviewer"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "IT.8.4.2.t3",
+      "process_ref": "IT.8.4.2",
+      "seq": 3,
+      "name": "Grant admin access",
+      "inputs": [
+        "request.verified"
+      ],
+      "outputs": [
+        "request.grant_decision"
+      ],
+      "data_scope": [
+        "request.user",
+        "request.resource"
+      ],
+      "kpi_refs": [
+        "kpi.access_review_sla"
+      ],
+      "performed_by": [
+        "role.it.security_lead"
+      ],
+      "guardrail_ref": "gr.IT.8.4.2.ADMIN",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "PD.2.4.1.t1",
+      "process_ref": "PD.2.4.1",
+      "seq": 1,
+      "name": "Receive defect report",
+      "inputs": [
+        "defect.report"
+      ],
+      "outputs": [
+        "defect.report"
+      ],
+      "data_scope": [
+        "defect.report"
+      ],
+      "kpi_refs": [
+        "kpi.defect_resolution_time"
+      ],
+      "performed_by": [
+        "role.eng.support_triage"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "PD.2.4.1.t2",
+      "process_ref": "PD.2.4.1",
+      "seq": 2,
+      "name": "Classify and prioritize",
+      "inputs": [
+        "defect.report"
+      ],
+      "outputs": [
+        "defect.classified"
+      ],
+      "data_scope": [
+        "defect.report",
+        "defect.severity"
+      ],
+      "kpi_refs": [
+        "kpi.defect_resolution_time"
+      ],
+      "performed_by": [
+        "role.eng.support_triage",
+        "agent.defect_triager"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "PD.2.4.1.t3",
+      "process_ref": "PD.2.4.1",
+      "seq": 3,
+      "name": "Assign to squad",
+      "inputs": [
+        "defect.classified"
+      ],
+      "outputs": [
+        "defect.triage_decision"
+      ],
+      "data_scope": [
+        "defect.report"
+      ],
+      "kpi_refs": [
+        "kpi.defect_resolution_time"
+      ],
+      "performed_by": [
+        "role.eng.support_triage"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "HR.7.2.5.t1",
+      "process_ref": "HR.7.2.5",
+      "seq": 1,
+      "name": "Receive application",
+      "inputs": [
+        "applicant.application"
+      ],
+      "outputs": [
+        "applicant.application"
+      ],
+      "data_scope": [
+        "applicant.resume"
+      ],
+      "kpi_refs": [
+        "kpi.applicant_pass_rate"
+      ],
+      "performed_by": [
+        "role.people.recruiting_coordinator"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "HR.7.2.5.t2",
+      "process_ref": "HR.7.2.5",
+      "seq": 2,
+      "name": "Screen resume",
+      "inputs": [
+        "applicant.application"
+      ],
+      "outputs": [
+        "applicant.screened"
+      ],
+      "data_scope": [
+        "applicant.resume",
+        "applicant.score"
+      ],
+      "kpi_refs": [
+        "kpi.applicant_pass_rate"
+      ],
+      "performed_by": [
+        "role.people.recruiting_coordinator",
+        "agent.resume_screener"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "HR.7.2.5.t3",
+      "process_ref": "HR.7.2.5",
+      "seq": 3,
+      "name": "Advance or hold",
+      "inputs": [
+        "applicant.screened"
+      ],
+      "outputs": [
+        "applicant.screen_decision"
+      ],
+      "data_scope": [
+        "applicant.score"
+      ],
+      "kpi_refs": [
+        "kpi.applicant_pass_rate"
+      ],
+      "performed_by": [
+        "role.people.recruiting_lead"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SV.1.2.3.t1",
+      "process_ref": "SV.1.2.3",
+      "seq": 1,
+      "name": "Assemble plan inputs",
+      "inputs": [
+        "plan.draft"
+      ],
+      "outputs": [
+        "plan.inputs"
+      ],
+      "data_scope": [
+        "plan.draft"
+      ],
+      "kpi_refs": [
+        "kpi.strategy_cycle_time"
+      ],
+      "performed_by": [
+        "role.strategy.analyst"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SV.1.2.3.t2",
+      "process_ref": "SV.1.2.3",
+      "seq": 2,
+      "name": "Draft plan summary",
+      "inputs": [
+        "plan.inputs"
+      ],
+      "outputs": [
+        "plan.summary"
+      ],
+      "data_scope": [
+        "plan.draft",
+        "plan.budget_impact"
+      ],
+      "kpi_refs": [
+        "kpi.strategy_cycle_time"
+      ],
+      "performed_by": [
+        "role.strategy.analyst",
+        "agent.plan_summarizer"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SV.1.2.3.t3",
+      "process_ref": "SV.1.2.3",
+      "seq": 3,
+      "name": "Executive approval",
+      "inputs": [
+        "plan.summary"
+      ],
+      "outputs": [
+        "plan.approval_decision"
+      ],
+      "data_scope": [
+        "plan.budget_impact"
+      ],
+      "kpi_refs": [
+        "kpi.strategy_cycle_time"
+      ],
+      "performed_by": [
+        "role.exec.coo"
+      ],
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "HumanRole": [
+    {
+      "id": "role.ops.head_of_operations",
+      "name": "Head of Operations",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "operations_strategy"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.ops.support_lead",
+      "name": "Support Team Lead",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "kyc",
+        "escalation_handling"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.ops.support_tier1",
+      "name": "Support Agent (Tier 1)",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "kyc",
+        "document_review"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.finance.cfo",
+      "name": "Chief Financial Officer",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "finance_strategy"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.finance.ap_lead",
+      "name": "Accounts Payable Lead",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "ap",
+        "controls"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.finance.ap_clerk",
+      "name": "Accounts Payable Clerk",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "ap"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.ops.procurement_lead",
+      "name": "Procurement Lead",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "procurement"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.ops.buyer",
+      "name": "Buyer",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "procurement"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.sales.cro",
+      "name": "Chief Revenue Officer",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "revenue_strategy"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.sales.sdr_manager",
+      "name": "SDR Manager",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "sales_ops"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.sales.sdr",
+      "name": "Sales Development Rep",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "prospecting"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.it.ciso",
+      "name": "Chief Information Security Officer",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "security_strategy"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.it.security_lead",
+      "name": "Security Lead",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "iam",
+        "access_review"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.it.helpdesk",
+      "name": "IT Helpdesk",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "provisioning"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.eng.vp",
+      "name": "VP Engineering",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "eng_strategy"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.eng.support_triage",
+      "name": "Support Triage Engineer",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "triage"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.people.recruiting_lead",
+      "name": "Recruiting Lead",
+      "raci": {
+        "responsible": true,
+        "accountable": true
+      },
+      "skills": [
+        "recruiting"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.people.recruiting_coordinator",
+      "name": "Recruiting Coordinator",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "recruiting_ops"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.exec.ceo",
+      "name": "Chief Executive Officer",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "executive"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.exec.coo",
+      "name": "Chief Operating Officer",
+      "raci": {
+        "accountable": true
+      },
+      "skills": [
+        "executive"
+      ],
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "role.strategy.analyst",
+      "name": "Strategy Analyst",
+      "raci": {
+        "responsible": true
+      },
+      "skills": [
+        "planning"
+      ],
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "AgentBinding": [
+    {
+      "id": "agent.kyc_verifier",
+      "task_ref": "CO.3.2.7.t3",
+      "mcp_tool": "continuum.kyc_verifier",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.expense_checker",
+      "task_ref": "FN.9.3.1.t2",
+      "mcp_tool": "continuum.expense_checker",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.po_matcher",
+      "task_ref": "SC.4.3.6.t2",
+      "mcp_tool": "continuum.po_matcher",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.lead_scorer",
+      "task_ref": "MS.3.5.2.t2",
+      "mcp_tool": "continuum.lead_scorer",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.access_reviewer",
+      "task_ref": "IT.8.4.2.t2",
+      "mcp_tool": "continuum.access_reviewer",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.defect_triager",
+      "task_ref": "PD.2.4.1.t2",
+      "mcp_tool": "continuum.defect_triager",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.resume_screener",
+      "task_ref": "HR.7.2.5.t2",
+      "mcp_tool": "continuum.resume_screener",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "agent.plan_summarizer",
+      "task_ref": "SV.1.2.3.t2",
+      "mcp_tool": "continuum.plan_summarizer",
+      "model": "claude-opus-4-8",
+      "guardrail_ref": null,
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "GuardrailPolicy": [
+    {
+      "id": "gr.CO.3.2.7",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "CO.3.2.7"
+      },
+      "allowed_actions": [
+        "verify_document",
+        "request_resubmit"
+      ],
+      "forbidden_actions": [
+        "approve_credit_limit"
+      ],
+      "escalate_if": "risk_score > 0.7",
+      "data_scope": [
+        "customer.kyc_doc",
+        "customer.risk_score"
+      ],
+      "rate_limit": {
+        "max_actions": 120,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.ops.support_lead",
+      "audit_requirement": "inputs_outputs",
+      "version": 3,
+      "status": "active",
+      "review": {
+        "reviewed_by": "role.qms.iso_advisor",
+        "reviewed_at": "2026-08-20T00:00:00Z",
+        "note": "Permissive-but-scoped default; escalate threshold lowered 0.8 -> 0.7 after a false-verify near-miss."
+      }
+    },
+    {
+      "id": "gr.FN.9.3.1",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "FN.9.3.1"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "validate_receipt",
+        "add_note",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "disburse_funds",
+        "modify_vendor",
+        "approve"
+      ],
+      "escalate_if": "amount > 500",
+      "data_scope": [
+        "expense.receipt",
+        "expense.amount"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.finance.ap_lead",
+      "audit_requirement": "inputs_outputs",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.SC.4.3.6",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "SC.4.3.6"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "match_po",
+        "add_note",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "approve",
+        "send_external",
+        "modify_vendor"
+      ],
+      "escalate_if": "amount > 10000 or vendor_risk > 0.6",
+      "data_scope": [
+        "po.amount",
+        "po.vendor_risk"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.ops.procurement_lead",
+      "audit_requirement": "inputs_outputs",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.MS.3.5.2",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "MS.3.5.2"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "enrich_lead",
+        "draft_response",
+        "add_note"
+      ],
+      "forbidden_actions": [
+        "send_external",
+        "close_case"
+      ],
+      "escalate_if": "deal_size > 50000",
+      "data_scope": [
+        "lead.profile",
+        "lead.deal_size"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.sales.sdr_manager",
+      "audit_requirement": "timestamp_outcome",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.IT.8.4.2",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "IT.8.4.2"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "grant_standard_access",
+        "add_note",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "modify_permissions",
+        "delete_record"
+      ],
+      "escalate_if": "resource_sensitivity > 0.7",
+      "data_scope": [
+        "request.user",
+        "request.resource"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.it.security_lead",
+      "audit_requirement": "inputs_outputs",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.IT.8.4.2.ADMIN",
+      "attaches_to": {
+        "kind": "task",
+        "ref": "IT.8.4.2.t3"
+      },
+      "allowed_actions": [
+        "read_record",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "grant_standard_access",
+        "grant_admin_access",
+        "modify_permissions"
+      ],
+      "escalate_if": null,
+      "data_scope": [
+        "request.user",
+        "request.resource"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.it.security_lead",
+      "audit_requirement": "full_capture",
+      "version": 1,
+      "status": "active",
+      "review": {
+        "reviewed_by": "role.qms.iso_advisor",
+        "reviewed_at": "2026-08-25T00:00:00Z",
+        "note": "Task override: admin grants are human-only. Agent may read and flag; every grant action forbidden."
+      }
+    },
+    {
+      "id": "gr.PD.2.4.1",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "PD.2.4.1"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "summarize",
+        "add_note",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "close_case",
+        "send_external"
+      ],
+      "escalate_if": "severity >= 4",
+      "data_scope": [
+        "defect.report",
+        "defect.severity"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.eng.support_triage",
+      "audit_requirement": "timestamp_outcome",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.HR.7.2.5",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "HR.7.2.5"
+      },
+      "allowed_actions": [
+        "read_record",
+        "classify",
+        "summarize",
+        "add_note",
+        "flag_for_review"
+      ],
+      "forbidden_actions": [
+        "reject_final",
+        "send_external"
+      ],
+      "escalate_if": "applicant_score < 0.5",
+      "data_scope": [
+        "applicant.resume",
+        "applicant.score"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.people.recruiting_lead",
+      "audit_requirement": "inputs_outputs",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "gr.SV.1.2.3",
+      "attaches_to": {
+        "kind": "process",
+        "ref": "SV.1.2.3"
+      },
+      "allowed_actions": [
+        "read_record",
+        "summarize",
+        "draft_response"
+      ],
+      "forbidden_actions": [
+        "approve",
+        "send_external",
+        "close_case"
+      ],
+      "escalate_if": "budget_impact > 1000000",
+      "data_scope": [
+        "plan.draft",
+        "plan.budget_impact"
+      ],
+      "rate_limit": {
+        "max_actions": 60,
+        "per_seconds": 60
+      },
+      "escalation_path": "role.exec.coo",
+      "audit_requirement": "full_capture",
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "RiskControl": [
+    {
+      "id": "rc.kyc_false_verify",
+      "process_ref": "CO.3.2.7",
+      "risk": "Agent verifies a fraudulent identity document, admitting a bad actor.",
+      "likelihood": 2,
+      "impact": 5,
+      "control": "High-risk submissions (risk_score > 0.7) escalate to a human lead before verification is final.",
+      "control_type": "preventive",
+      "guardrail_ref": "gr.CO.3.2.7",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "rc.expense_fraud",
+      "process_ref": "FN.9.3.1",
+      "risk": "Agent auto-validates an inflated or duplicate expense claim.",
+      "likelihood": 3,
+      "impact": 4,
+      "control": "Claims over $500 escalate to the AP lead; agent can never disburse funds.",
+      "control_type": "preventive",
+      "guardrail_ref": "gr.FN.9.3.1",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "rc.unauthorized_access",
+      "process_ref": "IT.8.4.2",
+      "risk": "Agent grants access broader than the request warrants.",
+      "likelihood": 2,
+      "impact": 5,
+      "control": "Admin grants are human-only (task-level override); standard grants escalate above sensitivity 0.7.",
+      "control_type": "preventive",
+      "guardrail_ref": "gr.IT.8.4.2.ADMIN",
+      "version": 1,
+      "status": "active"
+    }
+  ]
+}
