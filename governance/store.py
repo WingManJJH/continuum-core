@@ -127,6 +127,10 @@ class GovernanceStore:
                          "actor": ev["actor"]["id"], "actor_kind": ev["actor"]["kind"]})
         return sorted(rows, key=lambda r: r["ts"], reverse=True)[:limit]
 
+    def integrity(self) -> dict:
+        """Tamper-evidence status of the audit logs (ISO 9001 §7.5) for the UI."""
+        return cc.verify_audit()
+
     # --- the write path ----------------------------------------------------
     def edit_guardrail(self, gr_id: str, changes: dict, actor: str,
                        reason: str, reviewer: str) -> dict:

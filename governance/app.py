@@ -71,7 +71,7 @@ class Handler(BaseHTTPRequestHandler):
                     "history": STORE.history(gr_id),
                 })
             if u.path == "/api/audit":
-                return self._json(STORE.audit())
+                return self._json({"rows": STORE.audit(), "integrity": STORE.integrity()})
             return self._static(u.path)
         except gov.EditError as e:
             return self._json({"error": str(e)}, 404)

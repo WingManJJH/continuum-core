@@ -79,3 +79,8 @@ button:disabled { opacity: .5; cursor: default; }
 .aud .k.agent_action { background: #eef; color: var(--accent); }
 .aud .det { color: var(--ink); }
 .aud .who { color: var(--muted); }
+.integrity { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; font-weight: 600;
+  padding: 8px 11px; border-radius: 8px; margin-bottom: 10px; }
+.integrity span { font-family: var(--mono); font-size: 11px; font-weight: 400; }
+.integrity.ok { background: var(--green-bg); color: var(--green); }
+.integrity.bad { background: var(--red-bg); color: var(--red); }

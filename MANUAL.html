@@ -259,7 +259,7 @@
 
     <section id="tests">
       <h2><span class="no">&sect;</span> Run every test</h2>
-      <p>The fastest way to confirm the whole system is healthy &mdash; 48 assertions plus 3 harness
+      <p>The fastest way to confirm the whole system is healthy &mdash; 58 assertions plus 3 harness
         checks. The chain ends with <code class="inl">ALL GREEN</code>.</p>
       <div class="cmd">
         <div class="bar"><span class="dot"></span><span class="tag">bash</span>
@@ -271,6 +271,7 @@
   &amp;&amp; <span class="p">python3</span> enforcement/test_enforce.py \
   &amp;&amp; <span class="p">python3</span> signal/test_conformance.py \
   &amp;&amp; <span class="p">python3</span> dashboard/test_rollup.py \
+  &amp;&amp; <span class="p">python3</span> audit/test_audit_chain.py \
   &amp;&amp; <span class="ok">echo "ALL GREEN"</span></code></pre>
       </div>
       <div class="tbl-wrap">
@@ -284,6 +285,7 @@
             <tr><td class="cmdcell">enforcement/test_enforce.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">signal/test_conformance.py</td><td><span class="pill good">8 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">dashboard/test_rollup.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">audit/test_audit_chain.py</td><td><span class="pill good">10 passed, 0 failed</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -380,7 +382,8 @@
             <button class="copy" type="button">copy</button></div>
           <pre><code><span class="p">python3</span> enforcement/sweep.py <span class="f">--keep</span>   <span class="c"># all 8 bindings + keep the activity log</span>
 <span class="p">python3</span> dashboard/app.py             <span class="c"># open http://localhost:8788</span>
-<span class="p">python3</span> dashboard/test_rollup.py     <span class="c"># 13 asserts</span></code></pre>
+<span class="p">python3</span> dashboard/test_rollup.py     <span class="c"># 13 asserts</span>
+<span class="p">python3</span> audit/verify.py             <span class="c"># verify the audit hash chain (exit 1 on tampering)</span></code></pre>
         </div>
         <div class="look"><span class="eye">LOOK</span><div><b>On http://localhost:8788:</b> metric tiles
           (guardrail coverage <span class="pill warn">12% &mdash; 1/8 reviewed</span>, honest; traceability 88%;
@@ -422,13 +425,14 @@
             <tr><td class="cmdcell">data/edits.log.jsonl</td><td>governance edits</td><td>reverts every guardrail to its <code class="inl">seed.json</code> version</td></tr>
             <tr><td class="cmdcell">data/events.log.jsonl</td><td>agent actions</td><td>clears dashboard activity + the audit trail's agent side</td></tr>
             <tr><td class="cmdcell">data/escalations.jsonl</td><td>escalations</td><td>empties the human escalation queue</td></tr>
+            <tr><td class="cmdcell">data/audit_heads.json</td><td>the hash chain</td><td>drops the tamper-evidence anchor &mdash; delete alongside the logs, never on its own</td></tr>
           </tbody>
         </table>
       </div>
       <div class="cmd">
         <div class="bar"><span class="dot"></span><span class="tag">bash &middot; full reset to pristine</span>
           <button class="copy" type="button">copy</button></div>
-        <pre><code><span class="p">rm</span> -f data/edits.log.jsonl data/events.log.jsonl data/escalations.jsonl</code></pre>
+        <pre><code><span class="p">rm</span> -f data/edits.log.jsonl data/events.log.jsonl data/escalations.jsonl data/audit_heads.json</code></pre>
       </div>
     </section>
 

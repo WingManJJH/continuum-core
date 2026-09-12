@@ -45,6 +45,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 enforcement/test_enforce.py \
   && python3 signal/test_conformance.py \
   && python3 dashboard/test_rollup.py \
+  && python3 audit/test_audit_chain.py \
   && echo "ALL GREEN"
 ```
 
@@ -59,8 +60,9 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `enforcement/test_enforce.py` | `13 passed, 0 failed` |
 | `signal/test_conformance.py` | `8 passed, 0 failed` |
 | `dashboard/test_rollup.py` | `13 passed, 0 failed` |
+| `audit/test_audit_chain.py` | `10 passed, 0 failed` |
 
-48 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+58 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -158,6 +160,9 @@ python3 enforcement/sweep.py --keep
 # the §05 standing report (reads the log you just populated)
 python3 dashboard/app.py                # then open http://localhost:8788
 python3 dashboard/test_rollup.py        # 13 assertions
+
+# verify the audit logs are tamper-free (after any activity)
+python3 audit/verify.py                  # re-walks the hash chain; exit 1 on tampering
 ```
 
 **What to look for on http://localhost:8788:** metric tiles (guardrail coverage **12% — 1/8
@@ -194,11 +199,12 @@ The model lives in `data/seed.json` (committed). Everything the running system w
 | `data/edits.log.jsonl` | governance edits (Phase 2) | reverts every guardrail to its `seed.json` version |
 | `data/events.log.jsonl` | agent actions (Phase 3/4) | clears the dashboard's activity + the audit trail's agent side |
 | `data/escalations.jsonl` | escalations (Phase 3/4) | empties the human escalation queue |
+| `data/audit_heads.json` | the hash chain (all phases) | drops the tamper-evidence anchor — delete it alongside the logs, never on its own |
 
 **Full reset to pristine:**
 
 ```bash
-rm -f data/edits.log.jsonl data/events.log.jsonl data/escalations.jsonl
+rm -f data/edits.log.jsonl data/events.log.jsonl data/escalations.jsonl data/audit_heads.json
 ```
 
 Most test suites clean up after themselves; the two demos that intentionally leave data are

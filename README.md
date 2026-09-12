@@ -73,6 +73,10 @@ python3 signal/test_conformance.py              # 8 asserts incl. "conformance n
 python3 enforcement/sweep.py --keep             # full enforcement across all 8 agent-bound tasks (+ populates the log)
 python3 dashboard/app.py                         # http://localhost:8788 — the §05 standing report
 python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom-up / coverage / metrics
+
+# Audit-log tamper-evidence (ISO 9001 §7.5 hardening)
+python3 audit/verify.py                           # re-walk the hash chain (exit 1 on tampering)
+python3 audit/test_audit_chain.py                 # 10 asserts: content/delete/reorder/truncate/whole-log
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -146,9 +150,13 @@ Run it: `python3 governance/app.py` → http://localhost:8787. Details in
 [`governance/README.md`](governance/README.md). This UI is also the higher-fidelity
 design-partner demo from [`design-partner/validation-guide.md`](design-partner/validation-guide.md) §5.
 
-**Honest edges (flagged, deferred to Phase 3+):** audit-log tamper-evidence (hash chain),
-a retention-policy engine, and consolidating the two logs into one signed store. The §7.5
-*content* requirements are met; the tamper-evidence *hardening* is named, not assumed.
+**Tamper-evidence (built, D9):** every audit event is hash-chained (`prev_hash`/`hash`); a
+per-log heads anchor catches truncation. `python3 audit/verify.py` re-walks the chain and the
+governance **Audit** tab shows a live *chain intact / tampering detected* badge — any edit,
+deletion, reorder, or truncation is caught (see [`schema/AUDIT-LOG.md`](schema/AUDIT-LOG.md)).
+**Still flagged (honest boundary):** off-box anchoring of the chain head (external notarization),
+a retention-policy engine, and one signed store for both logs — a party who can rewrite both a log
+and the heads file could still forge a consistent chain.
 
 ## What Phase 3 proves (signal & agent infrastructure)
 
@@ -204,8 +212,9 @@ continuum-core/
 │   └── <8 entity>.schema.json
 ├── data/
 │   ├── seed.json               # hand-built 8-domain graph (reproduces the §03 KYC example)
-│   ├── events.log.jsonl        # (runtime) agent-action events — git-ignored
-│   └── edits.log.jsonl         # (runtime) governance change-control events — git-ignored
+│   ├── events.log.jsonl        # (runtime) agent-action events, hash-chained — git-ignored
+│   ├── edits.log.jsonl         # (runtime) governance change-control events, hash-chained — git-ignored
+│   └── audit_heads.json        # (runtime) per-log chain head + count — git-ignored
 ├── mcp_server/                 # Deliverable 2
 │   ├── continuum_core.py       #   framework-independent engine (stdlib) + event-sourced fold/append
 │   ├── server.py               #   MCP server: get_task_context / check_guardrail / log_action
@@ -238,6 +247,9 @@ continuum-core/
 │   ├── static/                 #   vanilla-JS leadership view
 │   ├── test_rollup.py          #   rollup / coverage / metrics assertions
 │   └── README.md
+├── audit/                      # ISO 9001 §7.5 tamper-evidence (hash chain, D9)
+│   ├── verify.py               #   re-walk the chain; CLI + JSON report
+│   └── test_audit_chain.py     #   10 asserts, one per tamper mode
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json
 │   └── DEFAULT-GUARDRAIL-TEMPLATE.md

@@ -15,6 +15,7 @@ not to pretty-printed JSON.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 from datetime import datetime, timezone
@@ -24,6 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data", "seed.json"))
 EVENTS_LOG = os.path.join(os.path.dirname(DATA), "events.log.jsonl")   # agent actions (§04/§06)
 EDITS_LOG = os.path.join(os.path.dirname(DATA), "edits.log.jsonl")     # change control (Phase 2 governance edits, ISO 9001 §7.5)
+HEADS_FILE = os.path.join(os.path.dirname(DATA), "audit_heads.json")   # per-log chain head + count (truncation/rollback detection)
+GENESIS_HASH = "0" * 64                                                # prev_hash of the first event in a log
 
 REASON_CODES = {
     "allowed",
@@ -221,13 +224,131 @@ def render_guardrail_check(verdict: dict) -> str:
     return "\n".join(lines)
 
 
+# --------------------------------------------------------------------------
+# Tamper-evident audit chain (ISO 9001 §7.5 hardening).
+# Every event links to the previous one by hash, so any edit, deletion,
+# reorder, or insertion in an append-only log breaks the chain and is caught by
+# verify_log(). A per-log heads file anchors the last hash + count so trailing
+# truncation / rollback is caught too. Both writers go through _append_event so
+# there is one, and only one, place the chain is maintained.
+# --------------------------------------------------------------------------
+def _canonical(event: dict) -> str:
+    """Deterministic serialization for hashing — sorted keys, no whitespace."""
+    return json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def hash_event(event: dict) -> str:
+    """SHA-256 over the event with its own `hash` field excluded (but including
+    `prev_hash`, so the link is part of what's signed)."""
+    body = {k: v for k, v in event.items() if k != "hash"}
+    return hashlib.sha256(_canonical(body).encode("utf-8")).hexdigest()
+
+
+def _last_hash(log_path: str) -> str:
+    """Hash of the last event already in the log, or GENESIS if the log is new."""
+    if not os.path.exists(log_path):
+        return GENESIS_HASH
+    last = None
+    with open(log_path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                last = line
+    if not last:
+        return GENESIS_HASH
+    return json.loads(last).get("hash", GENESIS_HASH)
+
+
+def _read_heads() -> dict:
+    if not os.path.exists(HEADS_FILE):
+        return {}
+    try:
+        with open(HEADS_FILE) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _write_head(log_path: str, head: str, count: int) -> None:
+    heads = _read_heads()
+    heads[os.path.basename(log_path)] = {"head": head, "count": count}
+    with open(HEADS_FILE, "w") as f:
+        json.dump(heads, f, indent=2)
+
+
+def _append_event(log_path: str, event: dict) -> dict:
+    """Chain `event` onto `log_path`: set prev_hash + hash, append, advance head."""
+    event["prev_hash"] = _last_hash(log_path)
+    event["hash"] = hash_event(event)
+    with open(log_path, "a") as f:
+        f.write(json.dumps(event) + "\n")
+    heads = _read_heads().get(os.path.basename(log_path), {})
+    _write_head(log_path, event["hash"], heads.get("count", 0) + 1)
+    return event
+
+
+def verify_log(log_path: str) -> dict:
+    """Re-walk a log and confirm the chain is intact. Returns a structured result
+    with the first break (if any) and the heads-anchor check."""
+    name = os.path.basename(log_path)
+    if not os.path.exists(log_path):
+        heads = _read_heads().get(name)
+        if heads and heads.get("count", 0) > 0:
+            return {"log": name, "ok": False, "count": 0, "exists": False,
+                    "break": {"reason": "log missing but heads records "
+                              f"{heads['count']} event(s) — whole-log deletion"}}
+        return {"log": name, "ok": True, "count": 0, "exists": False, "detail": "no log yet"}
+
+    prev = GENESIS_HASH
+    count = 0
+    with open(log_path) as f:
+        for i, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                return {"log": name, "ok": False, "count": count,
+                        "break": {"index": i, "reason": "line is not valid JSON"}}
+            if ev.get("prev_hash") != prev:
+                return {"log": name, "ok": False, "count": count,
+                        "break": {"index": i, "event_id": ev.get("event_id"),
+                                  "reason": "prev_hash does not link to the previous "
+                                            "event (reorder, insertion, or deletion)"}}
+            if hash_event(ev) != ev.get("hash"):
+                return {"log": name, "ok": False, "count": count,
+                        "break": {"index": i, "event_id": ev.get("event_id"),
+                                  "reason": "content hash mismatch (event was modified)"}}
+            prev = ev["hash"]
+            count += 1
+
+    result = {"log": name, "ok": True, "count": count, "exists": True, "head": prev}
+    heads = _read_heads().get(name)
+    if heads:
+        if heads.get("count") != count or heads.get("head") != prev:
+            result["ok"] = False
+            result["break"] = {"reason": f"heads anchor mismatch — recorded "
+                               f"{heads.get('count')} event(s) ending {str(heads.get('head'))[:12]}…, "
+                               f"log has {count} ending {prev[:12]}… (truncation or rollback)"}
+    else:
+        result["head_anchor"] = "absent (cannot detect trailing truncation)"
+    return result
+
+
+def verify_audit(logs: tuple[str, ...] = (EDITS_LOG, EVENTS_LOG)) -> dict:
+    """Verify every audit log. overall.ok is True only if all chains are intact."""
+    results = [verify_log(p) for p in logs]
+    return {"ok": all(r["ok"] for r in results), "logs": results}
+
+
 def log_action(g: Graph, task_id: str, action: str, outcome: str,
                guardrail_version: str, actor: str = "agent.kyc_verifier",
                detail: dict | None = None) -> str:
-    """Append an immutable action event (§04: agent cites the guardrail version
-    it acted under) and return a compact ack. Also the raw feed the signal layer
-    aggregates in §06."""
-    event = {
+    """Append an immutable, hash-chained action event (§04: agent cites the
+    guardrail version it acted under) and return a compact ack. Also the raw feed
+    the signal layer aggregates in §06."""
+    event = _append_event(EVENTS_LOG, {
         "event_id": "evt_" + _ulidish(),
         "ts": datetime.now(timezone.utc).isoformat(),
         "entity_type": "Task",
@@ -242,9 +363,7 @@ def log_action(g: Graph, task_id: str, action: str, outcome: str,
             "guardrail_version": guardrail_version,
             "detail": detail or {},
         },
-    }
-    with open(EVENTS_LOG, "a") as f:
-        f.write(json.dumps(event) + "\n")
+    })
     return f"logged: {event['event_id']}\ntask: {task_id}\ncited_gr: {guardrail_version}"
 
 
@@ -252,10 +371,10 @@ def append_edit_event(entity_type: str, entity_id: str, op: str,
                       from_version: int | None, to_version: int,
                       actor: dict, payload: dict, reason: str,
                       log_path: str = EDITS_LOG) -> dict:
-    """Append an immutable change-control event to the edit log (ISO 9001 §7.5).
+    """Append an immutable, hash-chained change-control event (ISO 9001 §7.5).
     This is the write path Phase-2 governance edits go through — a new version,
     never an overwrite. Returns the event. Stdlib-only so the core stays light."""
-    event = {
+    return _append_event(log_path, {
         "event_id": "evt_" + _ulidish(),
         "ts": datetime.now(timezone.utc).isoformat(),
         "entity_type": entity_type,
@@ -266,10 +385,7 @@ def append_edit_event(entity_type: str, entity_id: str, op: str,
         "actor": actor,
         "reason": reason,
         "payload": payload,
-    }
-    with open(log_path, "a") as f:
-        f.write(json.dumps(event) + "\n")
-    return event
+    })
 
 
 def render_process_summary(g: Graph, process_id: str) -> str:

@@ -4,3 +4,4 @@ __pycache__/
 data/events.log.jsonl
 data/edits.log.jsonl
 data/escalations.jsonl
+data/audit_heads.json

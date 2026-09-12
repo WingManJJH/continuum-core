@@ -130,10 +130,16 @@ function renderHistory(hist) {
 }
 
 async function loadAudit() {
-  const rows = await api("/api/audit");
+  const data = await api("/api/audit");
+  const rows = data.rows || [];
+  const integ = data.integrity || { ok: true, logs: [] };
   const el = $("#tab-audit");
-  if (!rows.length) { el.innerHTML = '<div class="muted">No events yet. Edit a guardrail to create a change-control record.</div>'; return; }
-  el.innerHTML = rows.map((a) => `
+  const counts = integ.logs.map((l) => `${l.log.replace(".log.jsonl", "")} ${l.count}`).join(" · ");
+  const badge = integ.ok
+    ? `<div class="integrity ok">🔒 chain intact <span>${counts || "no events yet"}</span></div>`
+    : `<div class="integrity bad">⚠ tampering detected <span>${(integ.logs.find((l) => !l.ok) || {}).break?.reason || ""}</span></div>`;
+  if (!rows.length) { el.innerHTML = badge + '<div class="muted" style="margin-top:8px">No events yet. Edit a guardrail to create a change-control record.</div>'; return; }
+  el.innerHTML = badge + rows.map((a) => `
     <div class="aud">
       <span class="k ${a.kind}">${a.kind}</span>
       <span class="det"> ${a.entity}</span>

@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://continuum.dev/schema/v1/event-envelope",
   "title": "Event Envelope",
-  "description": "Every write to the object graph is an immutable event, never an in-place overwrite (ISO 9001 §7.5 document control + event-sourced engineering discipline, one mechanism serving both — Core Model §07). Current entity state is a fold over its event stream. This envelope is LOCKED for Phase 1.",
+  "description": "Every write to the object graph is an immutable event, never an in-place overwrite (ISO 9001 §7.5 document control + event-sourced engineering discipline, one mechanism serving both — Core Model §07). Current entity state is a fold over its event stream. Events are hash-chained for tamper-evidence (prev_hash/hash). This envelope is LOCKED for Phase 1.",
   "type": "object",
-  "required": ["event_id", "ts", "entity_type", "entity_id", "op", "to_version", "actor", "payload"],
+  "required": ["event_id", "ts", "entity_type", "entity_id", "op", "to_version", "actor", "payload", "prev_hash", "hash"],
   "additionalProperties": false,
   "properties": {
     "event_id": {
@@ -58,6 +58,16 @@
     "payload": {
       "type": "object",
       "description": "The full entity body at to_version, validating against that entity_type's schema. Stored whole (snapshot-per-event) so any historical version is reconstructable without replaying deltas."
+    },
+    "prev_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hash of the previous event in this log (64 zeros for the first event). Links the chain — any deletion, reorder, or insertion breaks it (verify_log). ISO 9001 §7.5 tamper-evidence."
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 over this event's canonical form excluding `hash` itself but including `prev_hash`. Recomputed on verification; a mismatch means the event was modified."
     }
   }
 }

@@ -36,17 +36,34 @@ is exactly the state the last governance edit produced.
 
 ## Retention & tamper-evidence — Phase 2 scope vs. later
 
-**In Phase 2 (built):** append-only files, full snapshot per event, reviewer/reason on every
-change-control event, version citation on every agent action, unified audit view.
+**Built:** append-only files, full snapshot per event, reviewer/reason on every change-control
+event, version citation on every agent action, unified audit view — and **tamper-evidence via a
+hash chain** (see below).
 
-**Deferred (flagged, not silently omitted):**
-- **Tamper-evidence** — a hash chain (`prev_event_hash`) over the log for cryptographic
-  append-only proof. The envelope has room; not wired in Phase 2. Add before an external audit
-  that requires it.
-- **Retention policy engine** — automatic disposition schedules per entity class. The `deprecate`
-  op and status exist; a scheduler does not yet.
-- **Segregation of the two logs into one signed store** — fine as two files for the prototype;
-  a production deployment should land both in one appended, access-controlled store.
+### Tamper-evidence — the hash chain (built)
 
-These are the honest edges of the Phase-2 audit trail: the §7.5 *content* requirements are met;
-the *tamper-evidence* hardening is a named Phase-3+ item, not an assumed given.
+Every event carries `prev_hash` (the SHA-256 `hash` of the previous event in its log; 64 zeros for
+the first) and its own `hash` (SHA-256 over the event's canonical form, excluding `hash` but
+including `prev_hash`). Both writers go through one choke point (`continuum_core._append_event`), so
+the chain is maintained in exactly one place. A per-log **heads anchor** (`data/audit_heads.json`)
+records each log's last hash + event count.
+
+`continuum_core.verify_log()` / `verify_audit()` re-walk each log and catch:
+
+| Tampering | Caught by |
+|---|---|
+| an event field modified | recomputed `hash` ≠ stored `hash` |
+| an event deleted or inserted | next event's `prev_hash` no longer links |
+| events reordered | `prev_hash` linkage breaks |
+| trailing events truncated / rolled back | heads anchor count/head mismatch |
+| a whole log deleted | heads records events that the missing log doesn't |
+
+Verify from the CLI: `python3 audit/verify.py` (exit 1 on tampering). The governance app's **Audit**
+tab shows a live *chain intact / tampering detected* badge. Tested end to end in
+`audit/test_audit_chain.py` (10 assertions, one per tamper mode).
+
+**What it does not prove (honest boundary):** a party with write access to *both* the log and the
+heads file can forge a fresh, internally-consistent chain. Detecting that requires anchoring the
+head **off-box** — external notarization or an append-only store the writer can't rewrite. That, a
+retention-policy engine, and consolidating the two logs into one signed store remain flagged as the
+next hardening steps — named, not assumed away.
