@@ -23,9 +23,9 @@ def check(name, cond):
 
 
 def clean():
-    for p in (cc.EVENTS_LOG, ESCALATIONS):
-        if os.path.exists(p):
-            os.remove(p)
+    cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
+    if os.path.exists(ESCALATIONS):
+        os.remove(ESCALATIONS)
 
 
 def main():

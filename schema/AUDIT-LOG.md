@@ -60,7 +60,7 @@ records each log's last hash + event count.
 
 Verify from the CLI: `python3 audit/verify.py` (exit 1 on tampering). The governance app's **Audit**
 tab shows a live *chain intact / tampering detected* badge. Tested end to end in
-`audit/test_audit_chain.py` (10 assertions, one per tamper mode).
+`audit/test_audit_chain.py` (13 assertions: one per tamper mode, plus reset-log hygiene).
 
 **What it does not prove (honest boundary):** a party with write access to *both* the log and the
 heads file can forge a fresh, internally-consistent chain. Detecting that requires anchoring the

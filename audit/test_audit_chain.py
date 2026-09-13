@@ -101,6 +101,14 @@ def main():
     roll = cc.verify_audit((edits, log))
     check("verify_audit ok when all chains intact", roll["ok"] and len(roll["logs"]) == 2)
 
+    # 8. reset_log clears the heads anchor too, so a fresh run is NOT a false positive
+    cc.reset_log(log)
+    check("reset_log removes the file", not os.path.exists(log))
+    check("reset_log drops the heads entry", "events.log.jsonl" not in cc._read_heads())
+    append(2)  # fresh chain after reset
+    r = cc.verify_log(log)
+    check("post-reset chain verifies clean (no orphaned anchor)", r["ok"] and r["count"] == 2)
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 

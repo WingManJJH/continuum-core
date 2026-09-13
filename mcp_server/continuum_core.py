@@ -276,6 +276,23 @@ def _write_head(log_path: str, head: str, count: int) -> None:
         json.dump(heads, f, indent=2)
 
 
+def _drop_head(log_path: str) -> None:
+    heads = _read_heads()
+    if heads.pop(os.path.basename(log_path), None) is not None:
+        with open(HEADS_FILE, "w") as f:
+            json.dump(heads, f, indent=2)
+
+
+def reset_log(log_path: str) -> None:
+    """Remove a chained log AND its heads-anchor entry together. Resetting the log
+    file alone would leave the anchor pointing at events that no longer exist —
+    indistinguishable from tampering — so demos/tests/reset paths must use this,
+    not a bare os.remove(), when clearing a log for a fresh run."""
+    if os.path.exists(log_path):
+        os.remove(log_path)
+    _drop_head(log_path)
+
+
 def _append_event(log_path: str, event: dict) -> dict:
     """Chain `event` onto `log_path`: set prev_hash + hash, append, advance head."""
     event["prev_hash"] = _last_hash(log_path)

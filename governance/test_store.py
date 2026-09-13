@@ -27,7 +27,7 @@ def check(name, cond):
 def main():
     # start from a clean edit log
     if os.path.exists(cc.EDITS_LOG):
-        os.remove(cc.EDITS_LOG)
+        cc.reset_log(cc.EDITS_LOG)
     s = gov.GovernanceStore()
 
     before = s.guardrail("gr.CO.3.2.7")
@@ -92,8 +92,8 @@ def main():
     cc_events = [a for a in aud if a["kind"] == "change_control"]
     check("audit shows exactly one committed change", len(cc_events) == 1)
 
-    # cleanup
-    os.remove(cc.EDITS_LOG)
+    # cleanup — drop the log AND its heads anchor together
+    cc.reset_log(cc.EDITS_LOG)
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 

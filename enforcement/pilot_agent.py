@@ -54,9 +54,10 @@ def handle_case(ep: EnforcementPoint, case: dict) -> dict:
 
 def main():
     # fresh audit + escalation state for a clean demo
-    for p in (cc.EVENTS_LOG, os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")):
-        if os.path.exists(p):
-            os.remove(p)
+    cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
+    _esc = os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")
+    if os.path.exists(_esc):
+        os.remove(_esc)
 
     ep = build_ep()
     cases = [
@@ -103,9 +104,10 @@ def main():
     print(f"audit trail: {os.path.relpath(cc.EVENTS_LOG, HERE)}")
 
     # cleanup demo artifacts
-    for p in (cc.EVENTS_LOG, os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")):
-        if os.path.exists(p):
-            os.remove(p)
+    cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
+    _esc = os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")
+    if os.path.exists(_esc):
+        os.remove(_esc)
 
 
 if __name__ == "__main__":

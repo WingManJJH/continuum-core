@@ -76,7 +76,7 @@ python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom
 
 # Audit-log tamper-evidence (ISO 9001 §7.5 hardening)
 python3 audit/verify.py                           # re-walk the hash chain (exit 1 on tampering)
-python3 audit/test_audit_chain.py                 # 10 asserts: content/delete/reorder/truncate/whole-log
+python3 audit/test_audit_chain.py                 # 13 asserts: content/delete/reorder/truncate/whole-log/reset
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -249,7 +249,7 @@ continuum-core/
 │   └── README.md
 ├── audit/                      # ISO 9001 §7.5 tamper-evidence (hash chain, D9)
 │   ├── verify.py               #   re-walk the chain; CLI + JSON report
-│   └── test_audit_chain.py     #   10 asserts, one per tamper mode
+│   └── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json
 │   └── DEFAULT-GUARDRAIL-TEMPLATE.md

@@ -35,11 +35,15 @@ TRIGGER = {"risk_score": 0.99, "amount": 10 ** 9, "vendor_risk": 0.99, "deal_siz
            "confidence": 0.0, "budget_impact": 10 ** 9}
 
 
+def _clean():
+    cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
+    if os.path.exists(ESCALATIONS):
+        os.remove(ESCALATIONS)
+
+
 def main():
     keep = "--keep" in sys.argv
-    for p in (cc.EVENTS_LOG, ESCALATIONS):
-        if os.path.exists(p):
-            os.remove(p)
+    _clean()
 
     ep = EnforcementPoint()
     g = ep.g
@@ -79,9 +83,7 @@ def main():
           + ("  (kept for the dashboard)" if keep else ""))
 
     if not keep:
-        for p in (cc.EVENTS_LOG, ESCALATIONS):
-            if os.path.exists(p):
-                os.remove(p)
+        _clean()
 
 
 if __name__ == "__main__":

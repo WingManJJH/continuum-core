@@ -17,7 +17,7 @@ the chain is maintained in exactly one place. A per-log heads anchor (`data/audi
 git-ignored) records the last hash + count. `verify_log()`/`verify_audit()` catch content edits,
 deletions, insertions, reorders (via the chain) and trailing truncation / whole-log deletion (via the
 heads anchor). CLI: `audit/verify.py`. Governance Audit tab shows a live intact/tampered badge.
-Tests: `audit/test_audit_chain.py` (10 assertions, one per tamper mode). Envelope schema updated to
+Tests: `audit/test_audit_chain.py` (13 assertions: 10 tamper modes + reset-log hygiene). Envelope schema updated to
 require `prev_hash`/`hash`.
 **Honest boundary (kept explicit):** a party who can rewrite BOTH the log and the heads file can forge
 a consistent chain; true tamper-*proofing* needs the head anchored off-box (external notarization /
