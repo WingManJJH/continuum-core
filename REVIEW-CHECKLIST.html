@@ -1,0 +1,280 @@
+<title>Continuum Review Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #f7f8fa; --surface: #ffffff; --surface-2: #eef1f6;
+    --ink: #1b2330; --muted: #5f6b7a; --line: #e2e7ef;
+    --accent: #2f6bff; --accent-ink: #ffffff;
+    --good: #1c7a4d; --good-bg: #e7f6ee; --warn: #9a6206; --warn-bg: #fdf1dd;
+    --crit: #b3261e; --crit-bg: #fdecea;
+    --shadow: 0 1px 2px rgba(20,30,50,.05), 0 6px 20px rgba(20,30,50,.06);
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f141b; --surface: #161d27; --surface-2: #1d2733;
+      --ink: #e7ecf3; --muted: #93a0b4; --line: #26303d;
+      --accent: #6f9bff; --accent-ink: #0b1017;
+      --good: #57c98d; --good-bg: #10281d; --warn: #e5a447; --warn-bg: #2b2110;
+      --crit: #f2837b; --crit-bg: #2b1512;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f141b; --surface: #161d27; --surface-2: #1d2733;
+    --ink: #e7ecf3; --muted: #93a0b4; --line: #26303d;
+    --accent: #6f9bff; --accent-ink: #0b1017;
+    --good: #57c98d; --good-bg: #10281d; --warn: #e5a447; --warn-bg: #2b2110;
+    --crit: #f2837b; --crit-bg: #2b1512;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+  header.top { position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: saturate(140%) blur(8px); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px; padding: 11px 20px; }
+  .mark { width: 25px; height: 25px; border-radius: 7px; flex: none; background: var(--accent);
+    color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .top .name { font-weight: 600; }
+  .top .name span { color: var(--muted); font-weight: 500; }
+  .top .spacer { flex: 1; }
+  .prog { font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex;
+    align-items: center; gap: 9px; }
+  .bar { width: 120px; height: 7px; border-radius: 4px; background: var(--surface-2);
+    overflow: hidden; border: 1px solid var(--line); }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .btn { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  .btn:hover { color: var(--ink); border-color: var(--accent); }
+
+  .wrap { max-width: 940px; margin: 0 auto; padding: 22px 20px 70px; }
+  .lede { color: var(--muted); max-width: 74ch; margin: 4px 0 22px; }
+  .lede code { font-family: var(--mono); font-size: .86em; background: var(--surface-2);
+    padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); }
+
+  h2 { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin: 26px 0 10px; display: flex; align-items: baseline; gap: 10px; }
+  h2 .n { color: var(--accent); font-weight: 600; }
+  h2 .sub { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-weight: 400;
+    color: var(--muted); font-size: 12px; }
+
+  .chk { display: grid; grid-template-columns: 22px 1fr auto; gap: 11px; align-items: start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+    padding: 10px 13px; margin-bottom: 7px; cursor: pointer; }
+  .chk:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .chk input { width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--accent); cursor: pointer; flex: none; }
+  .chk .txt { min-width: 0; }
+  .chk .txt b { font-weight: 600; }
+  .chk .txt .d { color: var(--muted); }
+  .chk .where { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap;
+    padding-top: 2px; text-align: right; }
+  .chk.done { background: var(--surface-2); }
+  .chk.done .txt b, .chk.done .txt .d { text-decoration: line-through; opacity: .62; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 500;
+    padding: 1px 7px; border-radius: 20px; white-space: nowrap; }
+  .pill.good { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.crit { background: var(--crit-bg); color: var(--crit); }
+  code.c { font-family: var(--mono); font-size: .85em; background: var(--surface-2);
+    padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line); word-break: break-word; }
+
+  .verdict { margin-top: 26px; border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--surface); border-radius: 10px; padding: 15px 18px; box-shadow: var(--shadow); }
+  .verdict h3 { margin: 0 0 10px; font-size: 15px; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .opts label { font-size: 13px; border: 1px solid var(--line); border-radius: 20px; padding: 5px 12px;
+    cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--ground); }
+  .opts input { accent-color: var(--accent); }
+  .verdict textarea { width: 100%; min-height: 66px; font: inherit; font-size: 13px; padding: 9px 11px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--ground); color: var(--ink);
+    resize: vertical; }
+  .sig { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .sig input { flex: 1; min-width: 140px; font: inherit; font-size: 13px; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--ground); color: var(--ink); }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 22px; }
+
+  @media print {
+    header.top { position: static; } .btn, .prog .bar { display: none; }
+    body { font-size: 11.5px; } .wrap { padding: 0 8px; } .chk { break-inside: avoid; box-shadow: none; }
+    .chk:hover { border-color: var(--line); } .verdict { break-inside: avoid; }
+  }
+</style>
+
+<header class="top">
+  <div class="mark">C</div>
+  <div class="name">Continuum <span>&middot; Review Checklist</span></div>
+  <div class="spacer"></div>
+  <div class="prog"><span id="count">0 / 0</span><span class="bar"><i id="fill"></i></span></div>
+  <button class="btn" id="reset" type="button">reset</button>
+  <button class="btn" id="print" type="button">print</button>
+  <button class="btn" id="theme" type="button">theme: auto</button>
+</header>
+
+<div class="wrap">
+  <p class="lede">Tick each check as you confirm it. Your ticks, verdict, and notes save in this
+    browser automatically. Run everything from the <code>continuum-core/</code> directory with the
+    venv active. Do <b>&sect; A</b> first &mdash; it makes the rest observable. Apps:
+    <code>governance</code> at localhost:8787, <code>dashboard</code> at localhost:8788.</p>
+
+  <h2><span class="n">A</span> Bring it up <span class="sub">prove the baseline before judging anything</span></h2>
+
+  <label class="chk"><input type="checkbox" data-id="a1">
+    <span class="txt"><b>The full test suite passes.</b> <span class="d">Run the one-liner chain of all 8 suites.</span> <span class="pill good">ALL GREEN</span></span>
+    <span class="where">terminal &middot; 61 asserts</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="a2">
+    <span class="txt"><b>Both apps are reachable.</b> <span class="d">Start <code class="c">governance/app.py</code> and <code class="c">dashboard/app.py</code>.</span></span>
+    <span class="where">:8787 &middot; :8788</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="a3">
+    <span class="txt"><b>Audit chain is intact.</b> <span class="d"><code class="c">python3 audit/verify.py</code></span> <span class="pill good">ALL CHAINS INTACT</span></span>
+    <span class="where">terminal</span></label>
+
+  <h2><span class="n">B</span> See it work <span class="sub">the whole thesis lives in two screens</span></h2>
+
+  <label class="chk"><input type="checkbox" data-id="b1">
+    <span class="txt"><b>A guardrail opens with its linked risk.</b> <span class="d">Governance &rarr; click <code class="c">CO.3.2.7</code>; fields populate, the Risk &amp; Control panel shows <code class="c">rc.kyc_false_verify</code>.</span></span>
+    <span class="where">:8787</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="b2">
+    <span class="txt"><b>An owner can edit a policy, versioned, no deploy.</b> <span class="d">Change <code class="c">Escalate if</code> to <code class="c">risk_score &gt; 0.95</code>, add a reason, Save.</span> <span class="pill good">v3 &rarr; v4</span></span>
+    <span class="where">:8787</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="b3">
+    <span class="txt"><b>A bad policy is refused, not shipped.</b> <span class="d">Enter <code class="c">risk_score &gt;&gt;&gt; 0.5</code> and Save.</span> <span class="pill crit">refused, version unchanged</span></span>
+    <span class="where">:8787</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="b4">
+    <span class="txt"><b>Every change is on the &sect;7.5 trail.</b> <span class="d">Audit tab shows a <span class="pill good">chain intact</span> badge and the v3&rarr;v4 change-control event with reviewer + reason.</span></span>
+    <span class="where">:8787</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="b5">
+    <span class="txt"><b>Strategy traces to the agent action.</b> <span class="d">Dashboard shows each objective &rarr; KPI (on/off-target pills) &rarr; agent-bound tasks with activity.</span></span>
+    <span class="where">:8788</span></label>
+
+  <h2><span class="n">C</span> Prove the load-bearing claims <span class="sub">where the product either holds or doesn't</span></h2>
+
+  <label class="chk"><input type="checkbox" data-id="c1">
+    <span class="txt"><b>One source of truth.</b> <span class="d">After the UI edit, the MCP-side graph returns v4 (run the one-liner in MANUAL &sect;02).</span> <span class="pill good">4 risk_score &gt; 0.95</span></span>
+    <span class="where">terminal</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="c2">
+    <span class="txt"><b>The guardrail is a gate, not advice.</b> <span class="d"><code class="c">enforcement/pilot_agent.py</code> &mdash; the tool runs <b>only</b> on allow; escalate/deny/rate never run it.</span></span>
+    <span class="where">terminal</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="c3">
+    <span class="txt"><b>Enforcement is universal.</b> <span class="d"><code class="c">enforcement/sweep.py --keep</code> gates all 8 agent-bound tasks; fail-closed on a missing guardrail.</span></span>
+    <span class="where">terminal &middot; 8/8</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="c4">
+    <span class="txt"><b>The model is checked against reality.</b> <span class="d"><code class="c">signal/conformance.py</code> reports 5 drift types incl. a <b>stale guardrail</b>; every finding needs human review; the model is never mutated.</span></span>
+    <span class="where">terminal</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="c5">
+    <span class="txt"><b>Tampering is detectable.</b> <span class="d">Edit any line in <code class="c">data/events.log.jsonl</code>, rerun <code class="c">audit/verify.py</code>.</span> <span class="pill crit">TAMPERING DETECTED</span> <span class="d">then restore/reset.</span></span>
+    <span class="where">terminal</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="c6">
+    <span class="txt"><b>Data-quality defects are flagged, not hidden.</b> <span class="d"><code class="c">traceability.py</code> flags the 2 orphan KPIs + 1 un-parented process.</span> <span class="pill warn">88% complete</span></span>
+    <span class="where">terminal</span></label>
+
+  <h2><span class="n">D</span> Judge the honesty <span class="sub">does it overclaim? this is the real test</span></h2>
+
+  <label class="chk"><input type="checkbox" data-id="d1">
+    <span class="txt"><b>Coverage is reported truthfully.</b> <span class="d">Dashboard tile reads <span class="pill warn">12% (1/8)</span> &mdash; only the reviewed KYC guardrail counts; the rest run under defaults. Not padded.</span></span>
+    <span class="where">:8788</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="d2">
+    <span class="txt"><b>Un-provable metrics say so.</b> <span class="d">Escalation precision &amp; drift-to-update latency show <span class="pill">needs data</span> &mdash; not invented numbers.</span></span>
+    <span class="where">:8788</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="d3">
+    <span class="txt"><b>Stubbed integrations are declared, not faked.</b> <span class="d"><code class="c">signal/connectors.py</code> &mdash; Notion/Teams/Slack/Outlook/Gmail raise a clear OAuth error; a file connector stands in.</span></span>
+    <span class="where">code</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="d4">
+    <span class="txt"><b>Security boundaries are stated, not glossed.</b> <span class="d"><code class="c">AUDIT-LOG.md</code>: rewriting both a log <b>and</b> the heads file could forge a chain; off-box anchoring is the named next step.</span></span>
+    <span class="where">docs</span></label>
+
+  <label class="chk"><input type="checkbox" data-id="d5">
+    <span class="txt"><b>Decisions &amp; pushback are on record.</b> <span class="d"><code class="c">DECISIONS.md</code> D1&ndash;D9 &mdash; incl. correcting the spec's &quot;8&ndash;15&times;&quot; claim to ~3&times;/task, and what's deferred.</span></span>
+    <span class="where">docs</span></label>
+
+  <div class="verdict">
+    <h3>Reviewer verdict</h3>
+    <div class="opts">
+      <label><input type="radio" name="verdict" value="pass"> Pass</label>
+      <label><input type="radio" name="verdict" value="concerns"> Pass with concerns</label>
+      <label><input type="radio" name="verdict" value="needs-work"> Needs work</label>
+    </div>
+    <textarea id="notes" placeholder="Notes, concerns, follow-ups..."></textarea>
+    <div class="sig">
+      <input id="reviewer" type="text" placeholder="Reviewer">
+      <input id="date" type="text" placeholder="Date">
+    </div>
+  </div>
+
+  <footer>Continuum Core &middot; Phases 1&ndash;4 + audit hash chain &middot; see MANUAL.md, README.md, DECISIONS.md for detail.</footer>
+</div>
+
+<script>
+  var KEY = "continuum-review-v1";
+  var root = document.documentElement;
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  var state = load();
+
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.chk input[type=checkbox]'));
+  function refresh() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    document.getElementById('count').textContent = done + ' / ' + boxes.length;
+    document.getElementById('fill').style.width = (boxes.length ? done / boxes.length * 100 : 0) + '%';
+  }
+  boxes.forEach(function (b) {
+    var id = b.getAttribute('data-id');
+    b.checked = !!state[id];
+    b.closest('.chk').classList.toggle('done', b.checked);
+    b.addEventListener('change', function () {
+      state[id] = b.checked; save(state);
+      b.closest('.chk').classList.toggle('done', b.checked);
+      refresh();
+    });
+  });
+  refresh();
+
+  // verdict + notes + signature persistence
+  var notes = document.getElementById('notes'), reviewer = document.getElementById('reviewer'), date = document.getElementById('date');
+  notes.value = state._notes || ''; reviewer.value = state._reviewer || ''; date.value = state._date || '';
+  [['_notes', notes], ['_reviewer', reviewer], ['_date', date]].forEach(function (p) {
+    p[1].addEventListener('input', function () { state[p[0]] = p[1].value; save(state); });
+  });
+  if (state._verdict) { var r = document.querySelector('input[name=verdict][value="' + state._verdict + '"]'); if (r) r.checked = true; }
+  document.querySelectorAll('input[name=verdict]').forEach(function (r) {
+    r.addEventListener('change', function () { state._verdict = r.value; save(state); });
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    if (!confirm('Clear all ticks, verdict, and notes?')) return;
+    state = {}; save(state);
+    boxes.forEach(function (b) { b.checked = false; b.closest('.chk').classList.remove('done'); });
+    notes.value = ''; reviewer.value = ''; date.value = '';
+    document.querySelectorAll('input[name=verdict]').forEach(function (r) { r.checked = false; });
+    refresh();
+  });
+  document.getElementById('print').addEventListener('click', function () { window.print(); });
+
+  // theme: auto -> light -> dark
+  var order = ['auto', 'light', 'dark'], cur = state._theme || 'auto';
+  var tbtn = document.getElementById('theme');
+  function applyTheme(t) { if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t); tbtn.textContent = 'theme: ' + t; }
+  applyTheme(cur);
+  tbtn.addEventListener('click', function () { cur = order[(order.indexOf(cur) + 1) % order.length]; state._theme = cur; save(state); applyTheme(cur); });
+</script>
