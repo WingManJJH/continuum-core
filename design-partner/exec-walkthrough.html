@@ -1,0 +1,172 @@
+<title>Continuum Executive Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #f7f8fa; --surface: #ffffff; --surface-2: #eef1f6;
+    --ink: #1b2330; --muted: #5f6b7a; --line: #e2e7ef;
+    --accent: #2f6bff; --accent-ink: #ffffff;
+    --good: #1c7a4d; --good-bg: #e7f6ee; --warn: #9a6206; --warn-bg: #fdf1dd; --crit: #b3261e;
+    --shadow: 0 1px 2px rgba(20,30,50,.05), 0 10px 30px rgba(20,30,50,.07);
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f141b; --surface: #161d27; --surface-2: #1d2733;
+      --ink: #e7ecf3; --muted: #93a0b4; --line: #26303d;
+      --accent: #6f9bff; --accent-ink: #0b1017;
+      --good: #57c98d; --good-bg: #10281d; --warn: #e5a447; --warn-bg: #2b2110; --crit: #f2837b;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f141b; --surface: #161d27; --surface-2: #1d2733;
+    --ink: #e7ecf3; --muted: #93a0b4; --line: #26303d;
+    --accent: #6f9bff; --accent-ink: #0b1017;
+    --good: #57c98d; --good-bg: #10281d; --warn: #e5a447; --warn-bg: #2b2110; --crit: #f2837b;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans);
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 22px;
+    border-bottom: 1px solid var(--line); background: var(--surface); }
+  .mark { width: 25px; height: 25px; border-radius: 7px; background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  header .name { font-weight: 600; } header .name span { color: var(--muted); font-weight: 500; }
+  header .spacer { flex: 1; }
+  .toggle { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  .toggle:hover { color: var(--ink); border-color: var(--accent); }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 72px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 16px; }
+  h1 { font-size: clamp(28px, 4.4vw, 40px); line-height: 1.12; letter-spacing: -0.025em; font-weight: 700;
+    margin: 0 0 14px; text-wrap: balance; }
+  h1 b { color: var(--accent); font-weight: 700; }
+  .sub { font-size: 18px; color: var(--muted); max-width: 60ch; margin: 0 0 8px; }
+
+  h2 { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); margin: 44px 0 14px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+  p { max-width: 66ch; }
+  .accentword { color: var(--accent); font-weight: 600; }
+
+  .lead { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 11px; padding: 16px 20px; box-shadow: var(--shadow); }
+  .lead p { margin: 0; max-width: none; }
+
+  ol.claims, ol.demo { list-style: none; counter-reset: n; margin: 0; padding: 0; }
+  ol.claims > li, ol.demo > li { counter-increment: n; position: relative; padding: 0 0 0 46px; margin: 0 0 16px; }
+  ol.claims > li::before, ol.demo > li::before { content: counter(n); position: absolute; left: 0; top: -2px;
+    width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--accent); font-family: var(--mono); font-weight: 700; font-size: 14px; display: grid; place-items: center; }
+  ol.claims .t { font-weight: 600; }
+  ol.claims .d, ol.demo .d { color: var(--muted); }
+  ol.demo > li { padding-top: 2px; }
+  ol.demo .t { font-weight: 600; }
+
+  .ask { display: grid; gap: 10px; }
+  .ask .q { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 13px 16px;
+    box-shadow: var(--shadow); }
+  .ask .q b { color: var(--ink); }
+
+  .status { background: var(--warn-bg); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+    border-radius: 11px; padding: 15px 18px; color: var(--ink); }
+  .status .h { font-weight: 600; color: var(--warn); margin: 0 0 5px; font-size: 14px; }
+  .status p { margin: 0; max-width: none; font-size: 14.5px; }
+
+  .kicker { margin-top: 34px; font-size: 18px; font-weight: 600; text-align: center; color: var(--ink); }
+  code.i { font-family: var(--mono); font-size: .85em; background: var(--surface-2); padding: 1px 6px;
+    border-radius: 5px; border: 1px solid var(--line); }
+  footer { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted);
+    font-size: 13px; }
+  @media print { header { position: static; } .toggle { display: none; } .lead, .ask .q, .status { box-shadow: none; } }
+</style>
+
+<header>
+  <div class="mark">C</div>
+  <div class="name">Continuum <span>&middot; Executive Brief</span></div>
+  <div class="spacer"></div>
+  <button class="toggle" id="themeBtn" type="button">theme: auto</button>
+</header>
+
+<div class="wrap">
+  <div class="eyebrow">For a design-partner conversation</div>
+  <h1>Your processes become the layer every AI action <b>runs against</b>.</h1>
+  <p class="sub">And the person who owns the process can change what the AI is allowed to do &mdash;
+    without an engineering ticket.</p>
+
+  <h2>The problem you already have</h2>
+  <div class="lead"><p>You're putting AI agents into real work. The question no tool answers today:
+    <span class="accentword">what is each agent allowed to do on its own, who decided that, and can you
+    prove it to an auditor?</span> Process tools map how work should run; none put an editable
+    agent-permission layer in the process owner's hands. So agent permissions live in code, change by
+    deploy, and leave no trail &mdash; the wrong place for something a compliance team has to stand behind.</p></div>
+
+  <h2>What Continuum does</h2>
+  <ol class="claims">
+    <li><span class="t">Governed autonomy.</span> <span class="d">Every step an agent runs is bound to a
+      <em>guardrail</em>: what it may do alone, what it must escalate to a human, what it can never do,
+      which data it may touch. The guardrail is a <b>gate the action passes through</b>, not advice &mdash;
+      the agent cannot act outside it.</span></li>
+    <li><span class="t">Owned by the business, not engineering.</span> <span class="d">A process owner edits
+      that guardrail in a web page. The change is versioned and <b>live for agents on the next call &mdash;
+      no deploy.</b></span></li>
+    <li><span class="t">Provable.</span> <span class="d">Every edit and every agent action lands on a
+      <b>tamper-evident audit trail</b> (hash-chained), mapped to ISO 9001 &sect;7.5. And because strategy,
+      process, and agent live in one model, a leader can trace an objective down to the agent action
+      executing it &mdash; and back.</span></li>
+  </ol>
+
+  <h2>See it in ~4 minutes</h2>
+  <ol class="demo">
+    <li><span class="t">Open the process canvas.</span> <span class="d">Click a step &mdash; say KYC
+      verification. See the boundary the AI runs inside. Change <em>"escalate high-risk cases to a human"</em>
+      and Save: a new version, no code, no deploy.</span></li>
+    <li><span class="t">Watch it bite.</span> <span class="d">The case the agent used to auto-approve now
+      routes to a person &mdash; the edit is live, no restart.</span></li>
+    <li><span class="t">See it roll up.</span> <span class="d">The leadership dashboard shows which steps run
+      under an agent, what the agent did, and whether it moved the KPI it was meant to.</span></li>
+    <li><span class="t">Try to cover it up.</span> <span class="d">Edit the audit log by hand &mdash; the chain
+      flags <span style="color:var(--crit);font-weight:600">tampering</span>. The record is defensible.</span></li>
+  </ol>
+
+  <h2>What we want to learn from you</h2>
+  <p>We're testing one thing: whether <span class="accentword">"guardrails a process owner can edit without
+    an engineering ticket"</span> is the capability that lands &mdash; or needs to be said differently.</p>
+  <div class="ask">
+    <div class="q"><b>Who</b> in your org should own what an AI is allowed to do on a process &mdash; day to day,
+      without filing a ticket?</div>
+    <div class="q">In <b>your words</b>, what would you call this &mdash; permissions? approvals? controls?
+      guardrails? (We want your vocabulary, not ours.)</div>
+    <div class="q">What would it take to trust that this is the <b>only</b> way the AI can act &mdash; no back door?</div>
+  </div>
+
+  <h2>Honest status</h2>
+  <div class="status">
+    <p class="h">A working prototype, not a slide.</p>
+    <p>The model, the editable guardrails, the enforcement gate, the tamper-evident audit trail, and the
+      strategy-to-execution dashboard all run and are tested end to end. Two things need <em>your</em>
+      environment, not more building: the <b>live connectors</b> (Notion / Teams / Slack / Outlook / Gmail)
+      that feed real activity are gated on your OAuth, and guardrail <b>coverage starts low on purpose</b> &mdash;
+      only a reviewed guardrail counts, so the number tells the truth about what's been signed off.</p>
+  </div>
+
+  <div class="kicker">Ask us to show a guardrail change go live in 30 seconds.</div>
+
+  <footer>Continuum &middot; a running prototype &middot; pair this brief with the live demo (three apps) and the design-partner validation guide.</footer>
+</div>
+
+<script>
+  (function () {
+    var order = ["auto", "light", "dark"], root = document.documentElement, btn = document.getElementById("themeBtn"), cur = "auto";
+    try { cur = localStorage.getItem("cc-exec-theme") || "auto"; } catch (e) {}
+    function apply(t) { if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t); btn.textContent = "theme: " + t; try { localStorage.setItem("cc-exec-theme", t); } catch (e) {} }
+    apply(cur);
+    btn.addEventListener("click", function () { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); });
+  })();
+</script>
