@@ -6,6 +6,26 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Audit off-box anchor (co-forgery defense)
+
+### D10 — HMAC-signed off-box anchor over both audit logs
+**Context:** D9's hash chain is defeated by a party who rewrites both a log and its heads file into a
+consistent chain — flagged as needing an off-box anchor. This closes it.
+**Decision & build:** `audit/anchor.py` — `anchor_now()` takes a `combined_head` fingerprint over both
+logs (one hash of both heads + counts), HMAC-signs it with a key held off the log-writer's box
+(`CONTINUUM_AUDIT_KEY`), and publishes to a `Notary`. `verify_against_anchor()` re-derives each log's
+head at the anchored count, checks it against the signed head (catches a rewritten prefix) and checks
+the signature — returning verified / stale / TAMPERED. Wired into `audit/verify.py`.
+`audit/test_anchor.py` (10 assertions) proves it detects the exact consistent co-forgery the chain
+alone passes, plus signature/wrong-key/growth cases. Anchor store `data/audit_anchors.jsonl` (runtime,
+git-ignored). Full suite now 71 assertions.
+**Honest boundary (kept explicit):** security reduces to the HMAC key and the notary store being
+off-box. `LocalNotary` keeps both on-box (faithful stand-in); `ExternalNotary` is the auth-gated real
+write-once service and raises until provisioned (declared, not faked). Off-box *hosting* and a
+retention-policy engine remain the named next steps.
+
+---
+
 ## 2026-09-12 — Audit-log tamper-evidence
 
 ### D9 — Hash chain over the audit logs (ISO 9001 §7.5 hardening)

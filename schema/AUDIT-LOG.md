@@ -62,8 +62,24 @@ Verify from the CLI: `python3 audit/verify.py` (exit 1 on tampering). The govern
 tab shows a live *chain intact / tampering detected* badge. Tested end to end in
 `audit/test_audit_chain.py` (13 assertions: one per tamper mode, plus reset-log hygiene).
 
-**What it does not prove (honest boundary):** a party with write access to *both* the log and the
-heads file can forge a fresh, internally-consistent chain. Detecting that requires anchoring the
-head **off-box** — external notarization or an append-only store the writer can't rewrite. That, a
-retention-policy engine, and consolidating the two logs into one signed store remain flagged as the
-next hardening steps — named, not assumed away.
+### Off-box anchor — the co-forgery defense (built)
+
+The hash chain alone is defeated by a party who rewrites *both* the log and the heads file into a
+fresh, internally-consistent chain. `audit/anchor.py` closes that: it periodically takes an
+**HMAC-signed fingerprint over both logs** (`combined_head` = one hash of both logs' heads + counts —
+the "one signed store" fingerprint without merging the files) and publishes it to a **notary** the
+log writer cannot rewrite. `verify_against_anchor()` re-derives each log's head *at the anchored
+count* and checks it still equals the signed head (a rewritten prefix is caught), then checks the
+signature — distinguishing `verified` / `stale` (chain legitimately grew, re-anchor) / `TAMPERED`.
+`audit/verify.py` reports it; `audit/test_anchor.py` proves it catches the exact co-forgery the chain
+alone passes (10 assertions).
+
+The security now reduces to two things being off the log-writer's box: the **HMAC key** (env
+`CONTINUUM_AUDIT_KEY`; in production an audit service / HSM) and the **append-only notary store**.
+`LocalNotary` keeps both on-box, so it is a faithful *stand-in* for the mechanism, not the guarantee;
+`ExternalNotary` is the auth-gated real thing (a write-once external notarization service) and raises
+until provisioned — declared, not faked, exactly like the signal-layer connectors.
+
+**Still flagged (honest boundary):** hosting the key and notary **off-box** is a deployment step
+(the mechanism is complete, the external notary is auth-gated here); and a **retention-policy engine**
+(automatic disposition schedules per entity class) remains a named next step — not assumed away.

@@ -26,7 +26,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
+sys.path.insert(0, HERE)
 import continuum_core as cc  # noqa: E402
+import anchor  # noqa: E402
 
 
 def main() -> int:
@@ -51,9 +53,14 @@ def main() -> int:
                 print(f"        event_id {b['event_id']}")
         elif r.get("head_anchor"):
             print(f"      note: heads anchor {r['head_anchor']}")
+    # off-box anchor (Phase-3+ hardening): catches log+heads co-forgery
+    a = anchor.verify_against_anchor()
+    print("\n  off-box anchor       " + a["status"].upper() + "  · " + a["detail"])
+
     print("\n" + "-" * 70)
-    print("RESULT:", "ALL CHAINS INTACT" if report["ok"] else "TAMPERING DETECTED")
-    return 0 if report["ok"] else 1
+    overall_ok = report["ok"] and a["ok"]
+    print("RESULT:", "ALL CHAINS INTACT" if overall_ok else "TAMPERING DETECTED")
+    return 0 if overall_ok else 1
 
 
 if __name__ == "__main__":

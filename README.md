@@ -75,8 +75,9 @@ python3 dashboard/app.py                         # http://localhost:8788 — the
 python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom-up / coverage / metrics
 
 # Audit-log tamper-evidence (ISO 9001 §7.5 hardening)
-python3 audit/verify.py                           # re-walk the hash chain (exit 1 on tampering)
 python3 audit/test_audit_chain.py                 # 13 asserts: content/delete/reorder/truncate/whole-log/reset
+python3 audit/test_anchor.py                       # 10 asserts: off-box anchor catches log+heads co-forgery
+python3 audit/verify.py                            # re-walk chain + off-box anchor (exit 1 on tampering)
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -154,9 +155,11 @@ design-partner demo from [`design-partner/validation-guide.md`](design-partner/v
 per-log heads anchor catches truncation. `python3 audit/verify.py` re-walks the chain and the
 governance **Audit** tab shows a live *chain intact / tampering detected* badge — any edit,
 deletion, reorder, or truncation is caught (see [`schema/AUDIT-LOG.md`](schema/AUDIT-LOG.md)).
-**Still flagged (honest boundary):** off-box anchoring of the chain head (external notarization),
-a retention-policy engine, and one signed store for both logs — a party who can rewrite both a log
-and the heads file could still forge a consistent chain.
+**Off-box anchor (built, D10):** `audit/anchor.py` HMAC-signs a `combined_head` fingerprint over
+both logs and publishes it to a notary the writer can't rewrite; `verify_against_anchor()` catches the
+log+heads co-forgery the chain alone can't (proven in `audit/test_anchor.py`). **Still flagged:**
+hosting the key + notary off-box is a deployment step (`ExternalNotary` is auth-gated), and a
+retention-policy engine remains a named next step.
 
 ## What Phase 3 proves (signal & agent infrastructure)
 
@@ -248,8 +251,10 @@ continuum-core/
 │   ├── test_rollup.py          #   rollup / coverage / metrics assertions
 │   └── README.md
 ├── audit/                      # ISO 9001 §7.5 tamper-evidence (hash chain, D9)
-│   ├── verify.py               #   re-walk the chain; CLI + JSON report
-│   └── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
+│   ├── verify.py               #   re-walk the chain + off-box anchor; CLI + JSON report
+│   ├── anchor.py               #   HMAC-signed off-box anchor over both logs (co-forgery defense)
+│   ├── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
+│   └── test_anchor.py          #   10 asserts: anchor catches consistent co-forgery
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json
 │   └── DEFAULT-GUARDRAIL-TEMPLATE.md

@@ -46,6 +46,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 signal/test_conformance.py \
   && python3 dashboard/test_rollup.py \
   && python3 audit/test_audit_chain.py \
+  && python3 audit/test_anchor.py \
   && echo "ALL GREEN"
 ```
 
@@ -61,8 +62,9 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `signal/test_conformance.py` | `8 passed, 0 failed` |
 | `dashboard/test_rollup.py` | `13 passed, 0 failed` |
 | `audit/test_audit_chain.py` | `13 passed, 0 failed` |
+| `audit/test_anchor.py` | `10 passed, 0 failed` |
 
-61 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+71 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -162,7 +164,8 @@ python3 dashboard/app.py                # then open http://localhost:8788
 python3 dashboard/test_rollup.py        # 13 assertions
 
 # verify the audit logs are tamper-free (after any activity)
-python3 audit/verify.py                  # re-walks the hash chain; exit 1 on tampering
+python3 audit/verify.py                  # re-walks the hash chain + off-box anchor; exit 1 on tampering
+python3 audit/anchor.py                   # take a signed off-box anchor of the chain, then verify
 ```
 
 **What to look for on http://localhost:8788:** metric tiles (guardrail coverage **12% — 1/8
