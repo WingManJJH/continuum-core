@@ -78,6 +78,8 @@ python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom
 python3 audit/test_audit_chain.py                 # 13 asserts: content/delete/reorder/truncate/whole-log/reset
 python3 audit/test_anchor.py                       # 10 asserts: off-box anchor catches log+heads co-forgery
 python3 audit/verify.py                            # re-walk chain + off-box anchor (exit 1 on tampering)
+python3 governance/test_retention.py               # 16 asserts: §7.5.3 schedule, legal holds, chain-safe disposition
+python3 governance/retention.py                    # retention plan (add --apply to archive + ledger due records)
 
 # Process maps — §03 Canvas View (first slice)
 python3 maps/test_mapdata.py                       # 10 asserts: flow / agent step / escalation / override
@@ -232,7 +234,9 @@ continuum-core/
 ├── governance/                 # Phase 2 — the editable-guardrail module
 │   ├── app.py                  #   stdlib HTTP server: static UI + JSON API
 │   ├── store.py                #   validated, versioned edit path (write backbone)
+│   ├── retention.py            #   §7.5.3 retention scheduler + chain-safe disposition (D12)
 │   ├── test_store.py           #   write-path assertions
+│   ├── test_retention.py       #   16 asserts: schedule / holds / disposition
 │   ├── static/                 #   vanilla-JS three-pane editor (index.html/styles.css/app.js)
 │   └── README.md
 ├── enforcement/                # Phase 3 gate + Phase 4 full-coverage sweep

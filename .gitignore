@@ -6,3 +6,6 @@ data/edits.log.jsonl
 data/escalations.jsonl
 data/audit_heads.json
 data/audit_anchors.jsonl
+data/audit_archive.jsonl
+data/retention_ledger.jsonl
+data/legal_holds.json

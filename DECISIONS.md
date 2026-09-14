@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Retention-policy engine (ISO 9001 §7.5.3)
+
+### D12 — Retention & disposition scheduler
+**Context:** the last flagged hardening piece — §7.5.3 requires a defined retention period and a
+deliberate disposition schedule; the `deprecate` op existed but no scheduler did.
+**Decision & build:** `governance/retention.py` classifies every audit record, applies a rule table
+(retain period + action per class: `archive` / `dispose` / `review`), reports what is **due**, honors
+**legal holds**, and `apply()` dispositions deliberately — copies due records to an append-only cold
+archive and writes a per-record disposition ledger (who/when/action). It **never mutates the live
+hash-chained logs** (tamper-evidence preserved) and **never auto-destroys** (`review` records are
+surfaced for a human; `apply` is idempotent). `governance/test_retention.py` (16 assertions, incl.
+"live chains still intact after disposition"). CLI `python3 governance/retention.py [--apply]`. Full
+suite now 97 assertions.
+**Honest boundary:** physically shredding a disposed record from a hash-chained log without breaking
+the chain is a **seal-and-roll** deployment step (archive the old prefix under a new anchor, re-base
+the live log) — out of scope; retention preserves the chained copy and flags the step. With D10's
+off-box anchor, this closes the flagged audit hardening except the two named deployment steps (off-box
+hosting of the key+notary, and seal-and-roll).
+
+---
+
 ## 2026-09-13 — In-app process-map canvas (§03 Canvas View, first slice)
 
 ### D11 — Process Maps app (the visual layer)

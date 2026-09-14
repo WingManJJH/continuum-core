@@ -80,6 +80,19 @@ The security now reduces to two things being off the log-writer's box: the **HMA
 `ExternalNotary` is the auth-gated real thing (a write-once external notarization service) and raises
 until provisioned — declared, not faked, exactly like the signal-layer connectors.
 
-**Still flagged (honest boundary):** hosting the key and notary **off-box** is a deployment step
-(the mechanism is complete, the external notary is auth-gated here); and a **retention-policy engine**
-(automatic disposition schedules per entity class) remains a named next step — not assumed away.
+### Retention & disposition — the schedule (built)
+
+`governance/retention.py` is the §7.5.3 retention scheduler. It classifies every audit record,
+applies a rule table (retain period + disposition action per class), reports what is **due**, honors
+**legal holds** (a held entity's records are never dispositioned), and `apply()` performs disposition
+**deliberately and auditably**: it copies due records to an append-only cold **archive** and writes a
+per-record **disposition ledger** (who / when / action). It never removes records from the live
+hash-chained logs (tamper-evidence preserved) and never auto-destroys — `review`-class records are
+surfaced for a human. `governance/test_retention.py` (16 assertions). CLI: `python3
+governance/retention.py [--apply]`.
+
+**Still flagged (honest boundary):** two deployment-grade steps remain, both named not assumed away —
+hosting the anchor **key + notary off-box** (the mechanism is complete; `ExternalNotary` is auth-gated
+here), and the **seal-and-roll** that physically removes a disposed record from a hash-chained log
+without breaking the chain (retention archives + ledgers the decision and preserves the chained copy;
+it does not shred it).

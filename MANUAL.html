@@ -259,7 +259,7 @@
 
     <section id="tests">
       <h2><span class="no">&sect;</span> Run every test</h2>
-      <p>The fastest way to confirm the whole system is healthy &mdash; 81 assertions plus 3 harness
+      <p>The fastest way to confirm the whole system is healthy &mdash; 97 assertions plus 3 harness
         checks. The chain ends with <code class="inl">ALL GREEN</code>.</p>
       <div class="cmd">
         <div class="bar"><span class="dot"></span><span class="tag">bash</span>
@@ -273,6 +273,7 @@
   &amp;&amp; <span class="p">python3</span> dashboard/test_rollup.py \
   &amp;&amp; <span class="p">python3</span> audit/test_audit_chain.py \
   &amp;&amp; <span class="p">python3</span> audit/test_anchor.py \
+  &amp;&amp; <span class="p">python3</span> governance/test_retention.py \
   &amp;&amp; <span class="p">python3</span> maps/test_mapdata.py \
   &amp;&amp; <span class="ok">echo "ALL GREEN"</span></code></pre>
       </div>
@@ -289,6 +290,7 @@
             <tr><td class="cmdcell">dashboard/test_rollup.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">audit/test_audit_chain.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">audit/test_anchor.py</td><td><span class="pill good">10 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">governance/test_retention.py</td><td><span class="pill good">16 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">maps/test_mapdata.py</td><td><span class="pill good">10 passed, 0 failed</span></td></tr>
           </tbody>
         </table>
