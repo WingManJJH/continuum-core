@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Continuum · Advisor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="mark">C</div>
+    <div class="name">Continuum <span>· Advisor</span></div>
+    <div class="spacer"></div>
+    <button class="toggle" id="themeBtn" type="button">theme: auto</button>
+  </header>
+
+  <main id="thread" class="thread">
+    <div class="turn assistant intro">
+      <div class="bubble">
+        <p><b>Analyze anything against best practices &amp; standards.</b> Pick a process, guardrail,
+          task, or the whole model — or paste content or data — and I'll score it against ISO 9001
+          (§4.4, §7.5, §7.5.3), ISO 9004, APQC, and the Continuum doctrine (§04 / §11 / §12), with a
+          finding and a recommendation for anything that falls short.</p>
+        <p class="fine">Deterministic rules advisor — works with no model access. A deeper
+          natural-language review (the LLM advisor) plugs in once model access is provisioned.</p>
+      </div>
+    </div>
+  </main>
+
+  <div class="composer">
+    <select id="kind" class="pick">
+      <option value="process">Process</option>
+      <option value="guardrail">Guardrail</option>
+      <option value="task">Task</option>
+      <option value="model">Whole model</option>
+      <option value="content">Paste content / data</option>
+    </select>
+    <select id="subject" class="pick grow"></select>
+    <textarea id="content" class="content" placeholder="Paste an SOP, a policy, a JSON record…" hidden></textarea>
+    <button id="analyze" class="go" type="button">Analyze</button>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

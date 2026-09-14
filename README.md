@@ -87,6 +87,10 @@ python3 governance/retention.py                    # retention plan (add --apply
 # Process canvas — interactive §03 Canvas View
 python3 maps/test_mapdata.py                       # 12 asserts: flow / agent step / escalation / override / editor payload
 python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: flowchart/RACI/checklist + in-canvas guardrail editing
+
+# Advisor — analyze anything vs best practices & standards
+python3 advisor/test_advisor.py                    # 18 asserts: process/guardrail/task/content/model checks
+python3 advisor/app.py                             # http://localhost:8790 — AI window: score a subject against ISO 9001/9004/APQC + Core Model doctrine
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -269,6 +273,11 @@ continuum-core/
 │   ├── anchor.py               #   HMAC-signed off-box anchor over both logs (co-forgery defense)
 │   ├── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
 │   └── test_anchor.py          #   10 asserts: anchor catches consistent co-forgery
+├── advisor/                    # AI advisor window — analyze vs best practices & standards (D17)
+│   ├── advisor.py              #   RulesAdvisor engine + LLMAdvisor (auth-gated seam)
+│   ├── app.py                  #   stdlib server: /api/subjects + /api/analyze + chat window
+│   ├── static/                 #   vanilla-JS agent window
+│   └── test_advisor.py         #   18 asserts across every subject type
 ├── maps/                       # §03 Canvas View — interactive process canvas (D11 + D13)
 │   ├── mapdata.py              #   per-process map data incl. the editable guardrail
 │   ├── app.py                  #   stdlib server: /api/maps + PUT /api/guardrail + POST /api/task (reuses governance store)

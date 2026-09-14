@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — AI advisor window (analyze anything vs best practices & standards)
+
+### D17 — Standards advisor + agent window
+**Context:** asked for an AI window where any feature / data / process / content can be analyzed
+against best practices and standards.
+**Decision & build:** `advisor/` — a chat-style **agent window** (`app.py`, :8790) over a
+deterministic **`RulesAdvisor`** engine. Point it at a process, guardrail, task, the whole model, or
+paste content/data, and it returns a scored analysis with findings that **cite the standard each comes
+from**: ISO 9001 §4.4 / §7.5 / §7.5.3, ISO 9004, APQC, and the Core Model doctrine §04 / §11 / §12,
+plus least-privilege. Content is checked against an ISO 9001 §7.5 documented-information checklist;
+pasted JSON is validated against the locked entity schema. `advisor/test_advisor.py` — 18 asserts.
+Verified live: analyzed a guardrail (88%, "unreviewed default" flagged), the whole model (50%, real
+coverage + traceability numbers), and a thin SOP (0% on §7.5 elements).
+**The AI seam (honest):** a live natural-language reviewer is the **`LLMAdvisor`** — it needs model
+access (API/OAuth), so it is declared and **refuses until provisioned** (exactly like the signal
+connectors and the pilot agent); the RulesAdvisor stands in and is what the window uses now. Full
+suite 164 asserts. Four apps now run together: governance :8787, dashboard :8788, canvas :8789,
+advisor :8790.
+
+---
+
 ## 2026-09-13 — Agent-binding authoring (make a step agent-run from the canvas)
 
 ### D16 — AgentBinding write path
