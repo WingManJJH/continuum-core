@@ -67,7 +67,11 @@ class Graph:
                     continue
                 ev = json.loads(line)
                 et, eid, op = ev["entity_type"], ev["entity_id"], ev["op"]
-                if op in ("create", "update", "restore"):
+                # every governance edit carries the full entity in payload
+                # (snapshot-per-event), so overlaying it folds create/update/
+                # restore/deprecate uniformly — a deprecated entity keeps its
+                # bumped version and status:deprecated from the payload.
+                if op in ("create", "update", "restore", "deprecate") and ev.get("payload"):
                     self._by_type[et][eid] = ev["payload"]
                 elif op == "deprecate" and eid in self._by_type[et]:
                     self._by_type[et][eid]["status"] = "deprecated"

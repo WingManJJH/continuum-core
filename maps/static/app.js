@@ -164,7 +164,43 @@ function renderProps() {
     form.addEventListener("submit", saveGuardrail);
     $("#gr-reset").addEventListener("click", function () { renderProps(); });
   }
+  if ($("#t-save")) {
+    $("#t-save").onclick = saveStruct;
+    $("#t-up").onclick = function () { moveStep("up"); };
+    $("#t-down").onclick = function () { moveStep("down"); };
+    $("#t-remove").onclick = removeStep;
+  }
 }
+
+// ---------- structural edits (Task write path) ----------
+var ACTOR = "role.ops.support_lead";
+function postTask(body) {
+  return fetch("/api/task", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); });
+}
+function structMsg(txt, cls) { var m = $("#t-msg"); if (m) { m.textContent = txt; m.className = "msg " + cls; m.hidden = false; } }
+function saveStruct() {
+  var t = getTask(); if (!t) return;
+  postTask({ op: "edit", id: t.id, changes: { name: $("#t-name").value.trim(), performed_by: parseCsv($("#t-perf").value) }, actor: ACTOR, reason: $("#t-reason").value.trim() })
+    .then(function (res) { if (res.ok) { load().then(function () { structMsg("Saved v" + res.result.version + " — step updated.", "ok"); }); } else structMsg("Rejected: " + res.error, "err"); });
+}
+function moveStep(dir) {
+  var t = getTask(); if (!t) return;
+  postTask({ op: "move", id: t.id, dir: dir, actor: ACTOR, reason: "reorder step" })
+    .then(function (res) { if (res.ok) load(); else structMsg("Rejected: " + res.error, "err"); });
+}
+function removeStep() {
+  var t = getTask(); if (!t) return;
+  if (!confirm("Remove step " + t.id + "? It is deprecated (retained on the audit trail), not destroyed.")) return;
+  postTask({ op: "remove", id: t.id, actor: ACTOR, reason: $("#t-reason").value.trim() || "removed via canvas" })
+    .then(function (res) { if (res.ok) { state.task = null; load(); } else structMsg("Rejected: " + res.error, "err"); });
+}
+function addStep() {
+  var p = getProc(); if (!p) return;
+  var name = prompt("New step name for " + p.id + ":"); if (!name) return;
+  postTask({ op: "add", process: p.id, name: name, actor: ACTOR, reason: "added step via canvas" })
+    .then(function (res) { if (res.ok) { state.task = res.result.id; load(); } else alert("Rejected: " + res.error); });
+}
+$("#add-step").addEventListener("click", addStep);
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");
   var kpis = p.kpis.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("");
@@ -183,8 +219,14 @@ function taskProps(p, t) {
     + '<div class="p-sec"><div class="lbl">performed by</div><div class="p-row">' + esc(t.roles.map(shortRole).join(", ") || "—") + (t.agents.length ? ' <span class="pill gr">' + esc(t.agents.map(lastSeg).join(", ")) + " (agent)</span>" : "") + "</div></div>"
     + '<div class="p-sec"><div class="lbl">data</div><div class="p-row">in ' + esc(csv(t.inputs) || "—") + " · out " + esc(csv(t.outputs) || "—") + "</div>"
     + '<div class="p-row">' + t.kpi_refs.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("") + "</div></div>";
-  if (!g) return head + '<div class="p-sec"><div class="p-row muted">No guardrail on this step.</div></div>';
-  return head
+  var struct = '<div class="struct"><div class="lbl">step structure</div>'
+    + '<label>Name<input id="t-name" type="text" value="' + esc(t.name) + '"></label>'
+    + '<label>Performed by <span class="hint">comma refs · role.* / agent.*</span><input id="t-perf" type="text" value="' + esc(t.roles.concat(t.agents).join(", ")) + '"></label>'
+    + '<label>Reason <span class="hint">required · §7.5</span><input id="t-reason" type="text" placeholder="why?"></label>'
+    + '<div class="btnrow"><button id="t-save">Save step</button><button id="t-up">↑ up</button><button id="t-down">↓ down</button><button id="t-remove" class="danger">Remove step</button></div>'
+    + '<div id="t-msg" class="msg" hidden></div></div>';
+  if (!g) return head + struct + '<div class="p-sec"><div class="p-row muted">No guardrail on this step (inherits the process default, if any).</div></div>';
+  return head + struct
     + '<div class="p-sec"><div class="lbl">guardrail ' + esc(g.id) + " v" + g.version + '</div>'
     + '<form id="gr-form">'
     + '<label>Allowed <span class="hint">comma-separated</span><textarea id="f-allow" rows="2">' + esc(csv(g.allowed_actions)) + "</textarea></label>"

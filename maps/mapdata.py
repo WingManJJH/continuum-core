@@ -26,7 +26,8 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
         risks = [{"id": r["id"], "risk": r["risk"]}
                  for r in (g.get("RiskControl", rr) for rr in p.get("risk_refs", [])) if r]
         tasks = []
-        for t in sorted((t for t in g.all("Task") if t["process_ref"] == p["id"]),
+        for t in sorted((t for t in g.all("Task")
+                         if t["process_ref"] == p["id"] and t["status"] == "active"),
                         key=lambda t: t["seq"]):
             gr, pinned = g.effective_guardrail(t["id"])
             # the full effective guardrail, trimmed to what the in-canvas editor

@@ -56,7 +56,8 @@ class Rollup:
     # --- helpers -----------------------------------------------------------
     def _agent_tasks(self) -> list[dict]:
         return [t for t in self.g.all("Task")
-                if any(w.startswith("agent.") for w in t.get("performed_by", []))]
+                if t.get("status") == "active"
+                and any(w.startswith("agent.") for w in t.get("performed_by", []))]
 
     @staticmethod
     def _activity(events: list[dict], task_id: str) -> dict:

@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Task write path (edit process structure on the canvas)
+
+### D14 — Structural editing: add / rename / reorder / remove steps
+**Context:** D13's canvas edited guardrails; editing the process *structure* itself needed a Task write
+path (the next extension).
+**Decision & build:** added `store.edit_task / add_task / move_task / remove_task` — all through the
+same event-sourced, hash-chained, §7.5 write path as guardrails: validated against the locked Task
+schema **plus referential-integrity checks** (process exists, performers are real roles/agent bindings,
+guardrail ref exists), versioned, reason required. `remove_task` **deprecates** (status change, retained
+— never hard-deleted); the fold now overlays a deprecated payload so version+status carry. Deprecated
+steps drop out of the canvas and the §12 coverage denominator (`mapdata` + `rollup` filter active). The
+canvas gained a "+ Step" toolbar button and a per-step **structure panel** (rename, edit performers,
+move up/down, remove) posting to `POST /api/task` (op = add/edit/move/remove → the store). New steps
+inherit the process guardrail. `governance/test_taskedit.py` — 16 asserts. Verified live in-browser:
+added/renamed(v2)/reordered/removed a step from the canvas, chain stayed intact. Full suite 115 asserts.
+**Scope:** covers step add/rename/reorder/remove + performer edits. A drag-palette for authoring
+brand-new processes and richer element editing round out the full §03 editor; the write path they'd use
+is now in place.
+
+---
+
 ## 2026-09-13 — Interactive process canvas (§03 Canvas View)
 
 ### D13 — Three-pane interactive editor with in-canvas guardrail editing

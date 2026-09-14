@@ -60,7 +60,8 @@ python3 mcp_server/traceability.py              # §01/§12 lint: orphan KPIs, u
 python3 mcp_server/scenario.py                  # walk an agent through the MCP tool loop
 
 # Phase 2 — governance module (editable guardrails)
-python3 governance/test_store.py                # write-path assertions (versioning, §7.5 trail, one-source-of-truth)
+python3 governance/test_store.py                # guardrail write-path assertions (versioning, §7.5, one-source-of-truth)
+python3 governance/test_taskedit.py             # 16 asserts: Task write path — add/rename/reorder/remove a step
 python3 governance/app.py                       # http://localhost:8787 — the editor UI
 
 # Phase 3 — signal & agent infrastructure
@@ -235,7 +236,8 @@ continuum-core/
 │   ├── app.py                  #   stdlib HTTP server: static UI + JSON API
 │   ├── store.py                #   validated, versioned edit path (write backbone)
 │   ├── retention.py            #   §7.5.3 retention scheduler + chain-safe disposition (D12)
-│   ├── test_store.py           #   write-path assertions
+│   ├── test_store.py           #   guardrail write-path assertions
+│   ├── test_taskedit.py        #   16 asserts: Task write path (add/rename/reorder/remove)
 │   ├── test_retention.py       #   16 asserts: schedule / holds / disposition
 │   ├── static/                 #   vanilla-JS three-pane editor (index.html/styles.css/app.js)
 │   └── README.md
@@ -265,8 +267,8 @@ continuum-core/
 │   └── test_anchor.py          #   10 asserts: anchor catches consistent co-forgery
 ├── maps/                       # §03 Canvas View — interactive process canvas (D11 + D13)
 │   ├── mapdata.py              #   per-process map data incl. the editable guardrail
-│   ├── app.py                  #   stdlib server: GET /api/maps + PUT /api/guardrail (reuses governance store)
-│   ├── static/                 #   3-pane canvas: SVG flowchart + RACI + checklist + properties/editor
+│   ├── app.py                  #   stdlib server: /api/maps + PUT /api/guardrail + POST /api/task (reuses governance store)
+│   ├── static/                 #   3-pane canvas: flowchart/RACI/checklist + edit guardrails AND process structure
 │   └── test_mapdata.py         #   12 asserts: flow / agent step / escalation / override / editor payload
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json

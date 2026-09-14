@@ -61,7 +61,17 @@ h2 { font-size: 11px; font-family: var(--mono); text-transform: uppercase; lette
 .viewbar { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
   border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .proc-title { font-weight: 600; } .proc-title .pid { font-family: var(--mono); }
+.add-btn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 8px;
+  border: 1px dashed var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.add-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .views { margin-left: auto; display: flex; gap: 4px; }
+.struct { border-top: 1px solid var(--line); padding: 10px 0 2px; }
+.struct .btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.struct .btnrow button { font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.struct .btnrow button:hover { border-color: var(--accent); }
+.struct .btnrow button.danger { color: var(--crit); border-color: var(--crit-bg); }
+.struct .btnrow button.danger:hover { border-color: var(--crit); }
 .views button { font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); cursor: pointer; }
 .views button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }

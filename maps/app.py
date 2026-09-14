@@ -92,6 +92,34 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._json_code({"ok": False, "error": repr(e)}, 500)
 
+    def do_POST(self):
+        # edit process STRUCTURE from the canvas — add / rename / reorder / remove
+        # a step, all through the versioned, hash-chained governance write path.
+        u = urlparse(self.path)
+        if u.path != "/api/task":
+            return self.send_error(404)
+        length = int(self.headers.get("Content-Length", 0))
+        b = json.loads(self.rfile.read(length) or b"{}")
+        op = b.get("op")
+        actor = b.get("actor", "role.ops.support_lead")
+        reason = b.get("reason", "")
+        try:
+            if op == "edit":
+                r = STORE.edit_task(b["id"], b.get("changes", {}), actor, reason)
+            elif op == "add":
+                r = STORE.add_task(b["process"], b.get("name", ""), actor, reason)
+            elif op == "move":
+                r = STORE.move_task(b["id"], b.get("dir", "up"), actor, reason or "reorder step")
+            elif op == "remove":
+                r = STORE.remove_task(b["id"], actor, reason)
+            else:
+                return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+            return self._json({"ok": True, "result": r})
+        except gov.EditError as e:
+            return self._json_code({"ok": False, "error": str(e)}, 400)
+        except Exception as e:  # noqa: BLE001
+            return self._json_code({"ok": False, "error": repr(e)}, 500)
+
 
 def main():
     port = 8789

@@ -38,6 +38,10 @@ EDITABLE_FIELDS = [
     "allowed_actions", "forbidden_actions", "escalate_if", "data_scope",
     "rate_limit", "escalation_path", "audit_requirement",
 ]
+EDITABLE_TASK_FIELDS = [
+    "name", "seq", "performed_by", "inputs", "outputs", "data_scope",
+    "kpi_refs", "guardrail_ref",
+]
 
 
 class EditError(ValueError):
@@ -52,6 +56,8 @@ class GovernanceStore:
     def __init__(self):
         with open(os.path.join(SCHEMA_DIR, "guardrail-policy.schema.json")) as f:
             self._gr_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "task.schema.json")) as f:
+            self._task_validator = Draft202012Validator(json.load(f))
 
     def graph(self) -> cc.Graph:
         return cc.Graph()  # folds seed + edit log every load
@@ -170,6 +176,107 @@ class GovernanceStore:
             from_version=current["version"], to_version=new["version"],
             actor={"kind": "human", "id": actor}, payload=new, reason=reason.strip(),
         )
+        return new
+
+    # --- Task write path (edit process structure on the canvas) ------------
+    def _validate_task(self, task: dict, g: cc.Graph) -> None:
+        errs = sorted(self._task_validator.iter_errors(task), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(f"{list(e.path) or '(root)'}: {e.message}" for e in errs[:3]))
+        if g.get("Process", task["process_ref"]) is None:
+            raise EditError(f"unknown process {task['process_ref']}")
+        for w in task["performed_by"]:  # referential integrity — no dangling performers
+            if w.startswith("role.") and g.get("HumanRole", w) is None:
+                raise EditError(f"unknown role {w}")
+            if w.startswith("agent.") and g.get("AgentBinding", w) is None:
+                raise EditError(f"unknown agent binding {w}")
+        if task.get("guardrail_ref") and g.get("GuardrailPolicy", task["guardrail_ref"]) is None:
+            raise EditError(f"unknown guardrail {task['guardrail_ref']}")
+
+    def _require(self, reason: str, actor: str) -> None:
+        if not reason or not reason.strip():
+            raise EditError("a change reason is required (ISO 9001 §7.5 review trail)")
+        if not actor or not actor.startswith("role."):
+            raise EditError("actor must be a role")
+
+    def _active_tasks(self, g: cc.Graph, process_ref: str) -> list[dict]:
+        return sorted((t for t in g.all("Task")
+                       if t["process_ref"] == process_ref and t["status"] == "active"),
+                      key=lambda t: t["seq"])
+
+    def edit_task(self, task_id: str, changes: dict, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("Task", task_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired task {task_id}")
+        unknown = set(changes) - set(EDITABLE_TASK_FIELDS)
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        new = copy.deepcopy(cur)
+        for k, v in changes.items():
+            new[k] = v
+        new["version"] = cur["version"] + 1
+        self._validate_task(new, g)
+        cc.append_edit_event("Task", task_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def add_task(self, process_ref: str, name: str, actor: str, reason: str,
+                 performed_by: list[str] | None = None) -> dict:
+        self._require(reason, actor)
+        if not name or not name.strip():
+            raise EditError("a step name is required")
+        g = self.graph()
+        proc = g.get("Process", process_ref)
+        if proc is None:
+            raise EditError(f"unknown process {process_ref}")
+        sibs = self._active_tasks(g, process_ref)
+        num = max((int(t["id"].split(".t")[-1]) for t in sibs), default=0) + 1
+        seq = max((t["seq"] for t in sibs), default=0) + 1
+        new = {
+            "id": f"{process_ref}.t{num}", "process_ref": process_ref, "seq": seq,
+            "name": name.strip(), "inputs": [], "outputs": [], "data_scope": [],
+            "kpi_refs": [], "performed_by": performed_by or [proc["owner_role"]],
+            "guardrail_ref": None, "version": 1, "status": "active",
+        }
+        self._validate_task(new, g)
+        cc.append_edit_event("Task", new["id"], "create", None, 1,
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def move_task(self, task_id: str, direction: str, actor: str,
+                  reason: str = "reorder step") -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        t = g.get("Task", task_id)
+        if t is None or t["status"] != "active":
+            raise EditError(f"unknown or retired task {task_id}")
+        sibs = self._active_tasks(g, t["process_ref"])
+        idx = next(i for i, x in enumerate(sibs) if x["id"] == task_id)
+        j = idx - 1 if direction == "up" else idx + 1
+        if j < 0 or j >= len(sibs):
+            raise EditError(f"cannot move {direction}: already at the {'top' if direction == 'up' else 'bottom'}")
+        other = sibs[j]
+        for one, newseq in ((t, other["seq"]), (other, t["seq"])):  # swap seqs, both versioned
+            nv = copy.deepcopy(one)
+            nv["seq"] = newseq
+            nv["version"] = one["version"] + 1
+            cc.append_edit_event("Task", one["id"], "update", one["version"], nv["version"],
+                                 {"kind": "human", "id": actor}, nv, reason.strip())
+        return {"moved": task_id, "direction": direction}
+
+    def remove_task(self, task_id: str, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        t = g.get("Task", task_id)
+        if t is None or t["status"] != "active":
+            raise EditError(f"unknown or already-retired task {task_id}")
+        new = copy.deepcopy(t)
+        new["status"] = "deprecated"          # never hard-deleted (ISO 9001 §7.5)
+        new["version"] = t["version"] + 1
+        cc.append_edit_event("Task", task_id, "deprecate", t["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
         return new
 
     # --- helpers -----------------------------------------------------------
