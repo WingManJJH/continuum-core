@@ -30,22 +30,40 @@ assistant turn in the window.
 
 ## The AI seam (honest)
 
-The engine is the **`RulesAdvisor`** — deterministic, needs no model access, works today.
-A deeper natural-language review (nuance a rule set can't reach — *is this guardrail's
-wording faithful to its intent? is this SOP actually clear?*) is the **`LLMAdvisor`**: it
-requires model access (API / OAuth), is **declared and refuses** until that's provisioned
-(exactly like the signal connectors and the pilot agent), and the `RulesAdvisor` stands in.
+The engine is the **`RulesAdvisor`** — deterministic, needs no model access, works today, and
+**the score is always rule-based**. A deeper natural-language review (nuance a rule set can't
+reach — *is this guardrail's wording faithful to its intent? is this SOP actually clear?*) is
+the **`LLMAdvisor`**, wired behind the shared env var (see below). With no key it **refuses**
+(like the signal connectors and the ask agent's planner) and the `RulesAdvisor` stands in.
+
+## Enabling the AI reviewer
+
+```bash
+export CONTINUUM_LLM_API_KEY=sk-...      # or ANTHROPIC_API_KEY
+export CONTINUUM_LLM_MODEL=claude-...    # optional; defaults to claude-opus-4-8
+python3 advisor/app.py
+```
+
+The **`Advisor`** orchestrator always computes the deterministic scorecard first, then — if a
+key is present — asks the `LLMAdvisor` to **augment** it. The model is given the subject and the
+rule checks and returns *only* qualitative findings the rules can't capture; those are
+normalized (severity whitelisted, text length-capped, count-capped) and shown in a distinct
+**AI reviewer** block marked *advisory*. Two honest guarantees: the LLM findings **never change
+the rule-based score**, and they never drive an action — they are narrative for a human. A model
+error or malformed reply is surfaced as an `AI reviewer error` and the deterministic result
+stands unchanged. The shared model plumbing (env var, call, JSON extraction) lives in
+[`mcp_server/llm.py`](../mcp_server/llm.py), the same helper the ask agent uses.
 
 ## Run
 
 ```bash
-python3 advisor/app.py            # http://localhost:8790 (alongside :8787 / :8788 / :8789)
-python3 advisor/test_advisor.py   # 18 asserts
+python3 advisor/app.py            # http://localhost:8790 (alongside :8787 / :8788 / :8789 / :8791)
+python3 advisor/test_advisor.py   # 26 asserts
 ```
 
 ## Files
 
-- `advisor.py` — `RulesAdvisor` (the analysis engine) + `LLMAdvisor` (auth-gated seam).
+- `advisor.py` — `RulesAdvisor` (rule engine) + `LLMAdvisor` (env-gated reviewer) + `Advisor` (orchestrator).
 - `app.py` — stdlib server: `GET /api/subjects` + `POST /api/analyze` + the static window.
-- `static/` — vanilla-JS chat-style advisor window (theme-aware).
-- `test_advisor.py` — engine assertions across every subject type.
+- `static/` — vanilla-JS chat-style advisor window (theme-aware) with the AI-reviewer block.
+- `test_advisor.py` — engine + LLM-augmentation assertions across every subject type.

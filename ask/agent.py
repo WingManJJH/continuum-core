@@ -31,26 +31,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "advisor"))
 import continuum_core as cc  # noqa: E402
+import llm  # shared model seam  # noqa: E402
 from advisor import HIGH_STAKES  # reuse the one high-stakes list  # noqa: E402
 
 ID_RE = re.compile(r"\b(?:gr|kpi|agent|role|obj)\.[A-Za-z0-9_.]+|\b[A-Z]{2}\.\d+\.\d+\.\d+\b")
 
-# --- LLM planner wiring (env-gated) ---------------------------------------- #
-API_KEY_ENV = "CONTINUUM_LLM_API_KEY"        # falls back to ANTHROPIC_API_KEY
-MODEL_ENV = "CONTINUUM_LLM_MODEL"            # default below; override for your account
-BASE_URL_ENV = "CONTINUUM_LLM_BASE_URL"      # default: Anthropic Messages API
-DEFAULT_MODEL = "claude-opus-4-8"
-DEFAULT_BASE_URL = "https://api.anthropic.com/v1/messages"
-
+# --- query-plan whitelist (the LLM planner may only emit one of these) ------ #
 ALLOWED_TYPES = {"StrategicObjective", "KPI", "Process", "Task", "HumanRole",
                  "AgentBinding", "GuardrailPolicy", "RiskControl"}
 ALLOWED_OPS = {"absent", "present", "eq", "ne", "lt", "gt", "in", "intersects", "predicate"}
 PLAN_KEYS = {"from", "active_only", "follow", "where", "select", "order_by", "limit"}
 LIMIT_CAP = 200
-
-
-def api_key() -> str | None:
-    return os.environ.get(API_KEY_ENV) or os.environ.get("ANTHROPIC_API_KEY")
 
 
 # --------------------------------------------------------------------------- #
@@ -511,43 +502,11 @@ class LLMPlanner:
         self._transport = transport
 
     def available(self) -> bool:
-        return bool(self._transport) or bool(api_key())
+        return llm.available(self._transport)
 
     @property
     def model(self) -> str:
-        return os.environ.get(MODEL_ENV, DEFAULT_MODEL)
-
-    def _call_model(self, question: str) -> str:
-        if self._transport:
-            return self._transport(question, self.engine.schema_doc())
-        key = api_key()
-        if not key:
-            raise RuntimeError("no API key")
-        import json as _json
-        import urllib.request as _rq
-        body = _json.dumps({
-            "model": self.model, "max_tokens": 700, "system": SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content":
-                          self.engine.schema_doc() + "\n\nQuestion: " + question}],
-        }).encode()
-        req = _rq.Request(os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL), data=body, headers={
-            "content-type": "application/json", "x-api-key": key,
-            "anthropic-version": "2023-06-01"})
-        with _rq.urlopen(req, timeout=30) as resp:  # nosec - fixed Anthropic endpoint
-            data = _json.loads(resp.read())
-        parts = data.get("content", [])
-        return "".join(p.get("text", "") for p in parts if p.get("type") == "text")
-
-    @staticmethod
-    def _extract_json(raw: str) -> dict:
-        import json as _json
-        s = raw.strip()
-        if s.startswith("```"):
-            s = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", s.strip())
-        start, end = s.find("{"), s.rfind("}")
-        if start < 0 or end <= start:
-            raise PlanError("no JSON object in model reply")
-        return _json.loads(s[start:end + 1])
+        return llm.model()
 
     def plan(self, question: str) -> dict:
         if not self.available():
@@ -555,8 +514,12 @@ class LLMPlanner:
                 "LLMPlanner requires model access — set CONTINUUM_LLM_API_KEY (or "
                 "ANTHROPIC_API_KEY) to enable it. The deterministic IntentPlanner is "
                 "answering the curated question set instead.")
-        raw = self._call_model(question)
-        return validate_plan(self._extract_json(raw), self.engine)
+        raw = llm.call_model(SYSTEM_PROMPT, self.engine.schema_doc() + "\n\nQuestion: " + question,
+                             transport=self._transport)
+        parsed = llm.extract_json(raw)
+        if not isinstance(parsed, dict):
+            raise PlanError("model did not return a query-plan object")
+        return validate_plan(parsed, self.engine)
 
 
 class Agent:

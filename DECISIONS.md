@@ -6,6 +6,30 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-14 — Wire the LLM advisor behind the same env var
+
+### D20 — LLMAdvisor augments the scorecard; shared model seam
+**Context:** D19 lit up the ask agent's LLM planner. Do the same for the advisor's `LLMAdvisor`
+so one key turns on live NL across both surfaces, without weakening the advisor's defensibility.
+**Decision & build:** factored the model plumbing into **`mcp_server/llm.py`** (env var
+`CONTINUUM_LLM_API_KEY` / `ANTHROPIC_API_KEY`, model + endpoint overrides, `call_model`,
+`extract_json`, injectable `transport`); the ask planner (D19) now uses it too — one seam, both
+apps. The advisor gains an **`Advisor`** orchestrator: it always computes the deterministic
+`RulesAdvisor` scorecard, then — **only when a key is present** — asks the `LLMAdvisor` to
+**augment** it with qualitative findings a rule set can't reach (wording-vs-intent, clarity,
+hidden risk). Deliberate honesty choices, different from the ask planner because the advisor's
+LLM output is *narrative for a human*, not an executable query: (1) the LLM findings are
+**advisory and never change the rule-based score** — the score stays deterministic and
+clause-cited; (2) they never drive an action; (3) they are normalized (severity whitelisted,
+text/count capped) and rendered in a distinct **AI reviewer** block; (4) a model error or
+malformed reply is surfaced as `llm_status:"error"` and the deterministic result stands. With no
+key, `LLMAdvisor.review` refuses and the window is unchanged. Tested hermetically via an injected
+transport (no key/network): augmentation, severity normalization, title-less drop, score-unchanged,
+and honest error fallback. `advisor/test_advisor.py` 18 -> **26 asserts**; full suite **207**.
+Both env-gated seams (ask planner + advisor reviewer) now light up from the same key.
+
+---
+
 ## 2026-09-14 — Wire the LLM planner behind an env var
 
 ### D19 — Enable the LLMPlanner when a key is present; validated-plan safety

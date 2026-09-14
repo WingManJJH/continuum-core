@@ -89,11 +89,40 @@ def main():
     # 9. dispatch + errors + the LLM seam
     check("dispatch routes by subject type", a.analyze("guardrail", "gr.CO.3.2.7")["score"] == 100)
     check("unknown subject errors cleanly", "error" in a.analyze("process", "NOPE.0.0.0"))
+
+    # 10. LLMAdvisor is auth-gated: unavailable + review refuses with no key
+    la = advisor.LLMAdvisor()
+    check("LLMAdvisor reports unavailable with no key", not la.available())
     try:
-        advisor.LLMAdvisor().analyze("x"); llm = False
+        la.review("Guardrail x", "guardrail", [], {}); refused = False
     except RuntimeError:
-        llm = True
-    check("LLMAdvisor is declared but auth-gated (refuses)", llm)
+        refused = True
+    check("LLMAdvisor.review refuses with no key (auth-gated)", refused)
+
+    # 11. Advisor orchestrator: deterministic-only by default (no key)
+    adv = advisor.Advisor()
+    r = adv.analyze("guardrail", "gr.CO.3.2.7")
+    check("Advisor runs rules only when no key", r["llm_status"] == "off" and r["llm_findings"] == [])
+    check("Advisor still returns the deterministic score", r["score"] == 100)
+
+    # 12. full LLM path via injected transport (no key, no network); it AUGMENTS
+    def good_transport(system, user):
+        return ('[{"severity":"high","title":"Wording invites over-collection",'
+                '"detail":"data_scope reads broad","recommendation":"Scope to the two fields used."},'
+                '{"severity":"SHOUT","title":"No title-less drop","detail":"x"},'
+                '{"detail":"no title so dropped"}]')
+    adv2 = advisor.Advisor(llm_transport=good_transport)
+    r2 = adv2.analyze("guardrail", "gr.CO.3.2.7")
+    check("LLM findings augment the scorecard", r2["llm_status"] == "on" and len(r2["llm_findings"]) == 2)
+    check("LLM findings tagged as source=llm", all(f["source"] == "llm" for f in r2["llm_findings"]))
+    check("bad severity normalized to info", r2["llm_findings"][1]["severity"] == "info")
+    check("LLM review never changes the deterministic score", r2["score"] == 100)
+
+    # 13. a malformed LLM reply falls back honestly; the rules result survives
+    adv3 = advisor.Advisor(llm_transport=lambda s, u: "sorry, no JSON here")
+    r3 = adv3.analyze("guardrail", "gr.CO.3.2.7")
+    check("malformed LLM reply -> status error, rules intact",
+          r3["llm_status"] == "error" and r3["score"] == 100 and "llm_note" in r3)
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

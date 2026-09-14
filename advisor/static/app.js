@@ -50,10 +50,26 @@ function addAnalysis(r) {
     + '<div class="scorecard"><span class="score ' + scoreClass(r.score) + '">' + r.score + '%</span>'
     + '<div class="sc-meta"><div class="subj">' + esc(r.subject) + '</div>'
     + '<div class="line">analyzed against: ' + esc(stds.join(" · ")) + "</div></div></div>"
-    + findings + passline + worst
+    + findings + passline + worst + llmBlock(r)
     + (r.note ? '<div class="note">' + esc(r.note) + "</div>" : "")
     + "</div>";
   thread.appendChild(el); scroll();
+}
+function llmBlock(r) {
+  if (!r.llm_status || r.llm_status === "off") return "";
+  var head = '<div class="llm-head">AI reviewer <span>advisory &middot; does not change the score</span></div>';
+  if (r.llm_status === "error")
+    return '<div class="llm err">' + head + '<div class="llm-empty">Reviewer error: ' + esc(r.llm_note || "") + "</div></div>";
+  if (r.llm_status === "on_empty" || !r.llm_findings || !r.llm_findings.length)
+    return '<div class="llm">' + head + '<div class="llm-empty">The reviewer had nothing to add beyond the checks above.</div></div>';
+  var items = r.llm_findings.map(function (f) {
+    return '<div class="find"><span class="sev ' + esc(f.severity) + '">' + esc(f.severity) + "</span>"
+      + '<div><div class="t">' + esc(f.title) + "</div>"
+      + '<div class="d">' + esc(f.detail) + "</div>"
+      + (f.recommendation ? '<div class="r">' + esc(f.recommendation) + "</div>" : "")
+      + '<span class="std">AI reviewer</span></div></div>';
+  }).join("");
+  return '<div class="llm">' + head + items + "</div>";
 }
 function scroll() { thread.scrollTop = thread.scrollHeight; }
 

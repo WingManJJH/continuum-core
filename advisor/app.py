@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 import continuum_core as cc  # noqa: E402
-from advisor import RulesAdvisor  # noqa: E402
+from advisor import Advisor  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
 CONTENT = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
@@ -72,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         b = json.loads(self.rfile.read(length) or b"{}")
         try:
-            r = RulesAdvisor().analyze(b.get("subject_type", ""), b.get("id", ""), b.get("content", ""))
+            r = Advisor().analyze(b.get("subject_type", ""), b.get("id", ""), b.get("content", ""))
             code = 200 if "error" not in r else 400
             return self._json(r, code)
         except Exception as e:  # noqa: BLE001

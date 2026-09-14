@@ -5,7 +5,7 @@ below is run from the `continuum-core/` directory unless stated otherwise.
 
 - **What each phase is** and how to see it work → [Using it, phase by phase](#using-it-phase-by-phase)
 - **Just prove it all works** → [Run every test](#run-every-test)
-- **The two web apps** (governance editor, dashboard) → [Web apps](#web-apps)
+- **The five web apps** (governance, dashboard, canvas, advisor, ask) → [Web apps](#web-apps)
 - **Reset to a clean state** → [Data & reset](#data--reset)
 - **What needs OAuth / is stubbed** → [Known limits](#known-limits)
 - **Something's wrong** → [Troubleshooting](#troubleshooting)
@@ -75,10 +75,10 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `governance/test_authoring.py` | `18 passed, 0 failed` |
 | `governance/test_binding.py` | `13 passed, 0 failed` |
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
-| `advisor/test_advisor.py` | `18 passed, 0 failed` |
+| `advisor/test_advisor.py` | `26 passed, 0 failed` |
 | `ask/test_agent.py` | `35 passed, 0 failed` |
 
-199 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+207 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---

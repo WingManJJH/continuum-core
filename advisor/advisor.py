@@ -22,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "dashboard"))
 import continuum_core as cc  # noqa: E402
+import llm  # shared model seam  # noqa: E402
 import traceability as trace  # noqa: E402
 from rollup import Rollup  # noqa: E402
 
@@ -265,15 +266,109 @@ class RulesAdvisor:
         return {"error": f"unknown subject type {subject_type}"}
 
 
+_SEV = {"high", "medium", "low", "info"}
+ADVISOR_SYSTEM = (
+    "You are a quality & governance reviewer for ISO 9001 / ISO 9004 / APQC and the "
+    "Continuum guardrail doctrine. You are given a subject and the deterministic, rule-based "
+    "checks already computed for it. Add ONLY qualitative findings a fixed rule set cannot "
+    "capture: whether wording matches intent, whether a policy is clear and unambiguous, "
+    "hidden or second-order risk, missing context. Do not repeat the rule checks. "
+    "Reply with a JSON array of objects {severity, title, detail, recommendation}, "
+    "severity one of high|medium|low|info. Return [] if you have nothing to add. "
+    "No prose outside the JSON.")
+
+
 class LLMAdvisor:
     """The deeper natural-language reviewer — nuance the rule set can't reach
     (does this guardrail's wording match its intent? is this SOP actually clear?).
-    Requires model access (API/OAuth), unavailable in this build, so it is declared
-    and refuses rather than pretending — exactly like the signal connectors. The
-    RulesAdvisor stands in; swap this in once model access is provisioned."""
-    def analyze(self, *a, **k):
-        raise RuntimeError("LLMAdvisor requires model access (API key / OAuth), "
-                           "unavailable in this build. RulesAdvisor stands in.")
+
+    Wired behind the shared env var (CONTINUUM_LLM_API_KEY / ANTHROPIC_API_KEY). When
+    no key is set it refuses — exactly like the signal connectors and the ask agent's
+    LLMPlanner — and the RulesAdvisor stands in. When a key is set it *augments* the
+    deterministic scorecard with advisory findings; it never changes the rule-based
+    score, and its output is displayed to a human, never used to drive an action.
+    `transport(system, user) -> str` can be injected for tests (no key, no network).
+    """
+
+    def __init__(self, transport=None):
+        self._transport = transport
+
+    def available(self) -> bool:
+        return llm.available(self._transport)
+
+    @property
+    def model(self) -> str:
+        return llm.model()
+
+    def review(self, subject: str, kind: str, checks: list[dict], payload) -> list[dict]:
+        if not self.available():
+            raise RuntimeError(
+                "LLMAdvisor requires model access — set CONTINUUM_LLM_API_KEY (or "
+                "ANTHROPIC_API_KEY) to enable it. RulesAdvisor stands in.")
+        import json
+        summary = [{"title": c["title"], "ok": c["ok"], "severity": c["severity"]} for c in checks]
+        user = (f"Subject: {subject}\nKind: {kind}\n\n"
+                f"Rule checks already computed:\n{json.dumps(summary, indent=2)}\n\n"
+                f"Subject data:\n{json.dumps(payload, indent=2, default=str)[:4000]}\n\n"
+                "Give additional qualitative findings as a JSON array (or [] if none).")
+        data = llm.extract_json(llm.call_model(ADVISOR_SYSTEM, user, transport=self._transport))
+        if isinstance(data, dict):
+            data = [data]
+        if not isinstance(data, list):
+            raise ValueError("LLM review did not return a list of findings")
+        out = []
+        for f in data[:6]:
+            if not isinstance(f, dict) or not f.get("title"):
+                continue
+            sev = str(f.get("severity", "info")).lower()
+            out.append({
+                "source": "llm",
+                "severity": sev if sev in _SEV else "info",
+                "title": str(f["title"])[:160],
+                "detail": str(f.get("detail", ""))[:600],
+                "recommendation": str(f.get("recommendation", ""))[:400],
+            })
+        return out
+
+
+class Advisor:
+    """Orchestrator the window uses: the deterministic RulesAdvisor is always the
+    scorecard; when a key is present the LLMAdvisor appends advisory findings."""
+
+    def __init__(self, graph: cc.Graph | None = None, llm_transport=None):
+        self.rules = RulesAdvisor(graph)
+        self.g = self.rules.g
+        self.llm = LLMAdvisor(transport=llm_transport)
+
+    def _payload(self, subject_type: str, ident: str, content: str):
+        if subject_type == "process":
+            return self.g.get("Process", ident)
+        if subject_type == "guardrail":
+            return self.g.get("GuardrailPolicy", ident)
+        if subject_type == "task":
+            return self.g.get("Task", ident)
+        if subject_type == "content":
+            return {"text": (content or "")[:4000]}
+        if subject_type == "model":
+            return {"note": "whole-model roll-up; see the checks for the numbers"}
+        return {}
+
+    def analyze(self, subject_type: str, ident: str = "", content: str = "") -> dict:
+        r = self.rules.analyze(subject_type, ident, content)
+        if "error" in r:
+            return r
+        r["llm_status"] = "off"
+        r["llm_findings"] = []
+        if self.llm.available():
+            try:
+                r["llm_findings"] = self.llm.review(
+                    r["subject"], r["kind"], r["checks"],
+                    self._payload(subject_type, ident, content))
+                r["llm_status"] = "on" if r["llm_findings"] else "on_empty"
+            except Exception as e:  # noqa: BLE001 - surface honestly, keep the rules result
+                r["llm_status"] = "error"
+                r["llm_note"] = f"{type(e).__name__}: {e}"
+        return r
 
 
 if __name__ == "__main__":

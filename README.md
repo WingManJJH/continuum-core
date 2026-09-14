@@ -89,7 +89,7 @@ python3 maps/test_mapdata.py                       # 12 asserts: flow / agent st
 python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: flowchart/RACI/checklist + in-canvas guardrail editing
 
 # Advisor — analyze anything vs best practices & standards
-python3 advisor/test_advisor.py                    # 18 asserts: process/guardrail/task/content/model checks
+python3 advisor/test_advisor.py                    # 26 asserts: rules + LLM-augmentation across every subject
 python3 advisor/app.py                             # http://localhost:8790 — AI window: score a subject against ISO 9001/9004/APQC + Core Model doctrine
 
 # Ask the Agent — plain-English question -> read-only graph query -> answer
