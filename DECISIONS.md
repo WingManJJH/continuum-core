@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Interactive process canvas (§03 Canvas View)
+
+### D13 — Three-pane interactive editor with in-canvas guardrail editing
+**Context:** D11 shipped the read-only maps; §03's Canvas View is a three-pane editor with
+"click an element → its risks/KPIs/guardrail in a side panel" and multiple views of one model.
+**Decision & build:** evolved `maps/` into a three-pane canvas — process nav · a center canvas with a
+**view-switcher (Flowchart / RACI / Checklist)** · a contextual **properties panel**. Clicking a step
+selects it (outlined) and shows its performers, data in/out, KPIs, override status, and its
+**guardrail, editable in place**. The editor saves via `PUT /api/guardrail` → the *same tested
+governance write path* (`store.edit_guardrail`): validated, escalate_if-linted, versioned, on the §7.5
+trail, folded into the one graph — so a canvas edit is live for agents and shows on the dashboard, and
+the canvas redraws with the new version. RACI and Checklist are derived client-side from the same map
+data. `mapdata` now exposes the editable guardrail + data refs per task; `maps/test_mapdata.py` → 12
+asserts. Verified live in the browser (both themes): clicked t3, edited its guardrail v3→v4 through the
+canvas, confirmed via the MCP-side graph + intact audit chain. Full suite now 99 assertions.
+**Scope:** in-canvas editing is **guardrails** (the "editable without a ticket" capability). Editing
+process structure (add/move/rename steps) needs a task write path and palette-driven authoring — the
+next extension; map data is already shaped for it.
+
+---
+
 ## 2026-09-13 — Retention-policy engine (ISO 9001 §7.5.3)
 
 ### D12 — Retention & disposition scheduler

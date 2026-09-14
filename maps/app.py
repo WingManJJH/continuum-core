@@ -17,13 +17,17 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
+sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
 from mapdata import all_maps  # noqa: E402
+import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
+
+STORE = gov.GovernanceStore()
 
 STATIC = os.path.join(HERE, "static")
 CONTENT = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
@@ -54,12 +58,39 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json_code(self, obj, code):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         u = urlparse(self.path)
         if u.path == "/api/maps":
             g = cc.Graph()
             return self._json({"model_sig": g.model_sig, "processes": all_maps(g)})
         return self._static(u.path)
+
+    def do_PUT(self):
+        # edit a guardrail from the canvas — same tested write path as governance,
+        # so the edit is versioned, on the §7.5 trail, and live for the redraw.
+        u = urlparse(self.path)
+        if u.path != "/api/guardrail":
+            return self.send_error(404)
+        length = int(self.headers.get("Content-Length", 0))
+        payload = json.loads(self.rfile.read(length) or b"{}")
+        try:
+            new = STORE.edit_guardrail(
+                parse_qs(u.query).get("id", [""])[0],
+                changes=payload.get("changes", {}), actor=payload.get("actor", "role.unknown"),
+                reason=payload.get("reason", ""), reviewer=payload.get("reviewer", ""))
+            return self._json({"ok": True, "guardrail": new})
+        except gov.EditError as e:
+            return self._json_code({"ok": False, "error": str(e)}, 400)
+        except Exception as e:  # noqa: BLE001
+            return self._json_code({"ok": False, "error": repr(e)}, 500)
 
 
 def main():

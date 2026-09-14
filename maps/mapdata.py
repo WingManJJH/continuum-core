@@ -29,6 +29,15 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
         for t in sorted((t for t in g.all("Task") if t["process_ref"] == p["id"]),
                         key=lambda t: t["seq"]):
             gr, pinned = g.effective_guardrail(t["id"])
+            # the full effective guardrail, trimmed to what the in-canvas editor
+            # can change (matches the governance write path) — None if unguarded.
+            gfull = None if not gr else {
+                "id": gr["id"], "version": gr["version"],
+                "allowed_actions": gr["allowed_actions"], "forbidden_actions": gr["forbidden_actions"],
+                "escalate_if": gr.get("escalate_if"), "data_scope": gr["data_scope"],
+                "rate_limit": gr.get("rate_limit"), "escalation_path": gr["escalation_path"],
+                "audit_requirement": gr["audit_requirement"],
+            }
             tasks.append({
                 "id": t["id"], "seq": t["seq"], "name": t["name"],
                 "roles": [w for w in t["performed_by"] if w.startswith("role.")],
@@ -39,6 +48,9 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
                 "escalation_path": gr.get("escalation_path") if gr else None,
                 "allow": gr.get("allowed_actions", []) if gr else [],
                 "deny": gr.get("forbidden_actions", []) if gr else [],
+                "inputs": t.get("inputs", []), "outputs": t.get("outputs", []),
+                "data_scope": t.get("data_scope", []), "kpi_refs": t.get("kpi_refs", []),
+                "guardrail_full": gfull,
             })
         out.append({
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],

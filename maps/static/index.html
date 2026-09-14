@@ -3,22 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Continuum · Process Maps</title>
+  <title>Continuum · Process Canvas</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header>
-    <div class="brand">Continuum <span>· Process Maps</span></div>
-    <div class="legend">
-      <span class="lg"><i class="sw task"></i> task</span>
-      <span class="lg"><i class="sw agent"></i> agent step</span>
-      <span class="lg"><i class="sw override"></i> task override</span>
-      <span class="lg"><i class="sw esc"></i> escalates to a human</span>
-    </div>
+    <div class="brand">Continuum <span>· Process Canvas</span></div>
     <div class="spacer"></div>
     <button class="toggle" id="themeBtn" type="button">theme: auto</button>
   </header>
-  <main id="maps"><div class="muted">loading…</div></main>
+
+  <div class="shell">
+    <!-- LEFT: process nav -->
+    <aside class="pane nav">
+      <h2>Processes</h2>
+      <ul id="proc-list" class="proc-list"><li class="muted">loading…</li></ul>
+    </aside>
+
+    <!-- CENTER: canvas + view switcher -->
+    <section class="pane center">
+      <div class="viewbar">
+        <div id="proc-title" class="proc-title"></div>
+        <nav class="views">
+          <button data-view="flow" class="active">Flowchart</button>
+          <button data-view="raci">RACI</button>
+          <button data-view="checklist">Checklist</button>
+        </nav>
+      </div>
+      <div id="canvas" class="canvas"></div>
+    </section>
+
+    <!-- RIGHT: contextual properties -->
+    <aside class="pane props">
+      <div id="props"><div class="muted center">Select a step on the canvas to see its risks, KPIs, and guardrail — and edit the guardrail here.</div></div>
+    </aside>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>

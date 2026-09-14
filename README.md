@@ -81,9 +81,9 @@ python3 audit/verify.py                            # re-walk chain + off-box anc
 python3 governance/test_retention.py               # 16 asserts: §7.5.3 schedule, legal holds, chain-safe disposition
 python3 governance/retention.py                    # retention plan (add --apply to archive + ledger due records)
 
-# Process maps — §03 Canvas View (first slice)
-python3 maps/test_mapdata.py                       # 10 asserts: flow / agent step / escalation / override
-python3 maps/app.py                                # http://localhost:8789 — BPMN-style maps of all 8 processes
+# Process canvas — interactive §03 Canvas View
+python3 maps/test_mapdata.py                       # 12 asserts: flow / agent step / escalation / override / editor payload
+python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: flowchart/RACI/checklist + in-canvas guardrail editing
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -263,11 +263,11 @@ continuum-core/
 │   ├── anchor.py               #   HMAC-signed off-box anchor over both logs (co-forgery defense)
 │   ├── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
 │   └── test_anchor.py          #   10 asserts: anchor catches consistent co-forgery
-├── maps/                       # §03 Canvas View — BPMN-style process maps (D11)
-│   ├── mapdata.py              #   assembles per-process map data from the graph
-│   ├── app.py                  #   stdlib server: /api/maps + static SVG canvas
-│   ├── static/                 #   vanilla-JS SVG renderer (theme-aware)
-│   └── test_mapdata.py         #   10 asserts: flow / agent step / escalation / override
+├── maps/                       # §03 Canvas View — interactive process canvas (D11 + D13)
+│   ├── mapdata.py              #   per-process map data incl. the editable guardrail
+│   ├── app.py                  #   stdlib server: GET /api/maps + PUT /api/guardrail (reuses governance store)
+│   ├── static/                 #   3-pane canvas: SVG flowchart + RACI + checklist + properties/editor
+│   └── test_mapdata.py         #   12 asserts: flow / agent step / escalation / override / editor payload
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json
 │   └── DEFAULT-GUARDRAIL-TEMPLATE.md

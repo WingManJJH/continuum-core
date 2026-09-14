@@ -45,6 +45,13 @@ def main():
     check("8 agent-bound steps across the maps", len(agent_tasks) == 8)
     check("every agent step has an effective guardrail", all(t["guardrail"] for t in agent_tasks))
 
+    # editor payload: the effective guardrail is exposed with editable fields
+    gf = t3["guardrail_full"]
+    check("task carries the full editable guardrail", gf and gf["id"] == "gr.CO.3.2.7"
+          and gf["version"] == 3 and "allowed_actions" in gf and "escalate_if" in gf)
+    check("task carries data refs for the properties panel",
+          t3["inputs"] == ["customer.kyc_doc"] and t3["kpi_refs"])
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 

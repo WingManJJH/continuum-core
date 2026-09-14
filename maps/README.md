@@ -1,34 +1,47 @@
-# Process Maps (Canvas View) — §03, first slice
+# Process Canvas (interactive §03 Canvas View)
 
-The in-app visual layer (Core Model §03 "visual for people"): every process in the
-model rendered as a BPMN-style flow diagram, drawn from the same graph the agent,
-governance, and dashboard layers read. Read-only; redrawn on each load.
+The in-app visual editor (Core Model §03 "visual for people"): a three-pane canvas
+over the one graph the agent, governance, and dashboard layers all read.
 
-## What each map shows
+## Three panes
 
-- **Flow** — `start → task → … → end`, tasks in `seq` order.
-- **Agent step** — the task an agent is bound to, outlined in the accent colour with an **AI** badge and its performers (`role + agent`).
-- **Escalation branch** — a dashed amber branch off an agent step showing where its guardrail sends the case to a human: `escalate → <role>  if <condition>`.
-- **Task override** — a step with a stricter task-level guardrail (e.g. `IT.8.4.2.t3` "Grant admin access") outlined in amber with an **override** tag; human-only where the override forbids agent actions.
-- **Header chips** — owner, guardrail version, KPIs, and linked risk.
+- **Left — processes.** Pick any of the 8 processes.
+- **Center — canvas with a view-switcher.** Three **views of one model** (§03):
+  - **Flowchart** — BPMN-style `start → task → end`; the agent-bound step is
+    outlined with an **AI** badge and shows its guardrail escalation branch to a
+    human; task-level overrides marked; **click a step to select it**.
+  - **RACI** — a matrix (roles × tasks, R / A / C) *derived from the model*, not
+    hand-maintained.
+  - **Checklist** — a guided, tickable run-list of the process's steps.
+- **Right — contextual properties.** For the selected step: performers, data
+  in/out, KPIs, task-level override — and its **guardrail, editable in place**.
+
+## Editing is real — and one source of truth
+
+The guardrail editor in the properties panel saves through the **same tested
+governance write path** (`store.edit_guardrail` via `PUT /api/guardrail`): the edit
+is validated, `escalate_if`-linted, **versioned** (new version, no deploy), recorded
+on the ISO 9001 §7.5 trail, and folded into the same graph. So a change made on the
+canvas is instantly live for agents, shows on the dashboard, and the canvas redraws
+with the new version — exactly the governance app's guarantee, from the map.
 
 ## Run
 
 ```bash
-python3 maps/app.py            # http://localhost:8789  (alongside governance :8787, dashboard :8788)
-python3 maps/test_mapdata.py   # 10 asserts: structure, agent steps, escalation, override, fail-closed
+python3 maps/app.py            # http://localhost:8789 (alongside governance :8787, dashboard :8788)
+python3 maps/test_mapdata.py   # 12 asserts: structure, agent steps, escalation, override, editor payload
 ```
 
 ## Files
 
-- `mapdata.py` — assembles per-process map data from the graph (`all_maps`).
-- `app.py` — stdlib HTTP server: `/api/maps` + the static canvas.
-- `static/` — vanilla-JS SVG renderer (theme-aware, no build step, no diagram library).
-- `test_mapdata.py` — structure assertions.
+- `mapdata.py` — assembles per-process map data (incl. the editable guardrail) from the graph.
+- `app.py` — stdlib server: `GET /api/maps` + `PUT /api/guardrail` (reuses the governance store).
+- `static/` — vanilla-JS three-pane canvas: SVG flowchart + RACI + checklist + properties/editor (theme-aware, no diagram library).
+- `test_mapdata.py` — structure + editor-payload assertions.
 
 ## Scope
 
-This is the **read-only first slice** of §03's Canvas View. The full spec adds an
-interactive three-pane editor and the other views of the same model (metro map,
-RACI matrix, guided checklist) — the larger follow-on. The data (`mapdata.all_maps`)
-is already shaped to feed those.
+The interactive editing here is **guardrails** (the "editable without an engineering
+ticket" capability). Editing the process structure itself (add/move/rename steps)
+needs a task write path and is the next extension; the palette-driven authoring and
+richer element editing round out the full §03 editor.
