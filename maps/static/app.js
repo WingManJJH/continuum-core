@@ -181,6 +181,14 @@ function renderProps() {
     $("#t-down").onclick = function () { moveStep("down"); };
     $("#t-remove").onclick = removeStep;
   }
+  if ($("#t-bind")) $("#t-bind").onclick = function () { bindAgent("bind"); };
+  if ($("#t-unbind")) $("#t-unbind").onclick = function () { bindAgent("unbind"); };
+}
+
+function bindAgent(op) {
+  var t = getTask(); if (!t) return;
+  postTask({ op: op, id: t.id, actor: ACTOR, reason: $("#t-reason").value.trim() || (op === "bind" ? "make step agent-run" : "make step human-only") })
+    .then(function (res) { if (res.ok) load(); else structMsg("Rejected: " + res.error, "err"); });
 }
 
 // ---------- structural edits (Task write path) ----------
@@ -271,6 +279,9 @@ function taskProps(p, t) {
     + '<label>Performed by <span class="hint">comma refs · role.* / agent.*</span><input id="t-perf" type="text" value="' + esc(t.roles.concat(t.agents).join(", ")) + '"></label>'
     + '<label>Reason <span class="hint">required · §7.5</span><input id="t-reason" type="text" placeholder="why?"></label>'
     + '<div class="btnrow"><button id="t-save">Save step</button><button id="t-up">↑ up</button><button id="t-down">↓ down</button><button id="t-remove" class="danger">Remove step</button></div>'
+    + (t.agents.length
+        ? '<button id="t-unbind" class="bindbtn unbind">Unbind agent (make human-only)</button>'
+        : '<button id="t-bind" class="bindbtn">Make this step agent-run</button>')
     + '<div id="t-msg" class="msg" hidden></div></div>';
   if (!g) return head + struct + '<div class="p-sec"><div class="p-row muted">No guardrail on this step (inherits the process default, if any).</div></div>';
   return head + struct

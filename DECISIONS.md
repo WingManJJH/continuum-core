@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Agent-binding authoring (make a step agent-run from the canvas)
+
+### D16 — AgentBinding write path
+**Context:** the one structural write path left after D15 — attaching an agent to a step.
+**Decision & build:** `store.bind_agent(task_id, ...)` creates an `AgentBinding` (id derived from the
+task, validated against the binding schema, pointing at the step) and adds it to the step's
+`performed_by` — the binding is created first so the task-update validates. `store.unbind_agent`
+reverses it: drops the agent from `performed_by` and **deprecates** the binding (retained, never
+hard-deleted). Both go through the versioned, hash-chained §7.5 write path. Effect: the step now renders
+as agent-run (AI badge + its guardrail's escalation branch) and counts toward §12 coverage. Canvas: the
+step panel shows **"Make this step agent-run"** / **"Unbind agent"** (→ `POST /api/task` op bind/unbind).
+`governance/test_binding.py` — 13 asserts. Verified live: bound an agent to `CO.3.2.7.t1` from the
+canvas — the AI badge + escalation branch appeared, the binding is real and on the trail; chain intact.
+Full suite 146 asserts.
+**This closes every structural write path in §03.** The canvas is now a complete authoring surface:
+view (flowchart/RACI/checklist), edit guardrails, edit + author process structure, and bind/unbind
+agents — all on the one graph, versioned, tamper-evident. Open work is only the two env-gated items
+(design-partner calls, connector OAuth).
+
+---
+
 ## 2026-09-13 — Drag-palette authoring (§03 Canvas View, completed)
 
 ### D15 — Author brand-new processes + drag steps from a palette

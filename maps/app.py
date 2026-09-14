@@ -116,6 +116,10 @@ class Handler(BaseHTTPRequestHandler):
                     r = STORE.move_task(b["id"], b.get("dir", "up"), actor, reason or "reorder step")
                 elif op == "remove":
                     r = STORE.remove_task(b["id"], actor, reason)
+                elif op == "bind":
+                    r = STORE.bind_agent(b["id"], actor, reason or "make step agent-run")
+                elif op == "unbind":
+                    r = STORE.unbind_agent(b["id"], actor, reason or "make step human-only")
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             else:

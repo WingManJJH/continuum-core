@@ -61,6 +61,8 @@ class GovernanceStore:
             self._task_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "process.schema.json")) as f:
             self._process_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "agent-binding.schema.json")) as f:
+            self._binding_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -272,6 +274,62 @@ class GovernanceStore:
         cc.append_edit_event("Task", new["id"], "create", None, 1,
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
+
+    def bind_agent(self, task_id: str, actor: str, reason: str,
+                   model: str = "claude-opus-4-8", mcp_tool: str | None = None) -> dict:
+        """Make a step agent-run: create an AgentBinding for it and add the agent to
+        the step's performers. The binding is created first so the task-update
+        validates. The step then shows as agent-bound (AI badge, guardrail
+        escalation branch) and counts toward §12 coverage."""
+        self._require(reason, actor)
+        g = self.graph()
+        t = g.get("Task", task_id)
+        if t is None or t["status"] != "active":
+            raise EditError(f"unknown or retired step {task_id}")
+        if any(w.startswith("agent.") for w in t["performed_by"]):
+            raise EditError("this step already has an agent binding")
+
+        base = "agent." + task_id.lower()
+        existing = {b["id"] for b in g.all("AgentBinding")}
+        aid, n = base, 2
+        while aid in existing:
+            aid = f"{base}_{n}"; n += 1
+        binding = {
+            "id": aid, "task_ref": task_id,
+            "mcp_tool": mcp_tool or ("continuum." + task_id.split(".")[0].lower()),
+            "model": model, "guardrail_ref": None, "version": 1, "status": "active",
+        }
+        errs = sorted(self._binding_validator.iter_errors(binding), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("agent binding invalid: " + "; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("AgentBinding", aid, "create", None, 1,
+                             {"kind": "human", "id": actor}, binding, reason.strip())
+        # now the binding exists, so this task update validates
+        self.edit_task(task_id, {"performed_by": t["performed_by"] + [aid]}, actor, reason)
+        return {"binding": aid, "task": task_id}
+
+    def unbind_agent(self, task_id: str, actor: str, reason: str) -> dict:
+        """Make a step human-only again: drop the agent from its performers and
+        deprecate the binding (retained, never hard-deleted)."""
+        self._require(reason, actor)
+        g = self.graph()
+        t = g.get("Task", task_id)
+        if t is None:
+            raise EditError(f"unknown step {task_id}")
+        agents = [w for w in t["performed_by"] if w.startswith("agent.")]
+        if not agents:
+            raise EditError("this step has no agent binding")
+        self.edit_task(task_id, {"performed_by": [w for w in t["performed_by"] if not w.startswith("agent.")]},
+                       actor, reason)
+        for aid in agents:
+            b = cc.Graph().get("AgentBinding", aid)
+            if b and b["status"] == "active":
+                nb = copy.deepcopy(b)
+                nb["status"] = "deprecated"
+                nb["version"] = b["version"] + 1
+                cc.append_edit_event("AgentBinding", aid, "deprecate", b["version"], nb["version"],
+                                     {"kind": "human", "id": actor}, nb, reason.strip())
+        return {"unbound": agents, "task": task_id}
 
     def add_process(self, code: str, name: str, owner_role: str, actor: str,
                     reason: str) -> dict:

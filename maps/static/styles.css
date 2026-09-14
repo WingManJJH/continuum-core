@@ -81,6 +81,12 @@ text.hintmsg { fill: var(--muted); font-size: 12px; }
 .struct .btnrow button:hover { border-color: var(--accent); }
 .struct .btnrow button.danger { color: var(--crit); border-color: var(--crit-bg); }
 .struct .btnrow button.danger:hover { border-color: var(--crit); }
+.bindbtn { width: 100%; margin-top: 8px; font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 7px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.bindbtn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.bindbtn.unbind { border-color: var(--line); color: var(--muted); background: var(--surface); }
+.bindbtn.unbind:hover { border-color: var(--crit); color: var(--crit); }
 .views button { font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); cursor: pointer; }
 .views button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }

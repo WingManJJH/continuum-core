@@ -49,10 +49,18 @@ tracks that it still needs review). A new process opens an empty `start → end`
 with a "drag a step here" hint. All authoring goes through the versioned, hash-chained
 governance write path (`POST /api/task`, `POST /api/process`).
 
+## Bind agents to steps
+
+Selecting a step shows **"Make this step agent-run"** (or **"Unbind agent"** if it's
+already agent-bound). Binding creates an `AgentBinding` for the step and adds it to the
+performers, so the step immediately renders as agent-run — AI badge and, if its guardrail
+has a condition, an escalation branch to a human — and counts toward §12 coverage.
+Unbinding drops the agent and deprecates the binding (retained, never destroyed). Both go
+through the versioned, hash-chained write path (`POST /api/task`, op bind/unbind).
+
 ## Scope
 
-The canvas now covers the full §03 loop: **view** (flowchart / RACI / checklist),
-**edit** guardrails and step structure (rename / reorder / remove), and **author** new
-processes and steps from the palette — all on the one graph, versioned, on the §7.5
-trail. The one remaining structural write path is **agent-binding authoring** (attaching
-an agent to a step from the canvas), noted for later.
+The canvas is the **complete §03 authoring surface**: **view** (flowchart / RACI /
+checklist), **edit** guardrails and step structure, **author** new processes and steps
+from the palette, and **bind / unbind agents** — every structural write path, all on the
+one graph, versioned and tamper-evident.
