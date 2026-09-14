@@ -6,6 +6,24 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — In-app process-map canvas (§03 Canvas View, first slice)
+
+### D11 — Process Maps app (the visual layer)
+**Context:** §03's human-facing "Canvas View" was the one planned product piece not built; the
+buildable slices had focused on the model, agent, governance, dashboard, and audit layers.
+**Decision & build:** `maps/` — a read-only app that renders every process as a BPMN-style flow from
+the live graph: start→tasks→end, the agent-bound step highlighted with an AI badge, its guardrail
+escalation branch to a human (`escalate → role if condition`), task-level overrides marked (e.g.
+`IT.8.4.2.t3`), and a header of owner / guardrail version / KPIs / linked risk. `mapdata.all_maps`
+assembles it; `maps/app.py` serves `/api/maps` + a vanilla-JS SVG canvas (theme-aware, no diagram
+library); `maps/test_mapdata.py` (10 asserts). Runs alongside governance (:8787) and dashboard (:8788)
+on :8789. Verified in the browser, both themes. Full suite now 81 assertions.
+**Scope:** read-only first slice. The full §03 Canvas View adds an interactive three-pane editor and
+the other views of the same model (metro map, RACI, guided checklist) — the larger follow-on; the map
+data is already shaped to feed them.
+
+---
+
 ## 2026-09-13 — Audit off-box anchor (co-forgery defense)
 
 ### D10 — HMAC-signed off-box anchor over both audit logs

@@ -78,6 +78,10 @@ python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom
 python3 audit/test_audit_chain.py                 # 13 asserts: content/delete/reorder/truncate/whole-log/reset
 python3 audit/test_anchor.py                       # 10 asserts: off-box anchor catches log+heads co-forgery
 python3 audit/verify.py                            # re-walk chain + off-box anchor (exit 1 on tampering)
+
+# Process maps — §03 Canvas View (first slice)
+python3 maps/test_mapdata.py                       # 10 asserts: flow / agent step / escalation / override
+python3 maps/app.py                                # http://localhost:8789 — BPMN-style maps of all 8 processes
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,
@@ -250,11 +254,16 @@ continuum-core/
 │   ├── static/                 #   vanilla-JS leadership view
 │   ├── test_rollup.py          #   rollup / coverage / metrics assertions
 │   └── README.md
-├── audit/                      # ISO 9001 §7.5 tamper-evidence (hash chain, D9)
+├── audit/                      # ISO 9001 §7.5 tamper-evidence (hash chain D9 + off-box anchor D10)
 │   ├── verify.py               #   re-walk the chain + off-box anchor; CLI + JSON report
 │   ├── anchor.py               #   HMAC-signed off-box anchor over both logs (co-forgery defense)
 │   ├── test_audit_chain.py     #   13 asserts: tamper modes + reset hygiene
 │   └── test_anchor.py          #   10 asserts: anchor catches consistent co-forgery
+├── maps/                       # §03 Canvas View — BPMN-style process maps (D11)
+│   ├── mapdata.py              #   assembles per-process map data from the graph
+│   ├── app.py                  #   stdlib server: /api/maps + static SVG canvas
+│   ├── static/                 #   vanilla-JS SVG renderer (theme-aware)
+│   └── test_mapdata.py         #   10 asserts: flow / agent step / escalation / override
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json
 │   └── DEFAULT-GUARDRAIL-TEMPLATE.md
