@@ -6,6 +6,30 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-14 — Ask the Agent (natural-language question over the graph)
+
+### D18 — NL question -> read-only graph query, with a Show-query receipt
+**Context:** benchmarked against a shipped time-management product's "Ask the data" text-to-SQL
+agent; wanted the same shape for Continuum, applied to the **graph** instead of a warehouse.
+**Decision & build:** `ask/` — a chat-style window (`app.py`, :8791). You ask a plain-English
+question; the agent writes a **read-only** graph query, runs it against the one graph, and answers
+with a table, the **assumptions** it made, and the exact query it ran (**Show query** — a small
+SQL-like receipt `FROM … FOLLOW … WHERE … SELECT …`), the graph analog of "Show SQL". Curated
+question set covers ungoverned processes, unreviewed default guardrails, dangling processes (finds
+the planted `HR.7.2.5`), agent steps, agent-steps-on-inherited-guardrails, off-target KPIs (breach by
+direction), lowest-maturity processes, high-stakes-allowing guardrails, APQC domain span, and
+`show <id>` entity lookup. `ask/test_agent.py` — 23 asserts. Verified live in the browser.
+**Two honest layers:** `QueryEngine` is a real read-only executor (only ever reads the graph — the
+Show-query receipt is asserted to contain no write verbs). The **planner** that turns a question into
+a plan is deterministic today (`IntentPlanner`); the **`LLMPlanner`** — a live model for *arbitrary*
+questions — is the declared seam and **refuses until model access is provisioned** (exactly like the
+connectors, the pilot agent, and the advisor's `LLMAdvisor`). An unrecognized question is not faked:
+the window says it needs the LLM planner and offers the questions it can answer now. Full suite
+**187 asserts**. Five apps now run together: governance :8787, dashboard :8788, canvas :8789,
+advisor :8790, **ask :8791**.
+
+---
+
 ## 2026-09-13 — AI advisor window (analyze anything vs best practices & standards)
 
 ### D17 — Standards advisor + agent window

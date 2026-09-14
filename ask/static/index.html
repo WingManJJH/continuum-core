@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Continuum &middot; Ask the Agent</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="mark">C</div>
+    <div class="name">Continuum <span>&middot; Ask the Agent</span></div>
+    <div class="spacer"></div>
+    <button class="toggle" id="themeBtn" type="button">theme: auto</button>
+  </header>
+
+  <main id="thread" class="thread">
+    <div class="turn assistant intro">
+      <div class="bubble">
+        <p><b>Ask a plain-English question about the model.</b> The agent writes a
+          <b>read-only</b> graph query, runs it against the one graph, and answers &mdash; with a
+          table, the assumptions it made, and the exact query it ran (<i>Show query</i>).</p>
+        <p class="fine">Deterministic planner over a curated question set &mdash; works with no model
+          access. Open-ended questions need the LLM planner, which is declared but auth-gated.</p>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+  </main>
+
+  <form class="composer" id="composer">
+    <input id="q" class="q" autocomplete="off"
+      placeholder="Ask about the model&hellip;  e.g. &ldquo;which processes have no guardrail?&rdquo;">
+    <button id="ask" class="go" type="submit">Ask</button>
+  </form>
+  <script src="app.js"></script>
+</body>
+</html>

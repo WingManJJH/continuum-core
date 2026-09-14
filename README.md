@@ -91,6 +91,10 @@ python3 maps/app.py                                # http://localhost:8789 — 3
 # Advisor — analyze anything vs best practices & standards
 python3 advisor/test_advisor.py                    # 18 asserts: process/guardrail/task/content/model checks
 python3 advisor/app.py                             # http://localhost:8790 — AI window: score a subject against ISO 9001/9004/APQC + Core Model doctrine
+
+# Ask the Agent — plain-English question -> read-only graph query -> answer
+python3 ask/test_agent.py                          # 23 asserts: NL intents, read-only receipt, grounded answers, auth-gated seam
+python3 ask/app.py                                 # http://localhost:8791 — ask window: writes a read-only query, runs it, Show query
 ```
 
 The **core engine** (`continuum_core.py`) needs only the standard library; `mcp`,

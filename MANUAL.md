@@ -53,6 +53,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 governance/test_binding.py \
   && python3 maps/test_mapdata.py \
   && python3 advisor/test_advisor.py \
+  && python3 ask/test_agent.py \
   && echo "ALL GREEN"
 ```
 
@@ -75,8 +76,9 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `governance/test_binding.py` | `13 passed, 0 failed` |
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 | `advisor/test_advisor.py` | `18 passed, 0 failed` |
+| `ask/test_agent.py` | `23 passed, 0 failed` |
 
-164 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+187 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -200,6 +202,7 @@ Two independent read/edit surfaces, different ports — you can run both at once
 | Strategy dashboard | `python3 dashboard/app.py` | http://localhost:8788 | standing report (Phase 4) |
 | Process canvas | `python3 maps/app.py` | http://localhost:8789 | interactive §03 canvas — flowchart/RACI/checklist; view + edit guardrails/structure + author processes + bind agents to steps |
 | Advisor | `python3 advisor/app.py` | http://localhost:8790 | AI window — analyze any process/guardrail/task/content vs best practices & standards |
+| Ask the Agent | `python3 ask/app.py` | http://localhost:8791 | ask a plain-English question — the agent writes a read-only graph query, runs it, and answers with a table + Show query |
 
 Each runs in the foreground; stop with `Ctrl-C`. To run one in the background:
 `python3 governance/app.py &`. Change the port with `--port N` if 8787/8788 are taken.
