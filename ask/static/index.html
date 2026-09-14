@@ -21,7 +21,8 @@
           <b>read-only</b> graph query, runs it against the one graph, and answers &mdash; with a
           table, the assumptions it made, and the exact query it ran (<i>Show query</i>).</p>
         <p class="fine">Deterministic planner over a curated question set &mdash; works with no model
-          access. Open-ended questions need the LLM planner, which is declared but auth-gated.</p>
+          access. Set <code>CONTINUUM_LLM_API_KEY</code> to light up the LLM planner, which turns
+          <i>any</i> question into a validated read-only query.</p>
         <div class="chips" id="chips"></div>
       </div>
     </div>

@@ -6,6 +6,29 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-14 — Wire the LLM planner behind an env var
+
+### D19 — Enable the LLMPlanner when a key is present; validated-plan safety
+**Context:** D18 shipped the `LLMPlanner` as a declared-but-refusing seam. Turn it on so it
+lights up the moment model access exists, without weakening the read-only guarantee.
+**Decision & build:** the `LLMPlanner` is wired behind **`CONTINUUM_LLM_API_KEY`** (falls back to
+`ANTHROPIC_API_KEY`); model + endpoint overridable via `CONTINUUM_LLM_MODEL` / `CONTINUUM_LLM_BASE_URL`
+(default model `claude-opus-4-8`, default endpoint the Anthropic Messages API, called over stdlib
+`urllib` — no new dependency). When set, an **unrecognized** question is routed to the model; curated
+questions keep using the deterministic `IntentPlanner` (fast, free, exact). **Safety by construction:**
+the model is asked for a query **plan (JSON), never code** — it can only choose *what to read* over a
+fixed schema (`QueryEngine.schema_doc()` is the exact prompt). Every returned plan passes through
+**`validate_plan`** (whitelist of entity type, ops, predicates, fields; `limit` capped at 200; unknown
+keys rejected) before the **read-only** `QueryEngine` runs it, so a hostile or hallucinated reply can do
+nothing but a bounded read. A model error or invalid plan **falls back honestly** to the deterministic
+suggestions with the error surfaced — never a faked answer. The UI tags every answer with its provenance
+(**deterministic planner** / **LLM planner** / **direct lookup**). Tested hermetically via an injected
+transport (no key, no network): full LLM path, plan-validation rejects, and honest fallback.
+`ask/test_agent.py` now **35 asserts**; full suite **199**. `LLMAdvisor` (advisor) remains the next
+seam to wire the same way.
+
+---
+
 ## 2026-09-14 — Ask the Agent (natural-language question over the graph)
 
 ### D18 — NL question -> read-only graph query, with a Show-query receipt

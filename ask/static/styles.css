@@ -60,6 +60,12 @@ header .spacer { flex: 1; }
 
 .answer { font-weight: 500; margin-bottom: 10px; }
 .answer .count { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+.prov { display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 6px;
+  margin-right: 8px; vertical-align: middle; background: var(--surface-2); color: var(--muted);
+  border: 1px solid var(--line); }
+.prov.llm { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.prov.intent { background: var(--surface-2); color: var(--accent); }
 
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; margin: 4px 0 8px; }
 table.res { border-collapse: collapse; width: 100%; font-size: 13px; }

@@ -68,14 +68,53 @@ def main():
           not r["matched"] and "auth-gated" in r["answer"] and len(r["suggestions"]) >= 5)
     check("unmatched names the LLMPlanner seam", "LLMPlanner" in r["note"])
 
-    # 6. the LLM planner seam is declared but refuses
+    # 6. the LLM planner seam refuses when no key/transport is present
+    eng = ag.QueryEngine()
     try:
-        ag.LLMPlanner().plan("anything"); llm = False
+        ag.LLMPlanner(eng).plan("anything"); llm = False
     except RuntimeError:
         llm = True
-    check("LLMPlanner is declared but auth-gated (refuses)", llm)
+    check("LLMPlanner refuses with no key (auth-gated)", llm)
+    check("LLMPlanner reports unavailable with no key", not ag.LLMPlanner(eng).available())
 
-    # 7. empty question handled
+    # 7. plan validation whitelists to a bounded, read-only plan
+    good = ag.validate_plan({"from": "Process", "where": [{"op": "absent", "path": "guardrail_ref"}]}, eng)
+    check("valid plan passes + gets a limit cap", good["limit"] == ag.LIMIT_CAP and good["select"])
+    for bad, why in [
+        ({"from": "Secrets"}, "unknown type"),
+        ({"from": "Process", "where": [{"op": "drop", "path": "id"}]}, "bad op"),
+        ({"from": "Process", "where": [{"op": "predicate", "name": "rm_rf"}]}, "unknown predicate"),
+        ({"from": "Process", "select": ["password"]}, "unknown field"),
+        ({"from": "Process", "sneaky": 1}, "unknown key"),
+    ]:
+        try:
+            ag.validate_plan(bad, eng); ok = False
+        except ag.PlanError:
+            ok = True
+        check(f"invalid plan rejected: {why}", ok)
+
+    # 8. full LLM path via an injected transport (no key, no network)
+    def transport(question, schema):
+        return '```json\n{"from":"Task","where":[{"op":"predicate","name":"agent_task"}],' \
+               '"select":["id","name"]}\n```'
+    la = ag.Agent(llm_transport=transport)
+    r = la.ask("show me the robots doing work")  # not a curated intent -> LLM planner
+    check("LLM planner answers an open question", r["matched"] and r["planner"] == "llm" and r["n"] == 8)
+    check("LLM answer carries a Show-query receipt", "FROM Task" in r["cql"])
+    check("LLM answer cites it was model-planned + validated",
+          any("LLM planner" in x for x in r["assumptions"]))
+
+    # 9. a malformed model reply falls back honestly (never crashes, never faked)
+    bad_agent = ag.Agent(llm_transport=lambda q, s: "sorry I can't help")
+    rb = bad_agent.ask("something totally open ended")
+    check("malformed LLM reply -> honest fallback, not a fake answer",
+          not rb["matched"] and "LLM planner error" in rb["note"])
+
+    # 10. a curated question still uses the deterministic planner even with LLM enabled
+    r = la.ask("which processes have no guardrail?")
+    check("curated question stays deterministic when LLM is on", r["planner"] == "intent")
+
+    # 11. empty question handled
     check("empty question returns suggestions, no crash", a.ask("")["suggestions"])
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

@@ -35,6 +35,23 @@ from advisor import HIGH_STAKES  # reuse the one high-stakes list  # noqa: E402
 
 ID_RE = re.compile(r"\b(?:gr|kpi|agent|role|obj)\.[A-Za-z0-9_.]+|\b[A-Z]{2}\.\d+\.\d+\.\d+\b")
 
+# --- LLM planner wiring (env-gated) ---------------------------------------- #
+API_KEY_ENV = "CONTINUUM_LLM_API_KEY"        # falls back to ANTHROPIC_API_KEY
+MODEL_ENV = "CONTINUUM_LLM_MODEL"            # default below; override for your account
+BASE_URL_ENV = "CONTINUUM_LLM_BASE_URL"      # default: Anthropic Messages API
+DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_BASE_URL = "https://api.anthropic.com/v1/messages"
+
+ALLOWED_TYPES = {"StrategicObjective", "KPI", "Process", "Task", "HumanRole",
+                 "AgentBinding", "GuardrailPolicy", "RiskControl"}
+ALLOWED_OPS = {"absent", "present", "eq", "ne", "lt", "gt", "in", "intersects", "predicate"}
+PLAN_KEYS = {"from", "active_only", "follow", "where", "select", "order_by", "limit"}
+LIMIT_CAP = 200
+
+
+def api_key() -> str | None:
+    return os.environ.get(API_KEY_ENV) or os.environ.get("ANTHROPIC_API_KEY")
+
 
 # --------------------------------------------------------------------------- #
 #  Read-only query executor                                                   #
@@ -149,6 +166,91 @@ class QueryEngine:
 
     def count(self, plan: dict) -> int:
         return len(self.run(plan))
+
+    def field_names(self, etype: str) -> set[str]:
+        names: set[str] = set()
+        for e in self.g.all(etype):
+            names.update(e.keys())
+        return names
+
+    # single-value ref fields the LLM may FOLLOW, mapped to the type they point at
+    FOLLOWABLE = {
+        "guardrail_ref": "GuardrailPolicy", "process_ref": "Process",
+        "task_ref": "Task", "owner_role": "HumanRole",
+    }
+
+    def schema_doc(self) -> str:
+        """Human/model-readable description of the read-only query DSL + graph schema."""
+        lines = ["READ-ONLY graph query plan (JSON). The plan can only READ; there is no write.",
+                 "Shape:",
+                 '  {"from": <EntityType>, "active_only": true,',
+                 '   "follow": [{"as":"gr","type":"GuardrailPolicy","via":"guardrail_ref"}],',
+                 '   "where": [ {"op":"absent","path":"guardrail_ref"},',
+                 '              {"op":"predicate","name":"traces_to_objective","negate":true} ],',
+                 '   "select": ["id","name"], "order_by":{"path":"maturity_score","dir":"asc"},',
+                 '   "limit": 20 }',
+                 "",
+                 f"Entity types: {', '.join(sorted(ALLOWED_TYPES))}.",
+                 f"Ops: {', '.join(sorted(ALLOWED_OPS))} "
+                 "(absent/present take a path; eq/ne/lt/gt/in take path+value; "
+                 "intersects takes a list path + value list; predicate takes name[+negate]).",
+                 f"Predicates: {', '.join(sorted(self.PREDS))}.",
+                 f"Followable ref fields: {', '.join(sorted(self.FOLLOWABLE))}.",
+                 "", "Fields per type:"]
+        for et in sorted(ALLOWED_TYPES):
+            lines.append(f"  {et}: {', '.join(sorted(self.field_names(et)))}")
+        lines.append("")
+        lines.append("Return ONLY the JSON plan, no prose. Use select to name the columns to show.")
+        return "\n".join(lines)
+
+
+class PlanError(ValueError):
+    """A query plan failed validation (unknown type/op/field, or oversized)."""
+
+
+def validate_plan(plan: dict, engine: "QueryEngine") -> dict:
+    """Whitelist a plan before it runs. Guarantees the plan is a bounded read."""
+    if not isinstance(plan, dict):
+        raise PlanError("plan is not an object")
+    extra = set(plan) - PLAN_KEYS
+    if extra:
+        raise PlanError(f"unknown plan keys: {sorted(extra)}")
+    et = plan.get("from")
+    if et not in ALLOWED_TYPES:
+        raise PlanError(f"'from' must be one of {sorted(ALLOWED_TYPES)}")
+    fields = engine.field_names(et)
+    aliases = set()
+    for f in plan.get("follow", []) or []:
+        if not isinstance(f, dict) or f.get("type") not in ALLOWED_TYPES:
+            raise PlanError("bad follow.type")
+        if f.get("via") not in engine.FOLLOWABLE:
+            raise PlanError(f"follow.via must be one of {sorted(engine.FOLLOWABLE)}")
+        aliases.add(f.get("as"))
+    for c in plan.get("where", []) or []:
+        if not isinstance(c, dict) or c.get("op") not in ALLOWED_OPS:
+            raise PlanError(f"bad where op: {c.get('op') if isinstance(c, dict) else c}")
+        if c["op"] == "predicate":
+            if c.get("name") not in engine.PREDS:
+                raise PlanError(f"unknown predicate: {c.get('name')}")
+        else:
+            head = str(c.get("path", "")).split(".")[0]
+            if head not in fields and head not in aliases:
+                raise PlanError(f"unknown field in where: {c.get('path')}")
+    for s in plan.get("select", []) or []:
+        head = str(s).split(".")[0]
+        if head not in fields and head not in aliases:
+            raise PlanError(f"unknown field in select: {s}")
+    ob = plan.get("order_by")
+    if ob and str(ob.get("path", "")).split(".")[0] not in (fields | aliases):
+        raise PlanError(f"unknown field in order_by: {ob.get('path')}")
+    lim = plan.get("limit")
+    if lim is not None and (not isinstance(lim, int) or lim <= 0):
+        raise PlanError("limit must be a positive integer")
+    plan["limit"] = min(lim, LIMIT_CAP) if isinstance(lim, int) else LIMIT_CAP
+    if not plan.get("select"):
+        plan["select"] = ["id"] + (["name"] if "name" in fields else [])
+    plan.setdefault("active_only", True)
+    return plan
 
 
 # --------------------------------------------------------------------------- #
@@ -384,29 +486,112 @@ INTENTS: list[Intent] = [
 # --------------------------------------------------------------------------- #
 #  Planners                                                                    #
 # --------------------------------------------------------------------------- #
+SYSTEM_PROMPT = (
+    "You translate a question about a governance graph into ONE read-only query plan. "
+    "You never write, mutate, or invent data — you only select what to read. "
+    "Reply with a single JSON object (the plan) and nothing else.")
+
+
 class LLMPlanner:
     """The auth-gated seam: a live model that turns ANY question into a query.
 
-    Declared but refuses until model access (API / OAuth) is provisioned, exactly
-    like the signal connectors, the pilot agent, and the advisor's LLMAdvisor.
-    The deterministic IntentPlanner stands in until then.
+    Wired behind an env var. When CONTINUUM_LLM_API_KEY (or ANTHROPIC_API_KEY) is
+    set, it asks the model for a query *plan* — never code — and that plan is
+    whitelisted by validate_plan before the read-only QueryEngine runs it, so even
+    a hostile or hallucinated response can do nothing but a bounded read. When no
+    key is set it refuses, exactly like the signal connectors, the pilot agent, and
+    the advisor's LLMAdvisor; the deterministic IntentPlanner stands in.
+
+    `transport` is an optional callable(question, schema_doc) -> raw model text,
+    injected for tests so the full path runs with no key and no network.
     """
 
-    def plan(self, *_a, **_k):
-        raise RuntimeError(
-            "LLMPlanner requires model access (set an API key / OAuth) — not provisioned. "
-            "The deterministic IntentPlanner is answering the curated question set instead.")
+    def __init__(self, engine: "QueryEngine", transport=None):
+        self.engine = engine
+        self._transport = transport
+
+    def available(self) -> bool:
+        return bool(self._transport) or bool(api_key())
+
+    @property
+    def model(self) -> str:
+        return os.environ.get(MODEL_ENV, DEFAULT_MODEL)
+
+    def _call_model(self, question: str) -> str:
+        if self._transport:
+            return self._transport(question, self.engine.schema_doc())
+        key = api_key()
+        if not key:
+            raise RuntimeError("no API key")
+        import json as _json
+        import urllib.request as _rq
+        body = _json.dumps({
+            "model": self.model, "max_tokens": 700, "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content":
+                          self.engine.schema_doc() + "\n\nQuestion: " + question}],
+        }).encode()
+        req = _rq.Request(os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL), data=body, headers={
+            "content-type": "application/json", "x-api-key": key,
+            "anthropic-version": "2023-06-01"})
+        with _rq.urlopen(req, timeout=30) as resp:  # nosec - fixed Anthropic endpoint
+            data = _json.loads(resp.read())
+        parts = data.get("content", [])
+        return "".join(p.get("text", "") for p in parts if p.get("type") == "text")
+
+    @staticmethod
+    def _extract_json(raw: str) -> dict:
+        import json as _json
+        s = raw.strip()
+        if s.startswith("```"):
+            s = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", s.strip())
+        start, end = s.find("{"), s.rfind("}")
+        if start < 0 or end <= start:
+            raise PlanError("no JSON object in model reply")
+        return _json.loads(s[start:end + 1])
+
+    def plan(self, question: str) -> dict:
+        if not self.available():
+            raise RuntimeError(
+                "LLMPlanner requires model access — set CONTINUUM_LLM_API_KEY (or "
+                "ANTHROPIC_API_KEY) to enable it. The deterministic IntentPlanner is "
+                "answering the curated question set instead.")
+        raw = self._call_model(question)
+        return validate_plan(self._extract_json(raw), self.engine)
 
 
 class Agent:
     """Ask a question, get an answer + the read-only query that produced it."""
 
-    def __init__(self, graph: cc.Graph | None = None):
+    def __init__(self, graph: cc.Graph | None = None, llm_transport=None):
         self.engine = QueryEngine(graph)
         self.g = self.engine.g
+        self.llm = LLMPlanner(self.engine, transport=llm_transport)
 
     def examples(self) -> list[str]:
         return [i.utterance for i in INTENTS]
+
+    def _llm_answer(self, question: str) -> dict | None:
+        """Try the env-gated LLM planner. Returns a result, or None to fall back."""
+        if not self.llm.available():
+            return None
+        try:
+            plan = self.llm.plan(question)
+            rows = self.engine.run(plan)
+            cols = plan.get("select") or ["id"]
+            proj = _project(rows, cols)
+            answer = ("The LLM planner wrote a read-only query for that and it returned "
+                      + (f"{_plural(len(proj),'row','rows')}:" if proj
+                         else "no matching rows."))
+            return {
+                "matched": True, "intent": "llm_planner", "planner": "llm",
+                "answer": answer, "columns": cols, "rows": proj, "n": len(proj),
+                "cql": render_cql(plan), "assumptions": [
+                    f"Query written by the LLM planner ({self.llm.model}) from your question.",
+                    "The plan was whitelist-validated as a bounded, read-only query before running."],
+                "note": "", "suggestions": [],
+            }
+        except Exception as e:  # noqa: BLE001 - surface as an honest note, then fall back
+            return {"_llm_error": f"{type(e).__name__}: {e}"}
 
     # -- entity lookup (an id in the question) ------------------------------ #
     def _describe_entity(self, ident: str) -> dict | None:
@@ -418,7 +603,7 @@ class Agent:
                 rows = [{"field": k, "value": ", ".join(map(str, ent[k]))
                          if isinstance(ent[k], list) else str(ent[k])} for k in fields]
                 return {
-                    "matched": True, "intent": "entity_detail",
+                    "matched": True, "intent": "entity_detail", "planner": "lookup",
                     "answer": f"{et} {ident}"
                               + (f" — {ent.get('name')}" if ent.get("name") else "")
                               + f" (status: {ent.get('status','?')}).",
@@ -444,7 +629,7 @@ class Agent:
 
     def _wrap(self, intent: Intent, columns, rows, answer) -> dict:
         return {
-            "matched": True, "intent": intent.id, "answer": answer,
+            "matched": True, "intent": intent.id, "planner": "intent", "answer": answer,
             "columns": columns, "rows": rows, "n": len(rows),
             "cql": render_cql(intent.plan), "assumptions": intent.assumptions,
             "note": "", "suggestions": [],
@@ -454,7 +639,7 @@ class Agent:
         q = (question or "").lower().strip()
         out = {"question": question}
         if not q:
-            out.update({"matched": False, "answer": "Ask a question about the model.",
+            out.update({"matched": False, "planner": "none", "answer": "Ask a question about the model.",
                         "columns": [], "rows": [], "n": 0, "cql": "", "assumptions": [],
                         "note": "", "suggestions": self.examples()})
             return out
@@ -479,15 +664,30 @@ class Agent:
             out.update(self._wrap(top, top.columns, proj, top.summarize(proj, len(proj), self.engine)))
             return out
 
-        # 3) unmatched -> honest seam note + suggestions
-        out.update({
-            "matched": False,
-            "answer": "I can't turn that into a read-only query yet. The deterministic planner "
+        # 3) unmatched -> if the LLM planner is enabled, let it write the query
+        llm = self._llm_answer(q if q else question)
+        llm_err = None
+        if llm and "_llm_error" not in llm:
+            out.update(llm)
+            return out
+        if llm:
+            llm_err = llm["_llm_error"]
+
+        # 4) unmatched + no (working) LLM planner -> honest seam note + suggestions
+        if llm_err:
+            answer = ("The LLM planner is enabled but could not turn that into a valid read-only "
+                      "query. The deterministic planner covers the questions below.")
+            note = f"LLM planner error: {llm_err}"
+        else:
+            answer = ("I can't turn that into a read-only query yet. The deterministic planner "
                       "covers the questions below; open-ended phrasing needs the LLM planner, "
-                      "which is declared but auth-gated (no model access yet).",
+                      "which is declared but auth-gated (no model access yet).")
+            note = ("LLMPlanner is the seam for arbitrary questions — set CONTINUUM_LLM_API_KEY "
+                    "(or ANTHROPIC_API_KEY) to enable it.")
+        out.update({
+            "matched": False, "planner": "none", "answer": answer,
             "columns": [], "rows": [], "n": 0, "cql": "", "assumptions": [],
-            "note": "LLMPlanner is the seam for arbitrary questions — provision model access to enable it.",
-            "suggestions": self.examples(),
+            "note": note, "suggestions": self.examples(),
         })
         return out
 

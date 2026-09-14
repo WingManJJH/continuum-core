@@ -43,7 +43,10 @@ function addAnswer(r) {
   el.className = "turn assistant";
   if (r.error) { el.innerHTML = '<div class="bubble">Something went wrong: ' + esc(r.error) + "</div>"; thread.appendChild(el); scroll(); return; }
 
-  var html = '<div class="answer">' + esc(r.answer) + "</div>";
+  var PROV = { intent: "deterministic planner", llm: "LLM planner", lookup: "direct lookup" };
+  var prov = r.matched && PROV[r.planner]
+    ? '<span class="prov ' + esc(r.planner) + '">' + esc(PROV[r.planner]) + "</span>" : "";
+  var html = '<div class="answer">' + prov + esc(r.answer) + "</div>";
 
   if (r.matched) {
     html += table(r.columns, r.rows);

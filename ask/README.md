@@ -14,13 +14,35 @@ Mirrors the advisor's `RulesAdvisor` / `LLMAdvisor` split:
   or edits an entity. This is what actually runs today.
 - **Planner** — turns a question into a query plan. The deterministic
   **`IntentPlanner`** (keyword intents over a curated question set) stands in and
-  works with no model access. The **`LLMPlanner`** is the declared seam where a
-  live model generalizes to *arbitrary* questions once auth (API / OAuth) is
-  provisioned; until then it **refuses**, exactly like the signal connectors, the
-  pilot agent, and the advisor's `LLMAdvisor`.
+  works with no model access. The **`LLMPlanner`** is the seam where a live model
+  generalizes to *arbitrary* questions; it is **wired behind an env var** (below).
 
-So an open-ended question isn't faked — the window says it needs the LLM planner
-and points you at the questions the deterministic planner can answer today.
+So an open-ended question isn't faked — with no key the window says it needs the
+LLM planner and points you at the questions the deterministic planner can answer
+today; with a key, the model writes the query.
+
+## Enabling the LLM planner
+
+```bash
+export CONTINUUM_LLM_API_KEY=sk-...      # or ANTHROPIC_API_KEY
+export CONTINUUM_LLM_MODEL=claude-...    # optional; defaults to claude-opus-4-8
+python3 ask/app.py
+```
+
+Now an unrecognized question is routed to the model. The model is asked for a
+**query plan (JSON), never code** — it can only choose *what to read* over a fixed
+schema (`ask/agent.py::QueryEngine.schema_doc()` is the exact prompt it sees).
+Every plan the model returns is passed through **`validate_plan`** before it runs:
+entity type, ops, predicates, fields, and a `limit` cap are all whitelisted, and
+unknown keys are rejected. Because the only thing that ever executes is a plan for
+the **read-only** `QueryEngine`, a hostile or hallucinated reply can do nothing but
+a bounded read — the same guarantee "Show query" gives a text-to-SQL answer.
+
+The answer is tagged in the UI with its provenance — **deterministic planner**,
+**LLM planner**, or **direct lookup** — so you always know who wrote the query.
+Curated questions keep using the deterministic planner even when the key is set
+(fast, free, and exact). A model error or an invalid plan **falls back honestly**
+to the deterministic suggestions with the error surfaced — never a faked answer.
 
 ## Questions it answers today
 
@@ -45,7 +67,7 @@ answer is auditable the same way "Show SQL" makes a text-to-SQL answer auditable
 
 ```bash
 python3 ask/app.py            # http://localhost:8791 (alongside :8787 / :8788 / :8789 / :8790)
-python3 ask/test_agent.py     # 23 asserts
+python3 ask/test_agent.py     # 35 asserts
 ```
 
 ## Files
