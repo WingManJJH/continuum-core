@@ -55,6 +55,15 @@ h2 { font-size: 11px; font-family: var(--mono); text-transform: uppercase; lette
 :root[data-theme="dark"] .proc-list li.active { background: #1a2540; }
 .proc-list .pid { font-family: var(--mono); font-weight: 600; font-size: 13px; }
 .proc-list .pnm { color: var(--muted); font-size: 12px; }
+.palette { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 12px; }
+.palette .tile { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+  font-size: 13px; font-weight: 600; cursor: grab; background: var(--surface-2); }
+.palette .tile:active { cursor: grabbing; }
+.palette .tile:hover { border-color: var(--accent); color: var(--accent); }
+.palette .add-btn { width: 100%; margin-top: 4px; }
+.palette .phint { color: var(--muted); font-size: 11px; margin-top: 8px; }
+.canvas.dropok { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: 8px; }
+text.hintmsg { fill: var(--muted); font-size: 12px; }
 
 /* center */
 .center { display: flex; flex-direction: column; padding: 0; }

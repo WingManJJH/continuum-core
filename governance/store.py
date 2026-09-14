@@ -23,6 +23,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -58,6 +59,10 @@ class GovernanceStore:
             self._gr_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "task.schema.json")) as f:
             self._task_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "process.schema.json")) as f:
+            self._process_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
+            self._default_gr = json.load(f)
 
     def graph(self) -> cc.Graph:
         return cc.Graph()  # folds seed + edit log every load
@@ -223,7 +228,10 @@ class GovernanceStore:
         return new
 
     def add_task(self, process_ref: str, name: str, actor: str, reason: str,
-                 performed_by: list[str] | None = None) -> dict:
+                 performed_by: list[str] | None = None, after: str | None = None) -> dict:
+        """Insert a step. after=None appends; after='__start__' prepends; after=<task id>
+        inserts right after that step. Steps below the insertion point shift down —
+        each a versioned update, so the reorder is fully on the §7.5 trail."""
         self._require(reason, actor)
         if not name or not name.strip():
             raise EditError("a step name is required")
@@ -232,8 +240,28 @@ class GovernanceStore:
         if proc is None:
             raise EditError(f"unknown process {process_ref}")
         sibs = self._active_tasks(g, process_ref)
-        num = max((int(t["id"].split(".t")[-1]) for t in sibs), default=0) + 1
-        seq = max((t["seq"] for t in sibs), default=0) + 1
+
+        if after is None:                                   # append at the end
+            seq = max((t["seq"] for t in sibs), default=0) + 1
+        elif after == "__start__":                          # prepend
+            seq = 1
+        else:                                               # insert after a given step
+            aft = g.get("Task", after)
+            if aft is None or aft["process_ref"] != process_ref or aft["status"] != "active":
+                raise EditError(f"cannot insert after unknown step {after}")
+            seq = aft["seq"] + 1
+
+        for t in sibs:                                      # shift the tail down, versioned
+            if t["seq"] >= seq:
+                nv = copy.deepcopy(t)
+                nv["seq"] = t["seq"] + 1
+                nv["version"] = t["version"] + 1
+                cc.append_edit_event("Task", t["id"], "update", t["version"], nv["version"],
+                                     {"kind": "human", "id": actor}, nv, "shift for insert")
+
+        # number over ALL tasks (incl. retired) so ids are never reused
+        num = max((int(t["id"].split(".t")[-1])
+                   for t in g.all("Task") if t["process_ref"] == process_ref), default=0) + 1
         new = {
             "id": f"{process_ref}.t{num}", "process_ref": process_ref, "seq": seq,
             "name": name.strip(), "inputs": [], "outputs": [], "data_scope": [],
@@ -244,6 +272,48 @@ class GovernanceStore:
         cc.append_edit_event("Task", new["id"], "create", None, 1,
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
+
+    def add_process(self, code: str, name: str, owner_role: str, actor: str,
+                    reason: str) -> dict:
+        """Author a brand-new process. It is stamped with the permissive-but-scoped
+        default guardrail template (§11) at creation — unreviewed, so §12 coverage
+        counts it as a default until an owner reviews it. Both the guardrail and the
+        process are created as versioned, chained events."""
+        self._require(reason, actor)
+        if not name or not name.strip():
+            raise EditError("a process name is required")
+        if not re.match(r"^[A-Z]{2}\.[0-9]+(\.[0-9]+)*$", code or ""):
+            raise EditError("code must look like an APQC path, e.g. QA.5.1.1")
+        g = self.graph()
+        if g.get("Process", code) is not None:
+            raise EditError(f"process {code} already exists")
+        if g.get("HumanRole", owner_role) is None:
+            raise EditError(f"unknown owner role {owner_role}")
+
+        # default guardrail from the signed-off template — but as a fresh, UNREVIEWED
+        # instance (no review block) so coverage tracks that it still needs review.
+        d = self._default_gr
+        gr_id = "gr." + code
+        gr = {"id": gr_id, "attaches_to": {"kind": "process", "ref": code},
+              "allowed_actions": d["allowed_actions"], "forbidden_actions": d["forbidden_actions"],
+              "escalate_if": d["escalate_if"], "data_scope": [], "rate_limit": d["rate_limit"],
+              "escalation_path": owner_role, "audit_requirement": d["audit_requirement"],
+              "version": 1, "status": "active"}
+        errs = sorted(self._gr_validator.iter_errors(gr), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("default guardrail invalid: " + "; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("GuardrailPolicy", gr_id, "create", None, 1,
+                             {"kind": "human", "id": actor}, gr, reason.strip())
+
+        proc = {"id": code, "apqc_code": code, "name": name.strip(), "owner_role": owner_role,
+                "inputs": [], "outputs": [], "kpi_refs": [], "risk_refs": [],
+                "guardrail_ref": gr_id, "maturity_score": None, "version": 1, "status": "active"}
+        perrs = sorted(self._process_validator.iter_errors(proc), key=lambda e: list(e.path))
+        if perrs:
+            raise EditError("; ".join(f"{list(e.path) or '(root)'}: {e.message}" for e in perrs[:3]))
+        cc.append_edit_event("Process", code, "create", None, 1,
+                             {"kind": "human", "id": actor}, proc, reason.strip())
+        return proc
 
     def move_task(self, task_id: str, direction: str, actor: str,
                   reason: str = "reorder step") -> dict:

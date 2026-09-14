@@ -39,9 +39,20 @@ python3 maps/test_mapdata.py   # 12 asserts: structure, agent steps, escalation,
 - `static/` — vanilla-JS three-pane canvas: SVG flowchart + RACI + checklist + properties/editor (theme-aware, no diagram library).
 - `test_mapdata.py` — structure + editor-payload assertions.
 
+## Authoring (drag palette)
+
+The left-nav **palette** completes the §03 editor: drag a **"+ Step"** tile onto the
+flow to insert a step at the drop position (append, prepend, or *between* two steps),
+and **"+ New process"** authors a brand-new process — stamped with the permissive-but-
+scoped **default guardrail** (§11) as a fresh, unreviewed instance (so §12 coverage
+tracks that it still needs review). A new process opens an empty `start → end` flow
+with a "drag a step here" hint. All authoring goes through the versioned, hash-chained
+governance write path (`POST /api/task`, `POST /api/process`).
+
 ## Scope
 
-The interactive editing here is **guardrails** (the "editable without an engineering
-ticket" capability). Editing the process structure itself (add/move/rename steps)
-needs a task write path and is the next extension; the palette-driven authoring and
-richer element editing round out the full §03 editor.
+The canvas now covers the full §03 loop: **view** (flowchart / RACI / checklist),
+**edit** guardrails and step structure (rename / reorder / remove), and **author** new
+processes and steps from the palette — all on the one graph, versioned, on the §7.5
+trail. The one remaining structural write path is **agent-binding authoring** (attaching
+an agent to a step from the canvas), noted for later.

@@ -62,6 +62,7 @@ python3 mcp_server/scenario.py                  # walk an agent through the MCP 
 # Phase 2 — governance module (editable guardrails)
 python3 governance/test_store.py                # guardrail write-path assertions (versioning, §7.5, one-source-of-truth)
 python3 governance/test_taskedit.py             # 16 asserts: Task write path — add/rename/reorder/remove a step
+python3 governance/test_authoring.py            # 18 asserts: author a process (auto default guardrail) + drag-insert steps
 python3 governance/app.py                       # http://localhost:8787 — the editor UI
 
 # Phase 3 — signal & agent infrastructure
@@ -238,6 +239,7 @@ continuum-core/
 │   ├── retention.py            #   §7.5.3 retention scheduler + chain-safe disposition (D12)
 │   ├── test_store.py           #   guardrail write-path assertions
 │   ├── test_taskedit.py        #   16 asserts: Task write path (add/rename/reorder/remove)
+│   ├── test_authoring.py       #   18 asserts: Process write path + positional insert
 │   ├── test_retention.py       #   16 asserts: schedule / holds / disposition
 │   ├── static/                 #   vanilla-JS three-pane editor (index.html/styles.css/app.js)
 │   └── README.md
@@ -268,7 +270,7 @@ continuum-core/
 ├── maps/                       # §03 Canvas View — interactive process canvas (D11 + D13)
 │   ├── mapdata.py              #   per-process map data incl. the editable guardrail
 │   ├── app.py                  #   stdlib server: /api/maps + PUT /api/guardrail + POST /api/task (reuses governance store)
-│   ├── static/                 #   3-pane canvas: flowchart/RACI/checklist + edit guardrails AND process structure
+│   ├── static/                 #   3-pane canvas: flowchart/RACI/checklist; edit guardrails + structure; drag-palette authoring
 │   └── test_mapdata.py         #   12 asserts: flow / agent step / escalation / override / editor payload
 ├── guardrail-template/         # Deliverable 3 (signed off)
 │   ├── default-guardrail-policy.json

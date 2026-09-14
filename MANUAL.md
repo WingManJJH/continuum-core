@@ -49,6 +49,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 audit/test_anchor.py \
   && python3 governance/test_retention.py \
   && python3 governance/test_taskedit.py \
+  && python3 governance/test_authoring.py \
   && python3 maps/test_mapdata.py \
   && echo "ALL GREEN"
 ```
@@ -68,9 +69,10 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `audit/test_anchor.py` | `10 passed, 0 failed` |
 | `governance/test_retention.py` | `16 passed, 0 failed` |
 | `governance/test_taskedit.py` | `16 passed, 0 failed` |
+| `governance/test_authoring.py` | `18 passed, 0 failed` |
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 
-115 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+133 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -192,7 +194,7 @@ Two independent read/edit surfaces, different ports — you can run both at once
 |---|---|---|---|
 | Governance editor | `python3 governance/app.py` | http://localhost:8787 | edit guardrails (Phase 2) |
 | Strategy dashboard | `python3 dashboard/app.py` | http://localhost:8788 | standing report (Phase 4) |
-| Process canvas | `python3 maps/app.py` | http://localhost:8789 | interactive §03 canvas — flowchart/RACI/checklist; edit guardrails AND process structure (add/rename/reorder/remove steps) |
+| Process canvas | `python3 maps/app.py` | http://localhost:8789 | interactive §03 canvas — flowchart/RACI/checklist; edit guardrails + structure; drag-palette authoring of new processes |
 
 Each runs in the foreground; stop with `Ctrl-C`. To run one in the background:
 `python3 governance/app.py &`. Change the port with `--port N` if 8787/8788 are taken.

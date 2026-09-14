@@ -6,6 +6,32 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-13 — Drag-palette authoring (§03 Canvas View, completed)
+
+### D15 — Author brand-new processes + drag steps from a palette
+**Context:** D14 let you edit an existing process's steps; the remaining §03 piece was authoring a
+process from scratch and a drag palette.
+**Decision & build:**
+- **Process write path** — `store.add_process(code, name, owner_role, ...)`: validates the APQC-style
+  code + owner, and stamps the new process with the **permissive-but-scoped default guardrail template
+  (§11)** as a fresh **unreviewed** instance (`gr.<code>`, no review block → §12 coverage counts it as
+  a default until reviewed). Both the guardrail and the process are created as versioned, chained events.
+- **Positional insertion** — `add_task` gained `after` (append / `__start__` prepend / after a step),
+  shifting the tail down as versioned updates, so a step can be dropped *between* existing ones.
+- **Palette UI** — a left-nav palette with draggable "+ Step" / "+ Approval step" tiles and a
+  "+ New process" button. Dragging a tile onto the flow inserts a step at the drop position (HTML5 DnD →
+  `POST /api/task` with `after` computed from the drop x); a brand-new process renders an empty
+  start→end flow with a "drag a step here" hint. `POST /api/process` reuses the store.
+- `governance/test_authoring.py` — 18 asserts (create + auto-default-guardrail, append/insert/prepend,
+  validation, chain-intact). Verified live in-browser: authored `QA.5.1.1` and built its flow by
+  dragging Intake / Assess / Resolve into place, incl. a between-steps insert. Full suite 133 asserts.
+**This completes the §03 Canvas View** buildable slice: view (flowchart/RACI/checklist), edit guardrails
+and step structure, and author new processes — all on the one graph, versioned, on the §7.5 trail.
+Agent-binding authoring (attaching an agent to a step) is the one remaining structural write path,
+noted for later.
+
+---
+
 ## 2026-09-13 — Task write path (edit process structure on the canvas)
 
 ### D14 — Structural editing: add / rename / reorder / remove steps

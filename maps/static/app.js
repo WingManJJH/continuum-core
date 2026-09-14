@@ -67,8 +67,19 @@ function wrap(name, max) {
   if (lines.length > 2) lines = [lines[0], trunc(lines.slice(1).join(" "), max)];
   return lines.slice(0, 2);
 }
+function renderEmptyFlow(m) {
+  var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), cy = LANE + NH / 2;
+  var sx = PAD + R, ex = sx + 200, W = ex + R + PAD, H = LANE + NH + 18;
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">'
+    + '<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>'
+    + '<circle class="tip" cx="' + sx + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (cy + 3) + '" text-anchor="middle">start</text>'
+    + '<line class="conn" x1="' + (sx + R) + '" y1="' + cy + '" x2="' + (ex - R) + '" y2="' + cy + '" marker-end="url(#ah_' + uid + ')"/>'
+    + '<text class="hintmsg" x="' + ((sx + ex) / 2) + '" y="' + (cy - 12) + '" text-anchor="middle">drag a step here</text>'
+    + '<circle class="tip" cx="' + ex + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (cy + 3) + '" text-anchor="middle">end</text></svg>';
+}
 function renderFlow(m) {
   var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), tasks = m.tasks;
+  if (!tasks.length) return renderEmptyFlow(m);
   var hasEsc = tasks.some(function (t) { return t.agents.length && t.escalate_if; });
   var escY = LANE + NH + 54, H = hasEsc ? escY + 44 : LANE + NH + 18;
   var firstX = PAD + 2 * R + GAP, lastX = firstX + (tasks.length - 1) * (NW + GAP);
@@ -201,6 +212,42 @@ function addStep() {
     .then(function (res) { if (res.ok) { state.task = res.result.id; load(); } else alert("Rejected: " + res.error); });
 }
 $("#add-step").addEventListener("click", addStep);
+
+// ---------- drag-palette authoring ----------
+document.querySelectorAll(".palette .tile").forEach(function (tile) {
+  tile.addEventListener("dragstart", function (e) {
+    e.dataTransfer.setData("text/plain", tile.getAttribute("data-name"));
+    e.dataTransfer.effectAllowed = "copy";
+  });
+});
+var canvas = $("#canvas");
+canvas.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; canvas.classList.add("dropok"); });
+canvas.addEventListener("dragleave", function () { canvas.classList.remove("dropok"); });
+canvas.addEventListener("drop", function (e) {
+  e.preventDefault(); canvas.classList.remove("dropok");
+  var p = getProc(); if (!p) return;
+  if (state.view !== "flow") { alert("Switch to the Flowchart view to drop a step."); return; }
+  var name = e.dataTransfer.getData("text/plain") || "Step";
+  postTask({ op: "add", process: p.id, name: name, after: dropAfter(e.clientX), actor: ACTOR, reason: "added step via palette" })
+    .then(function (res) { if (res.ok) { state.task = res.result.id; load(); } else alert("Rejected: " + res.error); });
+});
+function dropAfter(x) {
+  var nodes = Array.prototype.slice.call(document.querySelectorAll("#canvas g.tnode[data-task]"));
+  if (!nodes.length) return null;                       // empty process -> first step
+  var items = nodes.map(function (n) { var r = n.querySelector("rect").getBoundingClientRect(); return { id: n.getAttribute("data-task"), c: r.left + r.width / 2 }; });
+  if (x < items[0].c) return "__start__";               // dropped before the first step
+  var after = items[0].id;
+  items.forEach(function (it) { if (it.c < x) after = it.id; });
+  return after;                                          // insert after the last step left of the drop
+}
+$("#new-proc").addEventListener("click", function () {
+  var name = prompt("New process name:"); if (!name) return;
+  var code = prompt("APQC-style code (e.g. QA.5.1.1):"); if (!code) return;
+  var owner = prompt("Owner role:", "role.ops.support_lead"); if (!owner) return;
+  fetch("/api/process", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code.trim(), name: name.trim(), owner: owner.trim(), actor: ACTOR, reason: "authored via canvas" }) })
+    .then(function (r) { return r.json(); })
+    .then(function (res) { if (res.ok) { state.sel = res.result.id; state.task = null; state.view = "flow"; document.querySelectorAll(".views button").forEach(function (x) { x.classList.toggle("active", x.getAttribute("data-view") === "flow"); }); load(); } else alert("Rejected: " + res.error); });
+});
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");
   var kpis = p.kpis.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("");
