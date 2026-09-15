@@ -197,8 +197,9 @@ def verify_against_anchor(notary: Notary | None = None) -> dict:
 if __name__ == "__main__":
     if "--verify" not in sys.argv:
         rec = anchor_now()
+        entries_str = ", ".join(f"{e['log']}:{e['count']}" for e in rec["entries"])
         print(f"anchored at {rec['ts']}  combined_head {rec['combined_head'][:16]}...  "
-              f"({', '.join(f'{e['log']}:{e['count']}' for e in rec['entries'])})")
+              f"({entries_str})")
     r = verify_against_anchor()
     print(f"verify vs anchor: {r['status'].upper()} — {r['detail']}")
     sys.exit(0 if r["ok"] else 1)
