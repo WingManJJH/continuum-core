@@ -259,7 +259,7 @@
 
     <section id="tests">
       <h2><span class="no">&sect;</span> Run every test</h2>
-      <p>The fastest way to confirm the whole system is healthy &mdash; 207 assertions plus 3 harness
+      <p>The fastest way to confirm the whole system is healthy &mdash; 219 assertions plus 3 harness
         checks. The chain ends with <code class="inl">ALL GREEN</code>.</p>
       <div class="cmd">
         <div class="bar"><span class="dot"></span><span class="tag">bash</span>
@@ -280,6 +280,7 @@
   &amp;&amp; <span class="p">python3</span> maps/test_mapdata.py \
   &amp;&amp; <span class="p">python3</span> advisor/test_advisor.py \
   &amp;&amp; <span class="p">python3</span> ask/test_agent.py \
+  &amp;&amp; <span class="p">python3</span> test_run.py \
   &amp;&amp; <span class="ok">echo "ALL GREEN"</span></code></pre>
       </div>
       <div class="tbl-wrap">
@@ -302,6 +303,7 @@
             <tr><td class="cmdcell">maps/test_mapdata.py</td><td><span class="pill good">12 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">advisor/test_advisor.py</td><td><span class="pill good">26 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">ask/test_agent.py</td><td><span class="pill good">35 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">test_run.py</td><td><span class="pill good">12 passed, 0 failed</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -416,9 +418,16 @@
 
     <section id="apps">
       <h2><span class="no">&sect;</span> Web apps</h2>
-      <p>Five independent surfaces on different ports &mdash; run any or all at once. Each runs in the foreground;
-        stop with <code class="inl">Ctrl-C</code>, or background with a trailing <code class="inl">&amp;</code>.
-        Use <code class="inl">--port N</code> if a port is taken.</p>
+      <p>Five independent surfaces on different ports. Start them all with one command &mdash;
+        <code class="inl">python3 run.py</code> (Ctrl-C stops them all; <code class="inl">--only ask,advisor</code>
+        for a subset, <code class="inl">--list</code> to list). Or run any one directly, as below; each runs in
+        the foreground, stop with <code class="inl">Ctrl-C</code>, and use <code class="inl">--port N</code> if a
+        port is taken.</p>
+      <div class="cmd">
+        <div class="bar"><span class="dot"></span><span class="tag">bash &middot; all five at once</span>
+          <button class="copy" type="button">copy</button></div>
+        <pre><code><span class="p">python3</span> run.py                     <span class="c"># governance :8787 &middot; dashboard :8788 &middot; canvas :8789 &middot; advisor :8790 &middot; ask :8791</span></code></pre>
+      </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>App</th><th>Command</th><th>URL</th><th>What</th></tr></thead>

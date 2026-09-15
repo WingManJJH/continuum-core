@@ -6,6 +6,22 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-14 — One-command launcher for all five apps
+
+### D21 — `run.py` starts (and stops) every web app together
+**Context:** five apps now run on :8787-:8791; starting them one terminal at a time is friction.
+**Decision & build:** **`run.py`** at the repo root starts all five as subprocesses, line-prefixes each
+one's output with its name, and stops them all on Ctrl-C (SIGTERM then SIGKILL after a grace period).
+A port already in use is reported and **skipped** (the app is probably already running), so re-running
+is safe. `--only ask,advisor` starts a subset, `--list` lists them. It runs children with `python3 -u`
+and line-buffers its own stdout so output streams even when piped/backgrounded, and forwards the
+environment so `CONTINUUM_LLM_API_KEY` reaches the ask planner and advisor reviewer. Stdlib only, no
+new dependency. `test_run.py` — 12 asserts (registry integrity, subset selection + unknown-name error,
+`port_busy` true/false, `--list` exits 0). Verified live: all five come up (HTTP 200) and a re-run
+correctly skips busy ports. Full suite **219**.
+
+---
+
 ## 2026-09-14 — Wire the LLM advisor behind the same env var
 
 ### D20 — LLMAdvisor augments the scorecard; shared model seam

@@ -54,6 +54,10 @@ cd continuum-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r mcp_server/requirements.txt        # mcp, tiktoken, jsonschema
 
+# Start all five web apps at once (Ctrl-C stops them all)
+python3 run.py                                    # governance :8787 · dashboard :8788 · canvas :8789 · advisor :8790 · ask :8791
+python3 run.py --only ask,advisor                 # or a subset · --list to list · set CONTINUUM_LLM_API_KEY for live LLM
+
 # Phase 1 — harness
 python3 mcp_server/token_budget.py --validate   # schema-validate seed + §08 budgets + whole-graph worst case
 python3 mcp_server/traceability.py              # §01/§12 lint: orphan KPIs, un-parented processes, broken refs

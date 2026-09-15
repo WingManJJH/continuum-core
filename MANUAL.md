@@ -5,7 +5,7 @@ below is run from the `continuum-core/` directory unless stated otherwise.
 
 - **What each phase is** and how to see it work → [Using it, phase by phase](#using-it-phase-by-phase)
 - **Just prove it all works** → [Run every test](#run-every-test)
-- **The five web apps** (governance, dashboard, canvas, advisor, ask) → [Web apps](#web-apps)
+- **The five web apps** (governance, dashboard, canvas, advisor, ask) — start them all with `python3 run.py` → [Web apps](#web-apps)
 - **Reset to a clean state** → [Data & reset](#data--reset)
 - **What needs OAuth / is stubbed** → [Known limits](#known-limits)
 - **Something's wrong** → [Troubleshooting](#troubleshooting)
@@ -54,6 +54,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 maps/test_mapdata.py \
   && python3 advisor/test_advisor.py \
   && python3 ask/test_agent.py \
+  && python3 test_run.py \
   && echo "ALL GREEN"
 ```
 
@@ -77,8 +78,9 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 | `advisor/test_advisor.py` | `26 passed, 0 failed` |
 | `ask/test_agent.py` | `35 passed, 0 failed` |
+| `test_run.py` | `12 passed, 0 failed` |
 
-207 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+219 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -194,7 +196,16 @@ agent-bound tasks beneath it, the coverage panel, and bottom-up traces. Two metr
 
 ## Web apps
 
-Two independent read/edit surfaces, different ports — you can run both at once:
+Five surfaces on different ports. **Start them all at once** with the launcher:
+
+```bash
+python3 run.py                     # all five (Ctrl-C stops them all)
+python3 run.py --only ask,advisor  # a subset  ·  --list to list them
+```
+
+The launcher prefixes each app's output with its name, skips a port that's already in
+use, and forwards `CONTINUUM_LLM_API_KEY` so the ask planner and advisor reviewer light
+up. Or run any one directly:
 
 | App | Command | URL | What |
 |---|---|---|---|
