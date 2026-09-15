@@ -145,6 +145,54 @@ class Rollup:
                 "uncovered": [x for x in per if x["state"] != "reviewed"],
                 "fail_closed_defects": missing, "per_task": per}
 
+    # --- per-APQC-domain breakdown (drill-down) ---------------------------
+    def _has_risk(self, p: dict) -> bool:
+        return bool(p.get("risk_refs")) or any(
+            rc.get("process_ref") == p["id"] for rc in self.g.all("RiskControl"))
+
+    def _proc_guardrail_reviewed(self, p: dict) -> bool:
+        gr = self.g.get("GuardrailPolicy", p.get("guardrail_ref")) if p.get("guardrail_ref") else None
+        return bool(gr and gr.get("review", {}).get("reviewed_by"))
+
+    def by_domain(self) -> list[dict]:
+        procs = [p for p in self.g.all("Process") if p["status"] == "active"]
+        doms: dict[str, dict] = {}
+        for p in procs:
+            d = (p.get("apqc_code") or "??")[:2]
+            e = doms.setdefault(d, {"domain": d, "processes": [], "maturity": [],
+                                    "risk_covered": 0, "gr_reviewed": 0})
+            e["processes"].append(p["id"])
+            if p.get("maturity_score") is not None:
+                e["maturity"].append(p["maturity_score"])
+            if self._has_risk(p):
+                e["risk_covered"] += 1
+            if self._proc_guardrail_reviewed(p):
+                e["gr_reviewed"] += 1
+        out = []
+        for d, e in sorted(doms.items()):
+            n = len(e["processes"])
+            out.append({"domain": d, "processes": n,
+                        "avg_maturity": round(sum(e["maturity"]) / len(e["maturity"]), 1) if e["maturity"] else None,
+                        "risk_covered": e["risk_covered"],
+                        "gr_reviewed": e["gr_reviewed"]})
+        return out
+
+    # --- risk register (severity-ranked) + coverage -----------------------
+    def risk_register(self) -> dict:
+        procs = [p for p in self.g.all("Process") if p["status"] == "active"]
+        rows = []
+        for rc in self.g.all("RiskControl"):
+            if rc.get("status") != "active":
+                continue
+            sev = (rc.get("likelihood") or 0) * (rc.get("impact") or 0)
+            rows.append({"id": rc["id"], "process": rc.get("process_ref"), "risk": rc.get("risk"),
+                         "control_type": rc.get("control_type"), "likelihood": rc.get("likelihood"),
+                         "impact": rc.get("impact"), "severity": sev})
+        rows.sort(key=lambda x: -x["severity"])
+        uncontrolled = sorted(p["id"] for p in procs if not self._has_risk(p))
+        return {"risks": rows, "processes_total": len(procs),
+                "processes_controlled": len(procs) - len(uncontrolled), "uncontrolled": uncontrolled}
+
     # --- §12 success metrics ----------------------------------------------
     def metrics(self, events: list[dict] | None = None,
                 escalation_dispositions: list[dict] | None = None) -> dict:
@@ -168,10 +216,15 @@ class Rollup:
         else:
             esc_precision = {"value": None, "needs_data": "human escalation dispositions"}
 
+        rr = self.risk_register()
         return {
             "guardrail_coverage": {"value": cov["pct"], "unit": "percent",
                                    "detail": f"{cov['reviewed']}/{cov['total_agent_tasks']} agent-bound tasks under a reviewed, versioned guardrail",
                                    "fail_closed_defects": cov["fail_closed_defects"]},
+            "risk_coverage": {"value": round(rr["processes_controlled"] / (rr["processes_total"] or 1) * 100),
+                              "unit": "percent",
+                              "detail": f"{rr['processes_controlled']}/{rr['processes_total']} processes have a linked risk control",
+                              "uncontrolled": rr["uncontrolled"]},
             "traceability_completeness": {"value": round(tc * 100), "unit": "percent",
                                           "detail": f"{sum(1 for f in findings if f['kind']=='no_strategic_parent')} process(es) with no strategic parent"},
             "agent_activity": act,

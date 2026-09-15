@@ -65,6 +65,8 @@ class Handler(BaseHTTPRequestHandler):
                 "strategy": r.strategy(events),
                 "bottom_up": r.bottom_up(events),
                 "coverage": r.coverage(),
+                "by_domain": r.by_domain(),
+                "risk_register": r.risk_register(),
                 "metrics": r.metrics(events),
             })
         return self._static(u.path)

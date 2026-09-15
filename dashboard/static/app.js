@@ -5,8 +5,10 @@ function metricTiles(m) {
   const gc = m.guardrail_coverage, tc = m.traceability_completeness;
   const a = m.agent_activity;
   const ep = m.escalation_precision;
+  const rk = m.risk_coverage;
   const tiles = [
     { v: gc.value + "%", l: "Guardrail coverage", sub: gc.detail, warn: gc.value < 100 },
+    { v: rk.value + "%", l: "Risk-control coverage", sub: rk.detail, warn: rk.value < 100 },
     { v: tc.value + "%", l: "Traceability completeness", sub: tc.detail },
     { v: `${a.success}/${a.escalated}/${a.denied}`, l: "Agent acts ok / esc / deny", sub: "current log" },
     ep.value != null
@@ -64,9 +66,33 @@ function bottomUp(bu) {
   }).join("");
 }
 
+function byDomain(rows) {
+  $("#bydomain").innerHTML =
+    '<table class="mini"><thead><tr><th>Dom</th><th>Proc</th><th>Matur.</th><th>Risk</th><th>Gr✓</th></tr></thead><tbody>' +
+    rows.map((r) => `<tr><td class="tid">${r.domain}</td><td>${r.processes}</td>
+      <td>${r.avg_maturity == null ? "—" : r.avg_maturity}</td>
+      <td class="${r.risk_covered < r.processes ? "lo" : ""}">${r.risk_covered}/${r.processes}</td>
+      <td class="${r.gr_reviewed < r.processes ? "lo" : ""}">${r.gr_reviewed}/${r.processes}</td></tr>`).join("") +
+    "</tbody></table>";
+}
+
+function riskRegister(rr) {
+  const sev = (s) => (s >= 15 ? "missing" : s >= 8 ? "default" : "reviewed");
+  const rows = rr.risks.map((r) =>
+    `<div class="risk-row"><span class="state ${sev(r.severity)}">${r.severity}</span>
+      <span class="tid">${r.process}</span>
+      <span class="rtxt">${r.risk || ""}</span></div>`).join("");
+  const un = rr.uncontrolled.length
+    ? `<div class="muted rnote">${rr.processes_controlled}/${rr.processes_total} processes controlled · uncontrolled: ${rr.uncontrolled.join(", ")}</div>`
+    : `<div class="muted rnote">all ${rr.processes_total} processes controlled</div>`;
+  $("#risk").innerHTML = rows + un;
+}
+
 fetch("/api/rollup").then((r) => r.json()).then((d) => {
   metricTiles(d.metrics);
   strategy(d.strategy);
   coverage(d.coverage);
+  byDomain(d.by_domain);
+  riskRegister(d.risk_register);
   bottomUp(d.bottom_up);
 }).catch((e) => { $("#metrics").innerHTML = '<div class="muted">failed to load: ' + e + "</div>"; });
