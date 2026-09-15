@@ -6,6 +6,21 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — CI on push + a real 3.11 portability fix
+
+### D22 — GitHub Actions runs the full suite on every push/PR
+**Context:** the repo is public; the 219-assertion suite should run automatically, not only by hand.
+**Decision & build:** `.github/workflows/tests.yml` runs the documented ALL-GREEN chain (3 harness
+checks + 219 assertions incl. the launcher test) on every push and pull request, across a Python
+**3.11 and 3.12** matrix; a status badge is on the README. The first run surfaced a genuine bug the
+dev box (3.14) had hidden: `audit/anchor.py`'s `__main__` block nested a **same-quote f-string inside
+another f-string** (PEP 701, 3.12+), a `SyntaxError` on 3.11 — so the code did not actually meet its
+stated "Python 3.10+" claim. Fixed by hoisting the joined string into a variable (no behavior change);
+CI is now green on both legs. Lesson: the version matrix earns its keep — test on the floor version you
+advertise, not just the one you develop on.
+
+---
+
 ## 2026-09-14 — One-command launcher for all five apps
 
 ### D21 — `run.py` starts (and stops) every web app together
