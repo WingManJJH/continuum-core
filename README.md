@@ -1,6 +1,9 @@
 # Continuum Core — Phases 1–4
 
 [![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![assertions](https://img.shields.io/badge/assertions-219%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 This directory executes the **Immediate next steps** in §13 of *The Continuum Core Model*
 (`../Continuum Core Model.rtf`), the follow-on decisions ratified in [`DECISIONS.md`](DECISIONS.md),
