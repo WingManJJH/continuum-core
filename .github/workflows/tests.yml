@@ -2,7 +2,12 @@ name: tests
 
 on:
   push:
+    branches: [main]        # feature branches are covered by their pull_request run
   pull_request:
+
+concurrency:                 # one run per ref; cancel a superseded in-progress run
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
