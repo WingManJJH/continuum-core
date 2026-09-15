@@ -68,7 +68,7 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `governance/test_store.py` | `14 passed, 0 failed` |
 | `enforcement/test_enforce.py` | `13 passed, 0 failed` |
 | `signal/test_conformance.py` | `8 passed, 0 failed` |
-| `dashboard/test_rollup.py` | `13 passed, 0 failed` |
+| `dashboard/test_rollup.py` | `20 passed, 0 failed` |
 | `audit/test_audit_chain.py` | `13 passed, 0 failed` |
 | `audit/test_anchor.py` | `10 passed, 0 failed` |
 | `governance/test_retention.py` | `16 passed, 0 failed` |
@@ -77,10 +77,10 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `governance/test_binding.py` | `13 passed, 0 failed` |
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 | `advisor/test_advisor.py` | `26 passed, 0 failed` |
-| `ask/test_agent.py` | `35 passed, 0 failed` |
+| `ask/test_agent.py` | `45 passed, 0 failed` |
 | `test_run.py` | `12 passed, 0 failed` |
 
-219 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+236 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---

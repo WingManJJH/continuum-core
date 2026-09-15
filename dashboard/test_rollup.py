@@ -71,6 +71,22 @@ def main():
     m2 = r.metrics(events, escalation_dispositions=disp)
     check("escalation precision computes from dispositions (3/4 = 0.75)", m2["escalation_precision"]["value"] == 0.75)
 
+    # deepened dashboard (D25): per-domain breakdown
+    dom = r.by_domain()
+    check("by_domain covers all 8 APQC domains", len(dom) == 8)
+    co = next(d for d in dom if d["domain"] == "CO")
+    check("CO domain: reviewed guardrail + risk covered", co["gr_reviewed"] == 1 and co["risk_covered"] == 1)
+    check("by_domain reports avg maturity", all(d["avg_maturity"] is not None for d in dom))
+
+    # risk register + coverage
+    rr = r.risk_register()
+    check("risk register ranks by severity (desc)",
+          [x["severity"] for x in rr["risks"]] == sorted([x["severity"] for x in rr["risks"]], reverse=True))
+    check("3 of 8 processes have a risk control", rr["processes_controlled"] == 3 and len(rr["uncontrolled"]) == 5)
+    check("planted uncontrolled process HR.7.2.5 flagged", "HR.7.2.5" in rr["uncontrolled"])
+    rc = r.metrics(events)["risk_coverage"]
+    check("risk_coverage metric is honest 38%", rc["value"] == 38 and rc["value"] < 100)
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 

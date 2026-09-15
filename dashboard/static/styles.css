@@ -56,3 +56,17 @@ main { display: grid; grid-template-columns: 1fr 380px; gap: 14px; padding: 0 22
   padding: 8px 10px; margin-bottom: 6px; font-size: 12px; }
 .bu .tid { font-family: var(--mono); font-weight: 600; }
 .bu .trace { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+table.mini { width: 100%; border-collapse: collapse; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 12px; }
+table.mini th { text-align: left; color: var(--muted); font-weight: 600; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .03em; padding: 6px 9px; background: var(--bg); }
+table.mini td { padding: 6px 9px; border-top: 1px solid var(--line); }
+table.mini td.tid { font-family: var(--mono); }
+table.mini td.lo { color: var(--amber); font-weight: 600; }
+
+.risk-row { display: flex; align-items: baseline; gap: 8px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; font-size: 12px; }
+.risk-row .tid { font-family: var(--mono); font-size: 11px; flex: none; }
+.risk-row .rtxt { color: var(--muted); }
+.rnote { font-size: 11px; margin-top: 4px; }

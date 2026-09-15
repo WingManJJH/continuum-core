@@ -6,6 +6,30 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Resume the build: wider ask questions, deeper dashboard, §03 fold
+
+### D24 — Widen the Ask-the-Agent question set
+**Decision & build:** five new grounded, read-only intents — **risk-control coverage** (processes
+with no linked RiskControl: 5/8), **RACI accountable roles**, **process owners**, **guardrails with
+no rate limit**, and the **agent-model tally** — plus predicates `risk_control_absent` / `accountable`
+/ `rate_limit_absent`. The curated set goes 9 → 14 questions. `ask/test_agent.py` 35 → 45 asserts.
+
+### D25 — Deepen the dashboard (drill-down + risk)
+**Decision & build:** `Rollup.by_domain()` (per-APQC-domain process count, avg maturity, risk-covered
+and reviewed-guardrail counts) and `Rollup.risk_register()` (RiskControls ranked by severity =
+likelihood × impact, plus a risk-coverage figure). The §05 report gains a **Risk-control coverage**
+tile (honest **38%** = 3/8 processes controlled), a **By-APQC-domain** table, and a **Risk register**
+panel — all read live, no fabricated numbers. `dashboard/test_rollup.py` 13 → 20 asserts. Verified live.
+
+### §03 spec fold (executes D2 + D1)
+Folded the **D2** compression restatement into the spec's §03 prose (`Continuum Core Model.rtf`):
+the single-task package is now stated as **~3× more per task (8–15× for a full-process export)**
+rather than a flat 8–15×. Also corrected the stale **D1** annotation in the same §03 example
+(`~70 tokens` → `~136 tokens`, the tokenizer-measured value). Both were ratified earlier and pending
+a spec revision; the RTF formatting is preserved. Full suite **236**.
+
+---
+
 ## 2026-09-15 — Branch protection: main is PR-gated on green CI
 
 ### D23 — `main` requires both CI checks; no direct pushes, admins included
@@ -416,8 +440,9 @@ the task context (the point of §03); do **not** split it behind a second tool c
 equivalent. Measured per single task it is ~3.4× (BPMN XML) / ~1.6× (prose SOP);
 the 8–15× figure holds for a *whole-process* export vs. one task package.
 **Decision:** state it as **"8–15× for a full-process export; ~3× per task."**
-**Applied in:** `README.md` findings, `mcp_server/token_budget.py` compression section.
-Still to do: fold the restatement into the spec's §03 prose at next spec revision.
+**Applied in:** `README.md` findings, `mcp_server/token_budget.py` compression section, and
+**now the spec's §03 prose** (`Continuum Core Model.rtf`, folded 2026-09-15 — see the §03 fold note
+under the 2026-09-15 build-resume entry).
 
 ### D3 — Default Guardrail Policy template signed off
 **Context:** §13 step 3 called for the default template to be reviewed with the
