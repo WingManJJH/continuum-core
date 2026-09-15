@@ -8,6 +8,10 @@ connection). Each item is a concrete, runnable deliverable.
 > **New here?** [`MANUAL.md`](MANUAL.md) is the step-by-step guide to setting up, running, and
 > testing everything below — start there.
 
+> **Related:** [`DECISIONS.md`](DECISIONS.md) records the rationale (D1–D21); the build's
+> working notes live in the [continuum-memory](https://github.com/WingManJJH/continuum-memory)
+> repo (private).
+
 > **Environment note:** every live enterprise connector (Notion, Teams, Slack, Outlook, Gmail) and
 > the pilot agent LLM require OAuth/network that this build does not have. Wherever that bites, the
 > capability is declared with its real interface and **stubbed with a clear error**, and a file
