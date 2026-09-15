@@ -311,3 +311,7 @@ continuum-core/
   guardrailed task — a policy commitment, not just this diagram (§11 bypass risk).
 - Canvas decorative properties (position, color, label placement) are kept entirely out
   of both the schemas and the agent payloads (§08).
+
+## License
+
+[MIT](LICENSE) © 2026 Jeffrey Hunt.
