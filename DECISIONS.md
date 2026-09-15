@@ -442,7 +442,10 @@ the 8–15× figure holds for a *whole-process* export vs. one task package.
 **Decision:** state it as **"8–15× for a full-process export; ~3× per task."**
 **Applied in:** `README.md` findings, `mcp_server/token_budget.py` compression section, and
 **now the spec's §03 prose** (`Continuum Core Model.rtf`, folded 2026-09-15 — see the §03 fold note
-under the 2026-09-15 build-resume entry).
+under the 2026-09-15 build-resume entry). The published **Continuum Core Model artifact** was
+refreshed the same day to match (same two §03 edits: `~3× per task (8–15× full-process export)` and
+the example package `~70 → ~136 tokens`). Both the RTF and the artifact live outside this repo, so
+this note is the in-repo record that they are in sync.
 
 ### D3 — Default Guardrail Policy template signed off
 **Context:** §13 step 3 called for the default template to be reviewed with the
