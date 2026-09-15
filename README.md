@@ -1,7 +1,7 @@
 # Continuum Core — Phases 1–4
 
 [![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
-[![assertions](https://img.shields.io/badge/assertions-219%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![assertions](https://img.shields.io/badge/assertions-236%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -88,7 +88,7 @@ python3 signal/test_conformance.py              # 8 asserts incl. "conformance n
 # Phase 4 — continuous enterprise connection
 python3 enforcement/sweep.py --keep             # full enforcement across all 8 agent-bound tasks (+ populates the log)
 python3 dashboard/app.py                         # http://localhost:8788 — the §05 standing report
-python3 dashboard/test_rollup.py                 # 13 asserts: top-down / bottom-up / coverage / metrics
+python3 dashboard/test_rollup.py                 # 20 asserts: top-down / bottom-up / coverage / by-domain / risk register
 
 # Audit-log tamper-evidence (ISO 9001 §7.5 hardening)
 python3 audit/test_audit_chain.py                 # 13 asserts: content/delete/reorder/truncate/whole-log/reset
@@ -106,7 +106,7 @@ python3 advisor/test_advisor.py                    # 26 asserts: rules + LLM-aug
 python3 advisor/app.py                             # http://localhost:8790 — AI window: score a subject against ISO 9001/9004/APQC + Core Model doctrine
 
 # Ask the Agent — plain-English question -> read-only graph query -> answer
-python3 ask/test_agent.py                          # 35 asserts: NL intents, read-only receipt, plan validation, LLM-planner wiring
+python3 ask/test_agent.py                          # 45 asserts: NL intents (14 questions), read-only receipt, plan validation, LLM wiring
 python3 ask/app.py                                 # http://localhost:8791 — ask window: writes a read-only query, runs it, Show query
 ```
 
