@@ -6,6 +6,23 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Branch protection: main is PR-gated on green CI
+
+### D23 — `main` requires both CI checks; no direct pushes, admins included
+**Context:** the repo is public with CI (D22); `main` should not accept unverified changes.
+**Decision & build:** `main` is branch-protected — required status checks **`test (3.11)`** and
+**`test (3.12)`**, strict (a PR must be up to date with `main` before it merges), force-pushes
+blocked, and **enforce-for-admins on**, so *no one* — the owner included — can push to `main`
+directly. The only path in is **branch → pull request → both checks green → merge**;
+[`CONTRIBUTING.md`](CONTRIBUTING.md) documents it. Verified live: PR #1 sat `BLOCKED` while checks
+ran and flipped to `CLEAN` only once both passed, then merged. A follow-up (PR #2) deduped CI — the
+`push` trigger is narrowed to `branches: [main]` and a `concurrency` group cancels superseded runs, so
+a same-repo PR runs the suite once, not twice. Consequence, by design: routine work here now goes
+through PRs; an emergency direct push means temporarily toggling enforce-admins off, pushing, and
+re-enabling.
+
+---
+
 ## 2026-09-15 — CI on push + a real 3.11 portability fix
 
 ### D22 — GitHub Actions runs the full suite on every push/PR
