@@ -88,6 +88,17 @@ class QueryEngine:
         rev = gr.get("review")
         return not rev or not rev.get("reviewed_by")
 
+    def _risk_control_absent(self, p: dict) -> bool:
+        if p.get("risk_refs"):
+            return False
+        return not any(rc.get("process_ref") == p["id"] for rc in self.g.all("RiskControl"))
+
+    def _accountable(self, r: dict) -> bool:
+        return bool((r.get("raci") or {}).get("accountable"))
+
+    def _rate_limit_absent(self, gr: dict) -> bool:
+        return not gr.get("rate_limit")
+
     PREDS: dict[str, str] = {
         "traces_to_objective": "_traces_to_objective",
         "kpi_breaching": "_kpi_breaching",
@@ -95,6 +106,9 @@ class QueryEngine:
         "effective_guardrail_absent": "_effective_guardrail_absent",
         "task_specific_guardrail_absent": "_task_specific_guardrail_absent",
         "unreviewed": "_unreviewed",
+        "risk_control_absent": "_risk_control_absent",
+        "accountable": "_accountable",
+        "rate_limit_absent": "_rate_limit_absent",
     }
 
     # -- value access, including followed refs (dotted paths) --------------- #
@@ -471,7 +485,87 @@ INTENTS: list[Intent] = [
         ["APQC domain is taken as the two-letter prefix of each process's APQC code.",
          "One seed process per domain in this prototype."],
     ),
+    Intent(
+        "processes_without_risk",
+        "Which processes have no risk control?",
+        [["process", "no risk"], ["process", "without risk"], ["process", "risk control"],
+         ["uncontrolled", "risk"], ["process", "no control"]],
+        {"from": "Process", "where": [{"op": "predicate", "name": "risk_control_absent"}],
+         "select": ["id", "name", "owner_role"]},
+        ["id", "name", "owner_role"],
+        lambda rows, n, e: (
+            "Every process has at least one linked risk control."
+            if n == 0 else
+            f"{_plural(n,'process has','processes have')} no linked risk control: "
+            + ", ".join(r["id"] for r in rows) + "."),
+        ["A process is 'controlled' if it names a risk_ref or a RiskControl points to it (ISO 9001 §6.1).",
+         "An agent-run process with no risk control is a gap worth a risk-register entry."],
+    ),
+    Intent(
+        "accountable_roles",
+        "Which roles are accountable?",
+        [["role", "accountable"], ["who", "accountable"], ["raci", "accountable"],
+         ["accountable", "roles"], ["raci", "a"]],
+        {"from": "HumanRole", "where": [{"op": "predicate", "name": "accountable"}],
+         "select": ["id", "name"], "order_by": {"path": "id"}},
+        ["id", "name"],
+        lambda rows, n, e: (
+            "No role is marked accountable in the RACI."
+            if n == 0 else
+            f"{_plural(n,'role is','roles are')} accountable (RACI 'A'): "
+            + ", ".join(r["id"] for r in rows) + "."),
+        ["Accountable = the role's RACI record has accountable = true.",
+         "'A' is the single-owner role answerable for the outcome, distinct from 'R' (does the work)."],
+    ),
+    Intent(
+        "process_owners",
+        "Who owns each process?",
+        [["who owns", "process"], ["process", "owner"], ["owns", "process"],
+         ["list", "owner"], ["process", "owned"]],
+        {"from": "Process", "select": ["id", "name", "owner_role"], "order_by": {"path": "id"}},
+        ["id", "name", "owner_role"],
+        lambda rows, n, e: (
+            f"Process owners ({n}): "
+            + ", ".join(f"{r['id']} → {r['owner_role']}" for r in rows) + "."),
+        ["owner_role is the single accountable role named on each process (ISO 9001 §4.4)."],
+    ),
+    Intent(
+        "unbounded_guardrails",
+        "Which guardrails have no rate limit?",
+        [["guardrail", "no rate"], ["guardrail", "rate limit"], ["guardrail", "unbounded"],
+         ["guardrail", "without rate"], ["rate limit", "missing"]],
+        {"from": "GuardrailPolicy", "where": [{"op": "predicate", "name": "rate_limit_absent"}],
+         "select": ["id", "attaches_to"]},
+        ["id", "attaches_to"],
+        lambda rows, n, e: (
+            "Every active guardrail sets a rate limit."
+            if n == 0 else
+            f"{_plural(n,'guardrail has','guardrails have')} no rate limit set: "
+            + ", ".join(r["id"] for r in rows) + "."),
+        ["A rate limit bounds how often an agent may act, containing a looping agent (§04).",
+         "Absence isn't always wrong, but it's worth a deliberate decision."],
+    ),
+    Intent(
+        "agent_models",
+        "Which models run the agents?",
+        [["which model", "agent"], ["agent", "model"], ["models", "run"],
+         ["what model", "agent"], ["agents", "powered"]],
+        {"from": "AgentBinding", "select": ["id", "model", "task_ref"], "order_by": {"path": "id"}},
+        ["id", "model", "task_ref"],
+        lambda rows, n, e: (
+            "No agents are bound." if n == 0 else
+            f"{n} agent bindings run: "
+            + ", ".join(f"{m} ×{c}" for m, c in _tally(r["model"] for r in rows)) + "."),
+        ["Model is the LLM each AgentBinding declares; one line per bound step."],
+    ),
 ]
+
+
+def _tally(items):
+    counts: dict[str, int] = {}
+    for it in items:
+        counts[it] = counts.get(it, 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
 
 
 # --------------------------------------------------------------------------- #

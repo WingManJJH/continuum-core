@@ -49,6 +49,19 @@ def main():
     r = a.ask("which APQC domains does the model cover?")
     check("8 APQC domains", "8 APQC domains" in r["answer"])
 
+    # widened question set (D24): risk coverage, RACI, ownership, rate limits, models
+    r = a.ask("which processes have no risk control?")
+    check("5 processes lack a risk control", r["n"] == 5 and "HR.7.2.5" in [x["id"] for x in r["rows"]])
+    r = a.ask("who owns each process?")
+    check("8 process owners listed", r["intent"] == "process_owners" and r["n"] == 8
+          and all(x.get("owner_role") for x in r["rows"]))
+    r = a.ask("which roles are accountable?")
+    check("accountable roles found via RACI", r["intent"] == "accountable_roles" and r["n"] >= 1)
+    r = a.ask("which guardrails have no rate limit?")
+    check("rate-limit coverage runs (seed all bounded)", r["intent"] == "unbounded_guardrails" and r["n"] == 0)
+    r = a.ask("which models run the agents?")
+    check("agent model tally", r["intent"] == "agent_models" and "claude-opus-4-8" in r["answer"])
+
     r = a.ask("which processes have the lowest maturity?")
     check("lowest-maturity ordered ascending", r["rows"][0]["maturity_score"] <= r["rows"][-1]["maturity_score"])
 
