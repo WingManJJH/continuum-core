@@ -1,5 +1,7 @@
 # Continuum Core — Phases 1–4
 
+[![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+
 This directory executes the **Immediate next steps** in §13 of *The Continuum Core Model*
 (`../Continuum Core Model.rtf`), the follow-on decisions ratified in [`DECISIONS.md`](DECISIONS.md),
 and the four-phase roadmap of §09 (Phase 2 governance, Phase 3 signal & agent, Phase 4 enterprise

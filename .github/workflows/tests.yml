@@ -1,0 +1,52 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r mcp_server/requirements.txt   # mcp, tiktoken, jsonschema
+
+      - name: Harness — schemas, token budgets, traceability, scenario
+        run: |
+          python mcp_server/token_budget.py --validate
+          python mcp_server/traceability.py
+          python mcp_server/scenario.py
+
+      - name: Test suites (219 assertions)
+        run: |
+          python governance/test_store.py
+          python enforcement/test_enforce.py
+          python signal/test_conformance.py
+          python dashboard/test_rollup.py
+          python audit/test_audit_chain.py
+          python audit/test_anchor.py
+          python governance/test_retention.py
+          python governance/test_taskedit.py
+          python governance/test_authoring.py
+          python governance/test_binding.py
+          python maps/test_mapdata.py
+          python advisor/test_advisor.py
+          python ask/test_agent.py
+          python test_run.py
+
+      - name: All green
+        run: echo "ALL GREEN -- 219 assertions + 3 harness checks"
