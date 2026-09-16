@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/gateway",
+  "title": "Gateway",
+  "description": "A branch/merge point in a process flow (Core Model §03 Canvas, Phase B). exclusive = XOR (one outgoing path taken, chosen by the outgoing flows' conditions); parallel = AND (all outgoing paths taken). Structural only — it carries no guardrail; the tasks it routes to do.",
+  "type": "object",
+  "required": ["id", "process_ref", "type", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}\\.[0-9.]+\\.g[0-9]+$",
+      "description": "Fully-qualified gateway id, e.g. CO.3.2.7.g1 — process apqc_code + '.g' + n."
+    },
+    "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
+    "type": {"type": "string", "enum": ["exclusive", "parallel"], "description": "exclusive = decision (XOR); parallel = fork/join (AND)."},
+    "name": {"type": "string", "maxLength": 80},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

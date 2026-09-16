@@ -49,6 +49,7 @@ class Graph:
         for etype in (
             "StrategicObjective", "KPI", "Process", "Task",
             "HumanRole", "AgentBinding", "GuardrailPolicy", "RiskControl",
+            "Gateway", "SequenceFlow",  # Phase B: explicit process-flow graph
         ):
             self._by_type[etype] = {e["id"]: e for e in raw.get(etype, [])}
         # Fold the change-control log on top of the seed baseline so the state an

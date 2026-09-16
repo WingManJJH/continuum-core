@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/sequence-flow",
+  "title": "Sequence Flow",
+  "description": "A directed edge between two nodes of a process flow (Core Model §03 Canvas, Phase B). Endpoints are tasks, gateways, or the process start/end. An optional condition labels a branch out of an exclusive gateway. This is what makes the diagram a real graph rather than a fixed linear sequence.",
+  "type": "object",
+  "required": ["id", "process_ref", "from_node", "to_node", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}\\.[0-9.]+\\.f[0-9]+$",
+      "description": "Fully-qualified flow id, e.g. CO.3.2.7.f1 — process apqc_code + '.f' + n."
+    },
+    "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
+    "from_node": {
+      "type": "string",
+      "pattern": "^(__start__|[A-Z]{2}\\.[0-9.]+\\.(t|g)[0-9]+)$",
+      "description": "Source node: the process start (__start__), a task (.tN), or a gateway (.gN)."
+    },
+    "to_node": {
+      "type": "string",
+      "pattern": "^(__end__|[A-Z]{2}\\.[0-9.]+\\.(t|g)[0-9]+)$",
+      "description": "Target node: the process end (__end__), a task (.tN), or a gateway (.gN)."
+    },
+    "condition": {
+      "type": ["string", "null"],
+      "maxLength": 120,
+      "description": "Optional guard on a branch (e.g. 'risk_score > 0.7' or 'approved'). Meaningful on flows out of an exclusive gateway."
+    },
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

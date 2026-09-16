@@ -55,7 +55,15 @@ function renderCenter() {
   var p = getProc(); if (!p) return;
   if (state.view === "raci") $("#canvas").innerHTML = renderRaci(p);
   else if (state.view === "checklist") $("#canvas").innerHTML = renderChecklist(p);
-  else { $("#canvas").innerHTML = renderFlow(p); if (p.tasks.length) wireFlow(p); }
+  else if (p.explicit) { $("#canvas").innerHTML = renderGraph(p); wireGraph(p); }
+  else { $("#canvas").innerHTML = renderLinear(p); if (p.tasks.length) wireFlow(p); }
+  syncFlowBar(p);
+}
+// show "Enable branching" only for a linear process with steps; "Connect" only in explicit mode
+function syncFlowBar(p) {
+  var eb = document.getElementById("enable-branch"), cn = document.getElementById("connect");
+  if (eb) eb.hidden = !(state.view === "flow" && !p.explicit && p.tasks.length);
+  if (cn) { cn.hidden = !(state.view === "flow" && p.explicit); if (cn.hidden) setConnect(false); }
 }
 
 // ---------- flowchart (free-form, draggable SVG) ----------
@@ -98,7 +106,7 @@ function edgePt(cx, cy, hw, hh, tx, ty) {
 }
 function circPt(cx, cy, r, tx, ty) { var dx = tx - cx, dy = ty - cy, d = Math.hypot(dx, dy) || 1; return { x: cx + dx * r / d, y: cy + dy * r / d }; }
 
-function renderFlow(m) {
+function renderLinear(m) {
   var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), tasks = m.tasks;
   if (!tasks.length) return renderEmptyFlow(m);
   var pos = nodePos(m); state.flowPos = pos;
@@ -212,6 +220,161 @@ if (tidyBtn) tidyBtn.addEventListener("click", function () {
     .then(function (r) { return r.json(); }).then(function () { load(); });
 });
 
+// ================= Phase B: explicit flow graph (gateways + drawn flows) =========
+var GW = 46;  // gateway diamond size
+function gwset(m) { var s = {}; (m.gateways || []).forEach(function (g) { s[g.id] = g; }); return s; }
+function nodePosGraph(m) {
+  var lay = m.layout || {}, pos = {}, sv = gwset(m), rx = 120;
+  m.tasks.forEach(function (t, i) { var s = lay[t.id]; pos[t.id] = (s && isFinite(s.x) && isFinite(s.y)) ? { x: +s.x, y: +s.y } : { x: 130 + i * (NW + GAP), y: AY }; });
+  (m.gateways || []).forEach(function (g, i) { var s = lay[g.id]; pos[g.id] = (s && isFinite(s.x) && isFinite(s.y)) ? { x: +s.x, y: +s.y } : { x: 130 + m.tasks.length * (NW + GAP), y: AY + i * (GW + 34) }; });
+  m.tasks.forEach(function (t) { rx = Math.max(rx, pos[t.id].x + NW); });
+  Object.keys(sv).forEach(function (id) { rx = Math.max(rx, pos[id].x + GW); });
+  var s0 = lay["__start__"], s1 = lay["__end__"];
+  pos["__start__"] = (s0 && isFinite(s0.x)) ? { x: +s0.x, y: +s0.y } : { x: 20, y: AY + NH / 2 - R };
+  pos["__end__"] = (s1 && isFinite(s1.x)) ? { x: +s1.x, y: +s1.y } : { x: rx + 60, y: AY + NH / 2 - R };
+  return pos;
+}
+function nodeGeo(m, id) {
+  var pos = state.flowPos[id]; if (!pos) return null;
+  if (id === "__start__" || id === "__end__") return { cx: pos.x + R, cy: pos.y + R, hw: R, hh: R, circle: true };
+  if (state.gw && state.gw[id]) return { cx: pos.x + GW / 2, cy: pos.y + GW / 2, hw: GW / 2, hh: GW / 2 };
+  return { cx: pos.x + NW / 2, cy: pos.y + NH / 2, hw: NW / 2, hh: NH / 2 };
+}
+function renderGraph(m) {
+  var uid = m.id.replace(/[^A-Za-z0-9]/g, "_");
+  state.flowPos = nodePosGraph(m); state.gw = gwset(m);
+  var p = ['<svg xmlns="http://www.w3.org/2000/svg">'];
+  p.push('<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>');
+  (m.flows || []).forEach(function (f) {
+    p.push('<line class="conn flow" data-flow="' + esc(f.id) + '" data-a="' + esc(f.from) + '" data-b="' + esc(f.to) + '" marker-end="url(#ah_' + uid + ')"/>');
+    if (f.condition) {
+      p.push('<g class="flabel" data-flow="' + esc(f.id) + '"><rect rx="4"/><text>' + esc(trunc(f.condition, 22)) + "</text></g>");
+    }
+  });
+  p.push('<g class="tip-node" data-node="__start__"><circle class="tip" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">start</text></g>');
+  p.push('<g class="tip-node" data-node="__end__"><circle class="tip" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">end</text></g>');
+  m.tasks.forEach(function (t) {
+    var x = state.flowPos[t.id].x, y = state.flowPos[t.id].y;
+    var ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
+    p.push('<g class="tnode" data-node="' + esc(t.id) + '" data-kind="task" data-task="' + esc(t.id) + '"' + (t.id === state.task ? ' data-sel="1"' : "") + ' transform="translate(' + x + ',' + y + ')">');
+    p.push('<rect class="' + ncls + (t.id === state.task ? " selrect" : "") + '" x="0" y="0" width="' + NW + '" height="' + NH + '" rx="9"/>');
+    p.push('<text class="tseq" x="9" y="15">t' + t.seq + '</text>');
+    if (t.agents.length) p.push('<rect class="badge-bg" x="' + (NW - 26) + '" y="-7" width="24" height="15" rx="3.5"/><text class="badge" x="' + (NW - 14) + '" y="3.5" text-anchor="middle">AI</text>');
+    var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
+    lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
+    var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
+    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text></g>");
+  });
+  (m.gateways || []).forEach(function (gw) {
+    var x = state.flowPos[gw.id].x, y = state.flowPos[gw.id].y, c = GW / 2;
+    p.push('<g class="gwnode" data-node="' + esc(gw.id) + '" data-kind="gateway"' + (gw.id === state.gwsel ? ' data-sel="1"' : "") + ' transform="translate(' + x + ',' + y + ')">');
+    p.push('<rect class="gw' + (gw.id === state.gwsel ? " selrect" : "") + '" x="7" y="7" width="' + (GW - 14) + '" height="' + (GW - 14) + '" transform="rotate(45 ' + c + ' ' + c + ')"/>');
+    p.push('<text class="gwglyph" x="' + c + '" y="' + (c + 6) + '" text-anchor="middle">' + (gw.type === "parallel" ? "+" : "×") + "</text>");
+    if (gw.name) p.push('<text class="gwname" x="' + c + '" y="' + (GW + 13) + '" text-anchor="middle">' + esc(trunc(gw.name, 16)) + "</text>");
+    p.push("</g>");
+  });
+  p.push("</svg>");
+  return p.join("");
+}
+function updateGeomGraph(m) {
+  var svg = $("#canvas svg"); if (!svg) return;
+  svg.querySelector('.tip-node[data-node="__start__"]').setAttribute("transform", "translate(" + state.flowPos["__start__"].x + "," + state.flowPos["__start__"].y + ")");
+  svg.querySelector('.tip-node[data-node="__end__"]').setAttribute("transform", "translate(" + state.flowPos["__end__"].x + "," + state.flowPos["__end__"].y + ")");
+  (m.flows || []).forEach(function (f) {
+    var A = nodeGeo(m, f.from), B = nodeGeo(m, f.to); if (!A || !B) return;
+    var p1 = A.circle ? circPt(A.cx, A.cy, A.hw, B.cx, B.cy) : edgePt(A.cx, A.cy, A.hw, A.hh, B.cx, B.cy);
+    var p2 = B.circle ? circPt(B.cx, B.cy, B.hw, A.cx, A.cy) : edgePt(B.cx, B.cy, B.hw, B.hh, A.cx, A.cy);
+    var ln = svg.querySelector('line.flow[data-flow="' + f.id + '"]');
+    if (ln) { ln.setAttribute("x1", p1.x); ln.setAttribute("y1", p1.y); ln.setAttribute("x2", p2.x); ln.setAttribute("y2", p2.y); }
+    var lab = svg.querySelector('g.flabel[data-flow="' + f.id + '"]');
+    if (lab) {
+      var mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2, txt = lab.querySelector("text"), rect = lab.querySelector("rect");
+      txt.setAttribute("x", mx); txt.setAttribute("y", my + 3); txt.setAttribute("text-anchor", "middle");
+      var w = (txt.textContent.length * 6.2) + 12;
+      rect.setAttribute("x", mx - w / 2); rect.setAttribute("y", my - 9); rect.setAttribute("width", w); rect.setAttribute("height", 17);
+    }
+  });
+  var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  Object.keys(state.flowPos).forEach(function (id) {
+    var g = nodeGeo(m, id);
+    minX = Math.min(minX, g.cx - g.hw); minY = Math.min(minY, g.cy - g.hh);
+    maxX = Math.max(maxX, g.cx + g.hw); maxY = Math.max(maxY, g.cy + g.hh + (state.gw[id] ? 16 : 0));
+  });
+  var vx = minX - PAD, vy = minY - PAD, W = (maxX - minX) + 2 * PAD, H = (maxY - minY) + 2 * PAD;
+  svg.setAttribute("viewBox", vx + " " + vy + " " + W + " " + H); svg.setAttribute("width", W); svg.setAttribute("height", H);
+}
+function wireGraph(m) {
+  var svg = $("#canvas svg"); if (!svg) return;
+  updateGeomGraph(m);
+  var drag = null;
+  svg.querySelectorAll("g[data-node]").forEach(function (g) {
+    var id = g.getAttribute("data-node");
+    g.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0 || state.connect) return;
+      drag = { sx: e.clientX, sy: e.clientY, ox: state.flowPos[id].x, oy: state.flowPos[id].y, moved: false };
+      g.setPointerCapture(e.pointerId); g.classList.add("dragging"); e.preventDefault();
+    });
+    g.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.moved = true;
+      var nx = Math.max(0, drag.ox + dx), ny = Math.max(0, drag.oy + dy);
+      state.flowPos[id] = { x: nx, y: ny };
+      g.setAttribute("transform", "translate(" + nx + "," + ny + ")");
+      updateGeomGraph(m);
+    });
+    g.addEventListener("pointerup", function (e) {
+      if (!drag) return;
+      try { g.releasePointerCapture(e.pointerId); } catch (err) {}
+      g.classList.remove("dragging");
+      var moved = drag.moved; drag = null;
+      if (moved) saveLayout(m);
+      else nodeClick(m, id, g);
+    });
+    // in connect mode drag is disabled, so selection/connect comes via click
+    g.addEventListener("click", function () { if (state.connect) nodeClick(m, id, g); });
+  });
+  svg.querySelectorAll("line.flow").forEach(function (ln) {
+    ln.addEventListener("click", function () {
+      if (state.connect) return;
+      var fid = ln.getAttribute("data-flow");
+      if (!confirm("Remove this flow? (deprecated on the audit trail, not destroyed)")) return;
+      postFlow({ op: "remove", id: fid, actor: ACTOR, reason: "removed flow via canvas" }).then(reloadIf);
+    });
+  });
+}
+function nodeClick(m, id, g) {
+  if (state.connect) {
+    if (!state.connectFrom) { state.connectFrom = id; g.classList.add("connsrc"); return; }
+    if (state.connectFrom === id) { state.connectFrom = null; renderCenter(); return; }
+    var from = state.connectFrom, to = id, cond = null;
+    var src = state.gw && state.gw[from];
+    if (src && src.type === "exclusive") cond = prompt("Condition for this branch (optional), e.g. risk_score > 0.7:") || null;
+    state.connectFrom = null;
+    postFlow({ op: "add", process: m.id, from: from, to: to, condition: cond, actor: ACTOR, reason: "drew flow via canvas" }).then(reloadIf);
+    return;
+  }
+  if (id === "__start__" || id === "__end__") { state.task = null; state.gwsel = null; renderCenter(); renderProps(); return; }
+  if (state.gw && state.gw[id]) { state.gwsel = id; state.task = null; renderCenter(); renderProps(); return; }
+  state.task = id; state.gwsel = null; renderCenter(); renderProps();
+}
+function postFlow(body) { return fetch("/api/flow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+function postGateway(body) { return fetch("/api/gateway", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+function reloadIf(res) { if (res && res.ok) load(); else if (res) alert("Rejected: " + res.error); }
+function setConnect(on) {
+  state.connect = on; state.connectFrom = null;
+  var cn = document.getElementById("connect"); if (cn) cn.classList.toggle("active", on);
+  var c = $("#canvas"); if (c) c.classList.toggle("connecting", on);
+  if (!on) { var s = $("#canvas .connsrc"); if (s) s.classList.remove("connsrc"); }
+}
+var connBtn = document.getElementById("connect");
+if (connBtn) connBtn.addEventListener("click", function () { setConnect(!state.connect); });
+var ebBtn = document.getElementById("enable-branch");
+if (ebBtn) ebBtn.addEventListener("click", function () {
+  var p = getProc(); if (!p) return;
+  postFlow({ op: "enable", process: p.id, actor: ACTOR, reason: "enabled branching via canvas" }).then(reloadIf);
+});
+
 // ---------- RACI view ----------
 function renderRaci(m) {
   var roles = [m.owner];
@@ -258,6 +421,19 @@ $("#canvas").addEventListener("change", function (e) {
 function renderProps() {
   var p = getProc(), t = getTask();
   if (!p) return;
+  if (state.gwsel && p.explicit) {
+    var gw = (p.gateways || []).find(function (g) { return g.id === state.gwsel; });
+    if (gw) {
+      $("#props").innerHTML = gwProps(gw);
+      $("#gw-remove").onclick = function () {
+        if (!confirm("Remove gateway " + gw.id + "? Its flows are removed too (all on the audit trail).")) return;
+        postGateway({ op: "remove", id: gw.id, actor: ACTOR, reason: "removed gateway via canvas" })
+          .then(function (res) { if (res.ok) { state.gwsel = null; load(); } else alert("Rejected: " + res.error); });
+      };
+      return;
+    }
+    state.gwsel = null;
+  }
   if (!t) { $("#props").innerHTML = procProps(p); return; }
   $("#props").innerHTML = taskProps(p, t);
   var form = $("#gr-form");
@@ -312,21 +488,43 @@ function addStep() {
 $("#add-step").addEventListener("click", addStep);
 
 // ---------- drag-palette authoring ----------
+var dragTile = null;
 document.querySelectorAll(".palette .tile").forEach(function (tile) {
   tile.addEventListener("dragstart", function (e) {
-    e.dataTransfer.setData("text/plain", tile.getAttribute("data-name"));
+    dragTile = { kind: tile.getAttribute("data-kind") || "task", gtype: tile.getAttribute("data-gtype") || "", name: tile.getAttribute("data-name") || "Step" };
+    e.dataTransfer.setData("text/plain", dragTile.name);
     e.dataTransfer.effectAllowed = "copy";
   });
 });
+// client point -> SVG user coords (for placing a dropped gateway where it lands)
+function svgPoint(clientX, clientY) {
+  var svg = $("#canvas svg"); if (!svg) return { x: 200, y: 120 };
+  var r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+  return { x: vb.x + (clientX - r.left) * (vb.width / r.width), y: vb.y + (clientY - r.top) * (vb.height / r.height) };
+}
 var canvas = $("#canvas");
 canvas.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; canvas.classList.add("dropok"); });
 canvas.addEventListener("dragleave", function () { canvas.classList.remove("dropok"); });
 canvas.addEventListener("drop", function (e) {
   e.preventDefault(); canvas.classList.remove("dropok");
   var p = getProc(); if (!p) return;
-  if (state.view !== "flow") { alert("Switch to the Flowchart view to drop a step."); return; }
-  var name = e.dataTransfer.getData("text/plain") || "Step";
-  postTask({ op: "add", process: p.id, name: name, after: dropAfter(e.clientX), actor: ACTOR, reason: "added step via palette" })
+  if (state.view !== "flow") { alert("Switch to the Flowchart view to drop here."); return; }
+  var tile = dragTile || { kind: "task", name: e.dataTransfer.getData("text/plain") || "Step" };
+  dragTile = null;
+  if (tile.kind === "gateway") {
+    if (!p.explicit) { alert("Enable branching first, then drop a gateway."); return; }
+    var pt = svgPoint(e.clientX, e.clientY);
+    postGateway({ op: "add", process: p.id, gtype: tile.gtype, name: "", actor: ACTOR, reason: "added gateway via palette" })
+      .then(function (res) {
+        if (!res.ok) { alert("Rejected: " + res.error); return; }
+        var positions = JSON.parse(JSON.stringify(state.flowPos || {}));
+        positions[res.result.id] = { x: Math.max(0, pt.x - GW / 2), y: Math.max(0, pt.y - GW / 2) };
+        fetch("/api/layout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ process: p.id, positions: positions }) })
+          .then(function () { state.gwsel = res.result.id; load(); });
+      });
+    return;
+  }
+  postTask({ op: "add", process: p.id, name: tile.name, after: p.explicit ? null : dropAfter(e.clientX), actor: ACTOR, reason: "added step via palette" })
     .then(function (res) { if (res.ok) { state.task = res.result.id; load(); } else alert("Rejected: " + res.error); });
 });
 function dropAfter(x) {
@@ -346,6 +544,15 @@ $("#new-proc").addEventListener("click", function () {
     .then(function (r) { return r.json(); })
     .then(function (res) { if (res.ok) { state.sel = res.result.id; state.task = null; state.view = "flow"; document.querySelectorAll(".views button").forEach(function (x) { x.classList.toggle("active", x.getAttribute("data-view") === "flow"); }); load(); } else alert("Rejected: " + res.error); });
 });
+function gwProps(gw) {
+  var label = gw.type === "exclusive" ? "Exclusive (decision · XOR)" : "Parallel (fork/join · AND)";
+  return '<div class="p-head"><span class="p-id">' + esc(gw.id) + "</span></div>"
+    + '<div class="p-sub">gateway</div>'
+    + '<div class="p-sec"><div class="lbl">type</div><div class="p-row">' + esc(label) + "</div></div>"
+    + (gw.name ? '<div class="p-sec"><div class="lbl">name</div><div class="p-row">' + esc(gw.name) + "</div></div>" : "")
+    + '<div class="p-sec"><div class="p-row muted">Turn on <b>Connect</b> and click this gateway then a target to route a branch out of it. On an exclusive gateway you can label each branch with a condition.</div></div>'
+    + '<div class="struct"><button id="gw-remove" class="danger">Remove gateway</button></div>';
+}
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");
   var kpis = p.kpis.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("");
