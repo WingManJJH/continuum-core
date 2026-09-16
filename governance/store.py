@@ -77,7 +77,7 @@ class GovernanceStore:
         with open(os.path.join(SCHEMA_DIR, "process-group.schema.json")) as f:
             self._group_validator = Draft202012Validator(json.load(f))
         for _t, _fn in (("enterprise", "enterprise"), ("objective", "strategic-objective"),
-                        ("kpi", "kpi"), ("initiative", "initiative")):
+                        ("kpi", "kpi"), ("initiative", "initiative"), ("correlation", "correlation")):
             with open(os.path.join(SCHEMA_DIR, _fn + ".schema.json")) as f:
                 setattr(self, "_%s_validator" % _t, Draft202012Validator(json.load(f)))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
@@ -659,6 +659,48 @@ class GovernanceStore:
         cc.append_edit_event("Initiative", init_id, "deprecate", cur["version"], new["version"],
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
+
+    # --- X-matrix cell overrides (manual link strengths) --------------------
+    @staticmethod
+    def _corr_id(ctype: str, a: str, b: str) -> str:
+        slug = lambda x: re.sub(r"[^a-z0-9]+", "_", str(x).lower()).strip("_")
+        return "corr.%s.%s__%s" % (slug(ctype), slug(a), slug(b))
+
+    def set_correlation(self, ctype: str, a: str, b: str, strength: str, actor: str, reason: str) -> dict:
+        """Upsert a manual X-matrix cell strength (versioned). Facilitators use this
+        to override or pin a correlation the graph would otherwise derive."""
+        self._require(reason, actor)
+        if ctype not in ("init_obj", "init_metric", "init_owner", "obj_goal"):
+            raise EditError("unknown correlation type")
+        if strength not in ("primary", "secondary", "leading", "supporting", "none"):
+            raise EditError("strength must be primary/secondary/leading/supporting/none")
+        cid = self._corr_id(ctype, a, b)
+        g = self.graph()
+        cur = g.get("Correlation", cid)
+        new = {"id": cid, "type": ctype, "a": a, "b": b, "strength": strength,
+               "version": (cur["version"] + 1) if cur else 1, "status": "active"}
+        errs = sorted(self._correlation_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Correlation", cid, "update" if cur else "create",
+                             cur["version"] if cur else None, new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def clear_correlation(self, ctype: str, a: str, b: str, actor: str, reason: str) -> dict:
+        """Remove a manual override — the cell reverts to the graph-derived value."""
+        self._require(reason, actor)
+        cid = self._corr_id(ctype, a, b)
+        g = self.graph()
+        cur = g.get("Correlation", cid)
+        if cur is None or cur["status"] != "active":
+            return {"id": cid, "cleared": False}
+        new = copy.deepcopy(cur)
+        new["status"] = "deprecated"
+        new["version"] = cur["version"] + 1
+        cc.append_edit_event("Correlation", cid, "deprecate", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return {"id": cid, "cleared": True}
 
     def move_task(self, task_id: str, direction: str, actor: str,
                   reason: str = "reorder step") -> dict:

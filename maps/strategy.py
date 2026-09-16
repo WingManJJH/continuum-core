@@ -170,6 +170,22 @@ def xmatrix(g: cc.Graph | None = None) -> dict:
         if it.get("owner"):                                     # initiatives ↔ owners (corner D)
             links.append({"type": "init_owner", "a": it["id"], "b": it["owner"], "strength": "leading"})
 
+    # manual cell overrides (a facilitator's explicit strength wins; 'none' forces empty)
+    overrides = {(o["type"], o["a"], o["b"]): o["strength"]
+                 for o in g.all("Correlation") if o.get("status") == "active"}
+    merged, seen = [], set()
+    for l in links:
+        key = (l["type"], l["a"], l["b"])
+        if key in overrides:
+            seen.add(key)
+            merged.append(dict(l, strength=overrides[key], manual=True))   # keep 'none' too, marked manual
+        else:
+            merged.append(dict(l, manual=False))
+    for (t, a, b), s in overrides.items():                      # overrides on cells with no derived link
+        if (t, a, b) not in seen:
+            merged.append({"type": t, "a": a, "b": b, "strength": s, "manual": True})
+    links = merged
+
     return {
         "enterprise": m["enterprise"],
         "goals": goals, "objectives": objectives, "initiatives": initiatives,

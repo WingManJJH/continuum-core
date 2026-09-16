@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/correlation",
+  "title": "Correlation",
+  "description": "A manual X-matrix cell override (Core Model §05). The X-matrix derives correlations from the graph's links; a Correlation lets a facilitator set an explicit strength on a specific cell (or force it empty). LOCKED addition.",
+  "type": "object",
+  "required": ["id", "type", "a", "b", "strength", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^corr\\.[a-z0-9_.]+$"},
+    "type": {"type": "string", "enum": ["init_obj", "init_metric", "init_owner", "obj_goal"]},
+    "a": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.]*$", "description": "Source node id (e.g. an initiative or objective)."},
+    "b": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.]*$", "description": "Target node id (e.g. an objective, KPI, owner, or goal)."},
+    "strength": {"type": "string", "enum": ["primary", "secondary", "leading", "supporting", "none"]},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

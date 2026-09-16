@@ -257,6 +257,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/process/edit":
                 r = STORE.edit_process(b["id"], b.get("changes", {}), actor, reason or "edited process header")
+            elif u.path == "/api/correlation":
+                if b.get("op") == "clear":
+                    r = STORE.clear_correlation(b["type"], b["a"], b["b"], actor, reason or "cleared X-matrix cell")
+                else:
+                    r = STORE.set_correlation(b["type"], b["a"], b["b"], b.get("strength", "primary"),
+                                              actor, reason or "set X-matrix cell")
             elif u.path == "/api/enterprise":
                 r = STORE.edit_enterprise(b.get("changes", {}), actor, reason or "edited enterprise")
             elif u.path == "/api/objective":
