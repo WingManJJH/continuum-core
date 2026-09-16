@@ -24,7 +24,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
-from mapdata import all_maps  # noqa: E402
+from mapdata import all_maps, landscape  # noqa: E402
 import layout  # noqa: E402  — decorative node positions (not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 
@@ -72,6 +72,8 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/maps":
             g = cc.Graph()
             return self._json({"model_sig": g.model_sig, "processes": all_maps(g)})
+        if u.path == "/api/landscape":
+            return self._json({"landscape": landscape(cc.Graph())})
         return self._static(u.path)
 
     def do_PUT(self):

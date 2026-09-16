@@ -112,6 +112,38 @@ line.flow:hover { stroke: var(--accent); stroke-width: 2.2; }
 .flabel rect { fill: var(--surface); stroke: var(--line); }
 .flabel text { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
 
+/* Phase D: process landscape / repository */
+.landscape { padding: 16px 18px; }
+.lshead { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.lshead b { color: var(--ink); }
+.house { display: flex; flex-direction: column; gap: 14px; }
+.domain h3 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.domain h3 .dcode { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+.domain h3 .dcount { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 20px; padding: 1px 8px; }
+.pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.pcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; cursor: pointer; transition: border-color .12s; }
+.pcard:hover { border-color: var(--accent); }
+.pcard .pcid { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+.pcard .pcname { font-weight: 600; font-size: 14px; margin: 2px 0 6px; }
+.pcard .pcmeta { font-size: 11.5px; color: var(--muted); }
+.pcard .pcbadges { font-size: 11px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.gdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.gdot.good { background: var(--green, #1c7a4d); } .gdot.warn { background: var(--warn, #b5730a); }
+.pcbadges .rtag { color: var(--crit, #b3261e); }
+
+.catalogs { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+.catshead { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 10px; }
+.catgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.catcol h4 { font-size: 12.5px; margin: 0 0 8px; }
+.catrow { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; background: var(--surface); }
+.catmain { display: flex; justify-content: space-between; align-items: baseline; }
+.catname { font-size: 12.5px; }
+.catcount { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.catprocs { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+.pchip { font-family: var(--mono); font-size: 10px; color: var(--accent); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; cursor: pointer; text-decoration: none; }
+.pchip:hover { border-color: var(--accent); }
+#landscape-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
 /* swimlanes */
 .lane { fill: var(--surface); stroke: var(--line); }
 .lane.alt { fill: var(--surface-2); }

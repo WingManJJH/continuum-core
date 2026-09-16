@@ -55,6 +55,7 @@ python3 mcp_server/token_budget.py --validate \
   && python3 governance/test_subprocess.py \
   && python3 maps/test_mapdata.py \
   && python3 maps/test_layout.py \
+  && python3 maps/test_landscape.py \
   && python3 advisor/test_advisor.py \
   && python3 ask/test_agent.py \
   && python3 test_run.py \
@@ -82,11 +83,12 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `governance/test_subprocess.py` | `8 passed, 0 failed` |
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 | `maps/test_layout.py` | `10 passed, 0 failed` |
+| `maps/test_landscape.py` | `11 passed, 0 failed` |
 | `advisor/test_advisor.py` | `26 passed, 0 failed` |
 | `ask/test_agent.py` | `45 passed, 0 failed` |
 | `test_run.py` | `12 passed, 0 failed` |
 
-278 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+289 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---

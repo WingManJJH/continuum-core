@@ -6,6 +6,26 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Visual modeler Phase D: process landscape / repository
+
+### D29 — Org-wide "process house" + linkable catalogs
+**Context:** Phase D — navigate a whole organization, the thing Mavim/GBTEC are known for: a process
+landscape grouped by APQC domain, plus catalogs that thread across processes.
+**Decision & build:** a testable backend aggregation **`mapdata.landscape(g)`** groups every active
+process by its **APQC domain** (the 2-letter code prefix, named via a small `DOMAIN_NAMES` map), with
+per-process stats (steps, agent steps, reviewed-vs-default guardrail, risk/KPI counts), and builds
+**catalogs** — roles, KPIs, risks — each item carrying the processes that reference it. Served at
+`GET /api/landscape`. The canvas gains a **Landscape** mode (HTML, not SVG): a domain-by-domain house of
+clickable process cards + a catalogs grid whose every item links (a process chip opens that process).
+All read-only, from the one graph; the cached landscape is invalidated on any model edit so it re-fetches
+fresh. `maps/test_landscape.py` — **11 asserts** (8 domains, each process placed once, per-process stats,
+catalogs populated + usage-sorted + process-linked). Verified live: opened the house, clicked a process
+card and a catalog chip to open processes, saw the honest reviewed/default guardrail dots.
+Full suite **289**. **Phase E next:** a read-only publish portal (shareable process viewer). (Events
+— timer/message — and BPMN XML import/export still after that.)
+
+---
+
 ## 2026-09-15 — Visual modeler Phase C: swimlanes + sub-process drill-down
 
 ### D28 — Lanes view (grouped by performer) + drill-down navigation
