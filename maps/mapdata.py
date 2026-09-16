@@ -65,11 +65,17 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
                  for f in sorted((f for f in g.all("SequenceFlow")
                                   if f["process_ref"] == p["id"] and f["status"] == "active"),
                                  key=lambda f: f["id"])]
+        events = [{"id": x["id"], "kind": x["kind"], "trigger": x["trigger"],
+                   "name": x.get("name", ""), "timer": x.get("timer"),
+                   "message_ref": x.get("message_ref")}
+                  for x in sorted((x for x in g.all("Event")
+                                   if x["process_ref"] == p["id"] and x["status"] == "active"),
+                                  key=lambda x: x["id"])]
         out.append({
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],
             "guardrail": f"{p['guardrail_ref']}.v{pgr['version']}" if pgr else None,
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
-            "gateways": gateways, "flows": flows, "explicit": bool(flows),
+            "gateways": gateways, "flows": flows, "events": events, "explicit": bool(flows),
             "layout": layout.load_process(p["id"]),  # {node_id: {x,y}} — decorative
         })
     return out

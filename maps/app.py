@@ -28,6 +28,8 @@ from mapdata import all_maps, landscape  # noqa: E402
 import layout  # noqa: E402  — decorative node positions (not a model edit)
 import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
+sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
+import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 
 STORE = gov.GovernanceStore()
 
@@ -87,6 +89,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "view": view})
         if u.path in ("/portal", "/portal.html"):
             return self._static("/portal.html")
+        if u.path == "/api/export/bpmn":
+            pid = parse_qs(u.query).get("process", [""])[0]
+            try:
+                xml = bpmn_export.export_process(pid, cc.Graph())
+            except ValueError as e:
+                return self._json_code({"ok": False, "error": str(e)}, 404)
+            body = xml.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Disposition",
+                             'attachment; filename="' + pid.replace(".", "_") + '.bpmn"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         return self._static(u.path)
 
     def do_PUT(self):
@@ -164,6 +181,17 @@ class Handler(BaseHTTPRequestHandler):
                                           reason or "added gateway via canvas", name=b.get("name", ""))
                 elif op == "remove":
                     r = STORE.remove_gateway(b["id"], actor, reason or "removed gateway via canvas")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+            elif u.path == "/api/event":
+                op = b.get("op")
+                if op == "add":
+                    r = STORE.add_event(b["process"], b.get("kind", "intermediate"),
+                                        b.get("trigger", "timer"), actor,
+                                        reason or "added event via canvas", name=b.get("name", ""),
+                                        timer=b.get("timer"), message_ref=b.get("message_ref"))
+                elif op == "remove":
+                    r = STORE.remove_event(b["id"], actor, reason or "removed event via canvas")
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/flow":

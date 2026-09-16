@@ -158,6 +158,7 @@ function buildFlow(p) {
   nodes["__end__"] = { id: "__end__", kind: "end", shape: "circle", r: R };
   p.tasks.forEach(function (t) { nodes[t.id] = taskNode(t); });
   (p.gateways || []).forEach(function (gw) { nodes[gw.id] = { id: gw.id, kind: "gateway", gw: gw, shape: "circle", r: GW / 2 }; });
+  (p.events || []).forEach(function (ev) { nodes[ev.id] = { id: ev.id, kind: "event", ev: ev, shape: "circle", r: 19 }; });
   edges = (p.flows || []).map(function (f) { return { from: f.from, to: f.to, condition: f.condition }; });
   // keep only edges whose endpoints exist
   edges = edges.filter(function (e) { return nodes[e.from] && nodes[e.to]; });
@@ -220,6 +221,15 @@ function flowSVG(p) {
       if (n.gw.name) parts.push('<text class="gwname" x="' + c + '" y="' + (GW + 13) + '" text-anchor="middle">' + esc(trunc(n.gw.name, 16)) + "</text>");
       parts.push("</g>");
       ext(n.cx - c, n.cy - c); ext(n.cx + c, n.cy + c + 16);
+    } else if (n.kind === "event") {
+      var ev = n.ev, er = 19;
+      parts.push('<circle class="ev ev-' + esc(ev.kind) + '" cx="' + n.cx + '" cy="' + n.cy + '" r="' + (er - 3) + '"/>');
+      if (ev.kind === "intermediate") parts.push('<circle class="ev-inner" cx="' + n.cx + '" cy="' + n.cy + '" r="' + (er - 7) + '"/>');
+      var eg = ev.trigger === "timer" ? "⏱" : ev.trigger === "message" ? "✉" : "";
+      if (eg) parts.push('<text class="evglyph" x="' + n.cx + '" y="' + (n.cy + 5) + '" text-anchor="middle">' + eg + "</text>");
+      var elbl = ev.name || (ev.trigger === "timer" ? (ev.timer || "timer") : ev.trigger === "message" ? (ev.message_ref || "message") : ev.kind);
+      parts.push('<text class="evname" x="' + n.cx + '" y="' + (n.cy + er + 10) + '" text-anchor="middle">' + esc(trunc(elbl, 16)) + "</text>");
+      ext(n.cx - er, n.cy - er); ext(n.cx + er, n.cy + er + 14);
     } else {
       var t = n.task, x2 = n.cx - NW / 2, y2 = n.cy - NH / 2;
       var ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");

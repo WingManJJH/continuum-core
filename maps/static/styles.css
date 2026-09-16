@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }  /* author display rules (e.g. .modal) must not override the hidden attribute */
 :root {
   --ground: #f7f8fa; --surface: #ffffff; --surface-2: #eef1f6;
   --ink: #1b2330; --muted: #5f6b7a; --line: #e2e7ef;
@@ -258,3 +259,14 @@ button:disabled { opacity: .5; cursor: default; }
 .mini { font: inherit; font-size: 12px; text-decoration: none; cursor: pointer; border: 1px solid var(--line); background: var(--ground); color: var(--ink); border-radius: 6px; padding: 4px 9px; }
 .mini:hover { border-color: var(--accent); }
 .mini.danger:hover { border-color: var(--crit); color: var(--crit); }
+
+/* ---- Phase F: events ---- */
+.ev-tile { border-color: var(--line); }
+circle.ev { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+circle.ev.ev-end { stroke-width: 3.2; }
+circle.ev.ev-start { stroke-width: 1.4; }
+circle.ev.selrect { stroke: var(--accent); stroke-width: 3; }
+circle.ev-inner { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.evglyph { font-size: 15px; fill: var(--ink); }
+.evname { font-size: 10.5px; fill: var(--muted); }
+.evnode { cursor: pointer; }

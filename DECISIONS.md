@@ -6,6 +6,43 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Visual modeler Phase F (part 1): events + BPMN 2.0 export
+
+### D31 — Timer / message events, and BPMN 2.0 XML export that renders in a real tool
+**Context:** Phase F — make the model interoperate with the BPMN world. Two pieces here: (1) the
+event vocabulary a real process needs (a timer firing, a message arriving), and (2) taking a Continuum
+process *out* as standards-compliant BPMN 2.0 XML.
+**Decision & build — events:** one new **locked** entity type **`Event`** — `kind` (start / intermediate
+/ end) × `trigger` (none / timer / message), plus optional `timer` (ISO-8601 duration / date / cron) and
+`message_ref`. Registered the additive way (D27 recipe): `continuum_core` type tuple + seed `[]` +
+`token_budget` type_to_title + `schema/event.schema.json`; the `SequenceFlow` endpoint patterns and
+`store._node_ok` were widened to accept event ids (`.eN`), so an event is a first-class flow node.
+Governance write path `store.add_event` / `remove_event` (validated, audited, remove cascades incident
+flows — same shape as gateways). `mapdata` exposes active events; the canvas renders them (start/end/
+intermediate circles + clock/envelope glyph), adds timer/message **palette tiles**, an event **properties
+panel**, and Connect-mode wiring; the read-only **portal** renders them too. `governance/test_event.py` —
+**14 asserts**.
+**Decision & build — export:** `bpmn/export.py` serializes a process to **BPMN 2.0 XML** off the same
+`mapdata` payload (one source of truth). Mapping: agent-bound task → `serviceTask`, human task →
+`userTask`; exclusive/parallel gateway → `exclusiveGateway`/`parallelGateway`; event kind+trigger →
+start/intermediateCatch/end event with a `timerEventDefinition`/`messageEventDefinition`; flow condition →
+`conditionExpression`; performing role → a `bpmn:lane`; the process start/end → plain start/end events.
+Every Continuum id is preserved as `continuum:id` for round-tripping (import is part 2). A **BPMNDI**
+diagram-interchange block with computed left-to-right layout (longest-path layering) + edge waypoints is
+emitted, so the file opens *with a drawing*. Served at `GET /api/export/bpmn?process=ID` (downloads a
+`.bpmn`); canvas gets an **Export BPMN** button. `bpmn/test_export.py` — **14 asserts** (well-formed,
+serviceTask for the agent step, laneSet, exclusiveGateway, timerEventDefinition, conditionExpression, no
+dangling flow endpoints, a DI shape per node + edge per flow, unknown-process refusal).
+**Honest verification:** the exported XML was imported into **bpmn-js (bpmn.io), the reference BPMN
+renderer, with zero warnings**, and rendered correctly — user vs. service tasks with the right icons,
+the timer event, the exclusive gateway, start/end. Not just well-formed: it actually opens in the tool.
+**Bug fixed (latent from Phase E):** the Share modal used `.modal { display:flex }`, which overrode the
+`hidden` attribute (no author `[hidden]` reset existed), so the dialog was stuck open on load. Added a
+global `[hidden] { display:none !important }`. Full suite **336**. **Phase F part 2 next:** BPMN 2.0 XML
+**import** (round-trips this export through the audited write path).
+
+---
+
 ## 2026-09-16 — Visual modeler Phase E: read-only publish portal
 
 ### D30 — Shareable, revocable, read-only process viewer

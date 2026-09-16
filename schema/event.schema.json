@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/event",
+  "title": "Event",
+  "description": "A BPMN-style event node in a process flow (Core Model §03 Canvas, Phase F). Events model what starts, interrupts, or ends a flow for a reason other than a task completing: a timer firing or a message arriving. kind places it (start / intermediate / end); trigger says what fires it (none / timer / message). Structural only — like a gateway it carries no guardrail; the tasks it routes to do.",
+  "type": "object",
+  "required": ["id", "process_ref", "kind", "trigger", "version", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}\\.[0-9.]+\\.e[0-9]+$",
+      "description": "Fully-qualified event id, e.g. CO.3.2.7.e1 — process apqc_code + '.e' + n."
+    },
+    "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
+    "kind": {"type": "string", "enum": ["start", "intermediate", "end"], "description": "Where the event sits: a start event begins the flow, an end event finishes it, an intermediate event fires in between (a catch)."},
+    "trigger": {"type": "string", "enum": ["none", "timer", "message"], "description": "What fires the event: none (a plain start/end), timer (a date/duration), or message (an inbound message)."},
+    "name": {"type": "string", "maxLength": 80},
+    "timer": {"type": ["string", "null"], "maxLength": 120, "description": "For trigger=timer: an ISO-8601 duration/date or a cron-like expression (e.g. 'P1D', '2026-01-01', '0 9 * * 1'). Free text — surfaced verbatim, not evaluated here."},
+    "message_ref": {"type": ["string", "null"], "maxLength": 120, "description": "For trigger=message: the name of the message that fires this event (e.g. 'payment_received')."},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

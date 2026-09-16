@@ -67,6 +67,8 @@ class GovernanceStore:
             self._gateway_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "sequence-flow.schema.json")) as f:
             self._flow_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "event.schema.json")) as f:
+            self._event_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -426,7 +428,7 @@ class GovernanceStore:
     def _node_ok(self, g: cc.Graph, process_ref: str, node: str) -> bool:
         if node in ("__start__", "__end__"):
             return True
-        for et in ("Task", "Gateway"):
+        for et in ("Task", "Gateway", "Event"):
             e = g.get(et, node)
             if e and e.get("process_ref") == process_ref and e.get("status") == "active":
                 return True
@@ -475,6 +477,49 @@ class GovernanceStore:
         new["version"] = f["version"] + 1
         cc.append_edit_event("SequenceFlow", f["id"], "deprecate", f["version"], new["version"],
                              {"kind": "human", "id": actor}, new, reason)
+        return new
+
+    def add_event(self, process_ref: str, kind: str, trigger: str, actor: str, reason: str,
+                  name: str = "", timer: str | None = None, message_ref: str | None = None) -> dict:
+        """Create a timer / message (or plain start / end) event node. Structural,
+        like a gateway — it carries no guardrail; it just routes the flow."""
+        self._require(reason, actor)
+        if kind not in ("start", "intermediate", "end"):
+            raise EditError("event kind must be 'start', 'intermediate', or 'end'")
+        if trigger not in ("none", "timer", "message"):
+            raise EditError("event trigger must be 'none', 'timer', or 'message'")
+        g = self.graph()
+        if g.get("Process", process_ref) is None:
+            raise EditError(f"unknown process {process_ref}")
+        num = max((int(x["id"].split(".e")[-1]) for x in g.all("Event")
+                   if x["process_ref"] == process_ref), default=0) + 1
+        ev = {"id": f"{process_ref}.e{num}", "process_ref": process_ref, "kind": kind,
+              "trigger": trigger, "name": name.strip(),
+              "timer": (timer.strip() or None) if timer else None,
+              "message_ref": (message_ref.strip() or None) if message_ref else None,
+              "version": 1, "status": "active"}
+        errs = sorted(self._event_validator.iter_errors(ev), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Event", ev["id"], "create", None, 1,
+                             {"kind": "human", "id": actor}, ev, reason.strip())
+        return ev
+
+    def remove_event(self, event_id: str, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        ev = g.get("Event", event_id)
+        if ev is None or ev["status"] != "active":
+            raise EditError(f"unknown or already-retired event {event_id}")
+        # cascade: retire flows touching it, so no edge dangles (all versioned)
+        for f in self._active(g, "SequenceFlow", ev["process_ref"]):
+            if event_id in (f["from_node"], f["to_node"]):
+                self._retire_flow(f, actor, "event removed")
+        new = copy.deepcopy(ev)
+        new["status"] = "deprecated"
+        new["version"] = ev["version"] + 1
+        cc.append_edit_event("Event", event_id, "deprecate", ev["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
         return new
 
     def add_flow(self, process_ref: str, from_node: str, to_node: str, actor: str,
