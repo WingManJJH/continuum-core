@@ -70,6 +70,8 @@ def main():
     check("lowercase + single-word performers are deduced",
           "role.ap_clerk" in roles_found and "role.finance_manager" in roles_found and "role.finance" in roles_found)
     check("an imperative step is NOT read as a role", all(not x.get("role") for x in bplan["preview"] if x["name"].startswith("Notify")))
+    check("an automated 'the system …' step gets no bogus role",
+          all(not x.get("role") for x in bplan["preview"] if x["agent"]))
     drafted = [f for f in bp["parsed"]["flows"] if f.get("condition")]
     check("a branch condition is drafted from an 'If …' line", any("over 500" in (f["condition"] or "") for f in drafted))
     check("the drafted-branch assumption is surfaced", any("branch condition" in a for a in bplan["assumptions"]))
