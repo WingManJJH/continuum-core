@@ -46,6 +46,17 @@ var DOCS = [
     "<p>Each step's AI <b>guardrail</b> is editable right in its properties panel — allowed and forbidden actions, the data scope, and the <b>escalate-if</b> condition that hands off to a human. Saving bumps a version, records who/why, and is <b>instantly live for agents</b> on their next call. No deploy.</p>"
     + "<p>Everything is governed the same way: a guardrail edit, a new step, a drawn flow, a renamed role — each is a <b>versioned, hash-chained event</b> on an append-only audit trail (ISO 9001 §7.5). Nothing is overwritten or silently deleted; retired items are kept, deprecated. That chain is tamper-evident.</p>" },
 
+  { id: "approvals", title: "Approvals (the review gate)", html:
+    "<p>Some changes shouldn't go live the moment one person clicks Save. When you edit a guardrail you can tick <b>“Submit for approval instead of saving directly.”</b> That queues the change as a <b>Change Request</b> — it does <i>not</i> touch the live model — and it waits in the <b>Approvals</b> queue (top of the screen; the badge shows how many are pending).</p>"
+    + "<p>A reviewer opens the queue and <b>Approves</b> it — which applies the change through the exact same audited, versioned, hash-chained path a direct edit uses — or <b>Rejects</b> it with a reason (no model change). The proposer can <b>Withdraw</b> a request they no longer want.</p>"
+    + "<ul><li><b>Separation of duties</b> is recorded: if the reviewer is also the proposer the decision is allowed but flagged <b>self-approved</b> on the trail.</li>"
+    + "<li>If the model moved on and a queued change no longer applies cleanly, Approve surfaces the reason and leaves the request pending.</li>"
+    + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li></ul>" },
+
+  { id: "board", title: "Live board (Present mode)", html:
+    "<p><b>▶ Present</b> (top of the screen) turns the canvas into a full-screen, touch-friendly <b>board</b> a leadership team can drive on a video wall. A dark bar switches between <b>Landscape, Architecture, OKRs, X-matrix, Alignment</b>, or opens any process flow; app chrome hides and the canvas fills the screen. <b>Esc</b> or <b>Exit</b> returns.</p>"
+    + "<p>The pulsing green <b>live dot</b> means the board updates in <b>real time</b>: whenever anyone commits a governed change — from any window — every open board and canvas refreshes within about a second and a half. No reload. Approve a change on one screen and watch it appear on the wall.</p>" },
+
   { id: "landscape", title: "Landscape (the repository)", html:
     "<p><b>Landscape</b> (toolbar) is the whole organization at a glance: every process grouped by <b>APQC domain</b>, each card showing steps, agent steps, and whether its guardrail is reviewed or still default. Below are <b>catalogs</b> — roles, KPIs, and risks — each listing the processes that reference it. Click any card or catalog item to open it.</p>" },
 
@@ -110,7 +121,7 @@ function renderDocs() {
 
 // ======================= GUIDED TOUR =======================
 function tourReset() {
-  ["share-modal", "roles-modal", "import-modal", "docs-modal"].forEach(function (id) {
+  ["share-modal", "roles-modal", "import-modal", "docs-modal", "appr-modal"].forEach(function (id) {
     var e = document.getElementById(id); if (e) e.hidden = true;
   });
   try { if (typeof closeRoleDrawer === "function") closeRoleDrawer(); } catch (e) {}
@@ -166,6 +177,16 @@ var TOUR = [
       body: "Drag a tile onto the flow to add a step, a decision (× / +), or a timer/message event. Drag any box to move it; <b>Tidy up</b> auto-arranges." },
     { sel: "#connect", before: function () { tourOpen("CO.3.2.7"); tourView("flow"); }, title: "Connect mode",
       body: "Turn on <b>Connect</b> to draw a flow between two nodes. A banner shows you're connecting and dragging is paused — press <b>Esc</b> to leave. Select any decision afterward to rename it, switch its type, or label each branch with a condition." },
+  ]},
+  { title: "Review & present", steps: [
+    { sel: "#f-approve", before: function () { tourOpen("CO.3.2.7"); state.task = "CO.3.2.7.t3"; if (typeof renderCenter === "function") renderCenter(); if (typeof renderProps === "function") renderProps(); },
+      title: "Submit for approval", body: "Editing a guardrail? Tick this to route the change through <b>review</b> instead of saving it directly. It queues as a Change Request and doesn't touch the live model until someone approves it." },
+    { sel: function () { return openModalCard(); }, before: function () { tourOpenModalBtn("approvals-btn"); },
+      title: "The approval queue", body: "Pending changes wait here. A reviewer <b>Approves</b> — applying it through the same audited, versioned path a direct edit uses — or <b>Rejects</b> it with a reason; the proposer can <b>Withdraw</b>. Self-approval is allowed but flagged. Every decision is on the tamper-evident trail." },
+    { sel: "#present-btn", before: function () { tourReset(); tourOpen("CO.3.2.7"); tourView("flow"); },
+      title: "Present — the live board", body: "Go full-screen and touch-friendly for a video wall: switch between <b>Landscape, OKRs, the X-matrix</b>, or open any process. <b>Esc</b> exits." },
+    { sel: "#live-dot", title: "Everything is live",
+      body: "The green dot means <b>real time</b>: commit a change in any window — approve one here — and every open board and canvas refreshes within about a second and a half. No reload." },
   ]},
   { title: "The big picture", steps: [
     { sel: "#canvas", before: function () { tourOpenModalBtn("landscape-btn"); }, title: "Landscape",

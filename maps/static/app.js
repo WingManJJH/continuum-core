@@ -987,6 +987,7 @@ function taskProps(p, t) {
     + ["timestamp_outcome", "inputs_outputs", "full_capture"].map(function (o) { return '<option ' + (o === g.audit_requirement ? "selected" : "") + ">" + o + "</option>"; }).join("")
     + "</select></label>"
     + '<label>Reason for change <span class="hint">required · §7.5</span><input id="f-reason" type="text" placeholder="why?"></label>'
+    + '<label class="ck"><input type="checkbox" id="f-approve"> Submit for approval instead of saving directly <span class="hint">routes through the review queue</span></label>'
     + '<div id="gr-msg" class="msg" hidden></div>'
     + '<div class="actions"><button type="button" id="gr-reset" class="ghost">Reset</button><button type="submit" class="save">Save new version</button></div>'
     + '<input type="hidden" id="f-grid" value="' + esc(g.id) + '"></form></div>';
@@ -1004,10 +1005,23 @@ function saveGuardrail(e) {
     audit_requirement: $("#f-audit").value,
     rate_limit: g.rate_limit,
   };
+  var reason = $("#f-reason").value.trim();
   var btn = $("#gr-form .save"); btn.disabled = true;
+  // Route through the approval gate instead of committing directly.
+  if ($("#f-approve") && $("#f-approve").checked && typeof proposeChange === "function") {
+    proposeChange("edit_guardrail", { gr_id: $("#f-grid").value, changes: changes },
+      "Guardrail change · " + $("#f-grid").value, reason).then(function (res) {
+      btn.disabled = false;
+      var m = $("#gr-msg");
+      if (res.ok) { m.textContent = "Submitted for approval — it will go live once a reviewer approves it (see the Approvals queue)."; m.className = "msg ok"; }
+      else { m.textContent = "Rejected: " + res.error; m.className = "msg err"; }
+      if (m) m.hidden = false;
+    });
+    return;
+  }
   fetch("/api/guardrail?id=" + encodeURIComponent($("#f-grid").value), {
     method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ changes: changes, actor: "role.ops.support_lead", reviewer: "role.qms.iso_advisor", reason: $("#f-reason").value.trim() }),
+    body: JSON.stringify({ changes: changes, actor: "role.ops.support_lead", reviewer: "role.qms.iso_advisor", reason: reason }),
   }).then(function (r) { return r.json(); }).then(function (res) {
     btn.disabled = false;
     if (res.ok) {
@@ -1347,6 +1361,7 @@ function refreshLive() {
   if (state.view === "landscape") fetch("/api/landscape").then(function (r) { return r.json(); }).then(function (d) { state.landscape = d.landscape; if (state.view === "landscape") renderCenter(); });
   else if (state.view === "architecture") fetch("/api/architecture").then(function (r) { return r.json(); }).then(function (d) { state.architecture = d.architecture; if (state.view === "architecture") renderCenter(); });
   else if (state.view === "strategy") fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; if (state.view === "strategy") renderCenter(); });
+  if (typeof refreshApprovalsBadge === "function") refreshApprovalsBadge();
 }
 (function () {
   if (!window.EventSource) return;

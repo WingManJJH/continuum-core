@@ -12,6 +12,7 @@
     <div class="spacer"></div>
     <span id="live-dot" class="live-dot" title="Live — the model updates in real time"></span>
     <button class="toggle" id="present-btn" type="button">▶ Present</button>
+    <button class="toggle" id="approvals-btn" type="button">Approvals <span id="appr-badge" class="appr-badge" hidden>0</span></button>
     <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
@@ -167,6 +168,21 @@
     <button id="pb-exit" class="pb-exit" type="button">Exit ✕</button>
   </div>
 
+  <!-- Approval gate — change requests -->
+  <div id="appr-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Approval queue</h2>
+        <nav class="appr-tabs">
+          <button data-af="pending" class="active" type="button">Pending</button>
+          <button data-af="all" type="button">All</button>
+        </nav>
+        <button id="appr-close" class="x" type="button">&times;</button>
+      </div>
+      <div id="appr-body"></div>
+    </div>
+  </div>
+
   <!-- Version history & compare -->
   <div id="hist-modal" class="modal" hidden>
     <div class="modal-card">
@@ -213,6 +229,7 @@
   <script src="strategy.js"></script>
   <script src="history.js"></script>
   <script src="present.js"></script>
+  <script src="approvals.js"></script>
   <script src="docs.js"></script>
 </body>
 </html>
