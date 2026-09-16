@@ -32,6 +32,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
 import visio_import as visio  # noqa: E402  — Visio .vsdx import
+sys.path.insert(0, os.path.join(HERE, "..", "builder"))
+import build as builder  # noqa: E402  — build a process from instructions
 
 STORE = gov.GovernanceStore()
 
@@ -157,6 +159,20 @@ class Handler(BaseHTTPRequestHandler):
                                          g=cc.Graph(), ttl_days=b.get("ttl_days"))
                     return self._json({"ok": True, "link": rec})
                 except ValueError as e:
+                    return self._json_code({"ok": False, "error": str(e)}, 400)
+            if u.path == "/api/build":
+                # build a process from instructions. op=plan is a write-free
+                # dry-run (returns the deduced plan + assumptions); op=apply creates
+                # it via the audited write path from the parsed plan the client previewed.
+                try:
+                    if b.get("op") == "apply":
+                        res = builder.apply_build(b.get("parsed", {}), code=(b.get("code") or None),
+                                                  owner=(b.get("owner") or None), actor=actor,
+                                                  reason=reason or "built from instructions", store=STORE)
+                        return self._json({"ok": True, "result": res})
+                    return self._json({"ok": True, **builder.plan_build(b.get("text", ""),
+                                                                        use_llm=bool(b.get("use_llm")))})
+                except (ValueError, gov.EditError) as e:
                     return self._json_code({"ok": False, "error": str(e)}, 400)
             if u.path == "/api/import/bpmn":
                 # bring a BPMN 2.0 XML file OR a Visio .vsdx into the model. op=plan

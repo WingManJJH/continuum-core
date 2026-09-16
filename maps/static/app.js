@@ -1267,3 +1267,49 @@ function refreshRolesList() {
     });
   });
 })();
+
+// ---------- Build a process from instructions ----------
+function postBuild(body) { return fetch("/api/build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+(function () {
+  var bb = $("#build-btn"); if (!bb) return;
+  var modal = $("#build-modal"), out = $("#build-out"), apply = $("#build-apply");
+  var parsed = null;
+  function open() { $("#build-text").value = ""; out.innerHTML = ""; apply.disabled = true; parsed = null; modal.hidden = false; }
+  function close() { modal.hidden = true; }
+  bb.addEventListener("click", open);
+  $("#build-close").addEventListener("click", close);
+  modal.addEventListener("click", function (e) { if (e.target === modal) close(); });
+  $("#build-text").addEventListener("input", function () { apply.disabled = true; });
+  $("#build-plan").addEventListener("click", function () {
+    var text = $("#build-text").value.trim();
+    if (!text) { out.innerHTML = '<div class="msg err">Paste a few instructions first.</div>'; return; }
+    out.innerHTML = '<div class="muted">Reading…</div>';
+    postBuild({ op: "plan", text: text, use_llm: $("#build-llm").checked }).then(function (res) {
+      if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; apply.disabled = true; return; }
+      parsed = res.parsed;
+      var p = res.plan, c = p.counts;
+      var steps = p.preview.map(function (x, i) {
+        var tag = x.kind === "decision" ? '<span class="bstep-gw">decision</span>' : (x.agent ? '<span class="bstep-ai">AI</span>' : "");
+        var who = x.role ? '<span class="muted"> · ' + esc(x.role.replace(/^role\./, "")) + "</span>" : "";
+        return '<li>' + esc(x.name) + " " + tag + who + "</li>";
+      }).join("");
+      var notes = p.assumptions.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("");
+      out.innerHTML = '<div class="imp-plan"><div class="imp-name">' + esc(p.name)
+        + ' <span class="bsrc">' + (p.source === "llm" ? "AI planner" : "built-in reader") + "</span></div>"
+        + '<div class="imp-counts">' + c.steps + " steps (" + c.agent_steps + " automated) · " + c.gateways + " decisions · " + (c.roles || 0) + " roles</div>"
+        + '<ol class="bsteps">' + steps + "</ol>"
+        + '<div class="imp-warn"><b>Assumptions</b><ul>' + notes + "</ul></div></div>";
+      apply.disabled = false;
+    });
+  });
+  apply.addEventListener("click", function () {
+    if (!parsed) return;
+    apply.disabled = true; out.innerHTML = '<div class="muted">Building…</div>';
+    postBuild({ op: "apply", parsed: parsed, actor: ACTOR, reason: "built from instructions via canvas" }).then(function (res) {
+      if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
+      var code = res.result.code;
+      out.innerHTML = '<div class="msg ok">Built <b>' + esc(code) + "</b> — opening it…</div>";
+      load().then(function () { close(); openProcess(code); });
+    });
+  });
+})();

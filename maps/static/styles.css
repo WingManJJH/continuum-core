@@ -390,3 +390,12 @@ g .connsrc rect, g.gwnode.connsrc rect, g.evnode.connsrc circle { outline: none;
   background: none; border: 0; color: var(--ink); padding: 7px 10px; border-radius: 7px; }
 .tour-chaplist button:hover { background: var(--surface-2); }
 .tour-chaplist button.on { color: var(--accent); font-weight: 600; }
+
+/* ---- Build from instructions ---- */
+.build-ai { display: flex; align-items: center; gap: 7px; font-size: 12.5px; margin: 8px 0; }
+.bsrc { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.bsteps { margin: 8px 0; padding-left: 22px; font-size: 13px; line-height: 1.7; }
+.bsteps li { margin: 2px 0; }
+.bstep-gw, .bstep-ai { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+.bstep-gw { background: var(--warn-bg); color: var(--warn); }
+.bstep-ai { background: var(--accent); color: var(--accent-ink); }
