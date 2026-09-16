@@ -528,3 +528,34 @@ g .connsrc rect, g.gwnode.connsrc rect, g.evnode.connsrc circle { outline: none;
 .agc { cursor: pointer; height: 16px; transition: outline .1s; }
 .agc:hover { outline: 2px solid #14425a; outline-offset: -1px; opacity: .85; }
 .agc.manual { box-shadow: inset 0 0 0 1.5px #14425a; }
+
+/* ==== X-matrix TRUE Hoshin geometry (D44) — rotated axis cards + intersection cells ==== */
+.nexus-grid { display: grid; grid-template-columns: max-content max-content max-content max-content;
+  grid-template-rows: max-content max-content max-content; gap: 3px; align-items: start; justify-content: start; }
+.nq { position: relative; padding: 16px 8px 8px 8px; border-radius: 4px; }
+/* labels float; they must not consume layout space (keeps corners aligned to axes) */
+.alab { position: absolute; top: 2px; left: 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45); z-index: 2; }
+.nq.owners .alab { color: #14425a; text-shadow: none; }
+.alab.vleft, .alab.vright { top: 16px; left: 1px; writing-mode: vertical-rl; }
+.alab.vleft { transform: rotate(180deg); }
+.nq.metrics .alab.vright { left: auto; right: 1px; }
+/* axis card strips */
+.vaxis { display: flex; flex-direction: row; align-items: flex-start; gap: 6px; }
+.haxis { display: flex; flex-direction: column; gap: 6px; }
+.nq.objectives, .nq.metrics, .nq.owners, .nq.initiatives, .nq.goals { display: block; }
+/* col1 (A / objectives / I) share a left offset so their columns line up with the objective cards */
+.nq.tl, .nq.objectives, .nq.bl { padding-left: 15px; }
+.nq.metrics, .nq.owners { padding-right: 15px; }
+.vcard { width: 16px; flex: none; background: rgba(255,255,255,.95); border-radius: 2px; writing-mode: vertical-rl;
+  overflow: hidden; display: flex; align-items: flex-start; justify-content: flex-start; padding: 3px 0; cursor: default; }
+.vcard.rot { transform: rotate(180deg); }
+.vcard .vtext { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1b2330; }
+.vcard.nx-met.crit { box-shadow: inset 0 -3px 0 #f06a4f; } .vcard.nx-met.good { box-shadow: inset 0 -3px 0 #5cb85c; }
+.vcard.nx-obj, .vcard.nx-met, .hcard.nx-goal { cursor: pointer; } .vcard.nx-obj:hover, .vcard.nx-met:hover, .hcard.nx-goal:hover { outline: 1px solid #14425a; }
+.hcard { height: 16px; min-width: 200px; max-width: 260px; background: rgba(255,255,255,.95); border-radius: 2px;
+  display: flex; align-items: center; padding: 0 8px; font-size: 10px; }
+.hcard span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1b2330; }
+.nq.center { display: flex; align-items: center; justify-content: center; padding: 8px; }
+.nq.center .xcross { min-height: 210px; min-width: 180px; }
+.agrid { display: grid; }
+.agc { width: 16px; height: 16px; }
