@@ -84,11 +84,15 @@ Expected: the chain ends with `ALL GREEN`. Per-suite expectations:
 | `maps/test_mapdata.py` | `12 passed, 0 failed` |
 | `maps/test_layout.py` | `10 passed, 0 failed` |
 | `maps/test_landscape.py` | `11 passed, 0 failed` |
+| `maps/test_portal.py` | `19 passed, 0 failed` |
+| `governance/test_event.py` | `14 passed, 0 failed` |
+| `bpmn/test_export.py` | `14 passed, 0 failed` |
+| `bpmn/test_import.py` | `17 passed, 0 failed` |
 | `advisor/test_advisor.py` | `26 passed, 0 failed` |
 | `ask/test_agent.py` | `45 passed, 0 failed` |
 | `test_run.py` | `12 passed, 0 failed` |
 
-289 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
+353 assertions + 3 harness checks. All suites exit `0` on success. (`traceability.py` exits `1`
 **only** if it finds a hard broken reference — never for the expected 3 warnings.)
 
 ---
@@ -219,7 +223,7 @@ up. Or run any one directly:
 |---|---|---|---|
 | Governance editor | `python3 governance/app.py` | http://localhost:8787 | edit guardrails (Phase 2) |
 | Strategy dashboard | `python3 dashboard/app.py` | http://localhost:8788 | standing report (Phase 4) |
-| Process canvas | `python3 maps/app.py` | http://localhost:8789 | interactive §03 canvas — flowchart/RACI/checklist; view + edit guardrails/structure + author processes + bind agents to steps |
+| Process canvas | `python3 maps/app.py` | http://localhost:8789 | interactive §03 canvas + visual modeler (Phases A–F) — free-form flowchart with branching (gateways) / swimlanes / RACI / checklist, sub-process drill-down, org-wide landscape repository; view + edit guardrails/structure + author processes + bind agents; **timer/message events**; **read-only Share links** (`/portal`); **BPMN 2.0 import/export** |
 | Advisor | `python3 advisor/app.py` | http://localhost:8790 | AI window — analyze any process/guardrail/task/content vs best practices & standards |
 | Ask the Agent | `python3 ask/app.py` | http://localhost:8791 | ask a plain-English question — the agent writes a read-only graph query, runs it, and answers with a table + Show query |
 

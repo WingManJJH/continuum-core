@@ -1,7 +1,7 @@
 # Continuum Core — Phases 1–4
 
 [![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
-[![assertions](https://img.shields.io/badge/assertions-289%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![assertions](https://img.shields.io/badge/assertions-353%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -99,11 +99,18 @@ python3 audit/verify.py                            # re-walk chain + off-box anc
 python3 governance/test_retention.py               # 16 asserts: §7.5.3 schedule, legal holds, chain-safe disposition
 python3 governance/retention.py                    # retention plan (add --apply to archive + ledger due records)
 
-# Process canvas — interactive §03 Canvas View
+# Process canvas — interactive §03 Canvas View + visual modeler (Phases A–F)
 python3 maps/test_mapdata.py                       # 12 asserts: flow / agent step / escalation / override / editor payload
 python3 maps/test_layout.py                        # 10 asserts: free-form canvas layout layer (save/reset, decorative-only)
 python3 maps/test_landscape.py                     # 11 asserts: Phase D process landscape (domains + catalogs)
-python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart with branching / swimlanes / RACI / checklist + drill-down + an org-wide process-landscape repository + in-canvas guardrail editing
+python3 maps/test_portal.py                        # 19 asserts: Phase E read-only publish portal (mint/revoke/expiry, no model mutation)
+python3 governance/test_event.py                   # 14 asserts: Phase F timer/message events (versioned, audited)
+python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart with branching / swimlanes / RACI / checklist + drill-down + org-wide landscape repository + in-canvas guardrail editing + read-only Share links + BPMN import/export
+
+# BPMN 2.0 interoperability — export a process, or import one as a new governed process
+python3 bpmn/test_export.py                        # 14 asserts: BPMN 2.0 XML export (serviceTask/userTask, gateways, timer/message events, lanes, BPMNDI) — opens in bpmn.io/Camunda
+python3 bpmn/test_import.py                         # 17 asserts: BPMN 2.0 import round-trip through the audited write path
+python3 bpmn/export.py CO.3.2.7                     # print a process as BPMN 2.0 XML
 
 # Advisor — analyze anything vs best practices & standards
 python3 advisor/test_advisor.py                    # 26 asserts: rules + LLM-augmentation across every subject
