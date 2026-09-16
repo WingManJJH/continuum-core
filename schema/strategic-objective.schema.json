@@ -2,9 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://continuum.dev/schema/v1/strategic-objective",
   "title": "Strategic Objective",
-  "description": "Top of the spine (Core Model §02, Figure 1). The intent every process below it ultimately serves. An objective with no operational owner, or with no KPI tracking it, is a data-quality defect the system flags (§01, §12 traceability completeness). LOCKED for Phase 1.",
+  "description": "Top of the spine (Core Model \u00a702, Figure 1). The intent every process below it ultimately serves. An objective with no operational owner, or with no KPI tracking it, is a data-quality defect the system flags (\u00a701, \u00a712 traceability completeness). LOCKED for Phase 1.",
   "type": "object",
-  "required": ["id", "name", "owner_role", "horizon", "target", "version", "status"],
+  "required": [
+    "id",
+    "name",
+    "owner_role",
+    "horizon",
+    "target",
+    "version",
+    "status"
+  ],
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -12,8 +20,14 @@
       "pattern": "^obj\\.[a-z0-9_.]+$",
       "description": "Stable id, e.g. obj.reduce_onboarding_friction."
     },
-    "name": {"type": "string", "maxLength": 120},
-    "description": {"type": "string", "description": "Human-facing only. Kept out of the agent context package (§08 discipline)."},
+    "name": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-facing only. Kept out of the agent context package (\u00a708 discipline)."
+    },
     "owner_role": {
       "type": "string",
       "pattern": "^role\\.[a-z0-9_.]+$",
@@ -22,24 +36,82 @@
     "horizon": {
       "type": "string",
       "description": "Time horizon the objective is set against.",
-      "examples": ["FY2026", "2026-Q4", "rolling-12mo"]
+      "examples": [
+        "FY2026",
+        "2026-Q4",
+        "rolling-12mo"
+      ]
     },
     "target": {
       "type": "object",
-      "required": ["statement"],
+      "required": [
+        "statement"
+      ],
       "additionalProperties": false,
       "properties": {
-        "statement": {"type": "string", "description": "The measurable end-state, e.g. 'Median KYC verification under 4h'."},
-        "metric_value": {"type": ["number", "null"]},
-        "metric_unit": {"type": ["string", "null"]}
+        "statement": {
+          "type": "string",
+          "description": "The measurable end-state, e.g. 'Median KYC verification under 4h'."
+        },
+        "metric_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "metric_unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "kpi_refs": {
       "type": "array",
-      "items": {"type": "string", "pattern": "^kpi\\.[a-z0-9_.]+$"},
+      "items": {
+        "type": "string",
+        "pattern": "^kpi\\.[a-z0-9_.]+$"
+      },
       "description": "KPIs that measure progress on this objective (objective --targets--> KPI). Empty array is a flagged orphan."
     },
-    "version": {"type": "integer", "minimum": 1},
-    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "breakthrough",
+        "annual",
+        "foundational"
+      ],
+      "description": "Hoshin X-matrix axis: breakthrough (3-5yr) or annual objective; foundational = ongoing."
+    },
+    "parent_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^obj\\.[a-z0-9_.]+$",
+      "description": "The objective one level up (an annual objective rolls up to a breakthrough objective)."
+    },
+    "applies_to_levels": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5
+      },
+      "description": "Process-hierarchy levels this objective is deployed at (1-5)."
+    }
   }
 }

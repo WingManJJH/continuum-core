@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
 from mapdata import all_maps, landscape, roles as role_list, architecture  # noqa: E402
+import strategy as strat  # noqa: E402  — OKR / X-matrix / alignment assembly
 import layout  # noqa: E402  — decorative node positions (not a model edit)
 import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
@@ -85,6 +86,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"roles": role_list(cc.Graph())})
         if u.path == "/api/architecture":
             return self._json({"architecture": architecture(cc.Graph())})
+        if u.path == "/api/strategy":
+            g = cc.Graph()
+            return self._json({"strategy": strat.strategy(g), "xmatrix": strat.xmatrix(g)})
         if u.path == "/api/portal":
             # the author's manage list — every minted share link + its status
             return self._json({"links": portal.all_links(cc.Graph())})
@@ -246,6 +250,24 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/process/edit":
                 r = STORE.edit_process(b["id"], b.get("changes", {}), actor, reason or "edited process header")
+            elif u.path == "/api/enterprise":
+                r = STORE.edit_enterprise(b.get("changes", {}), actor, reason or "edited enterprise")
+            elif u.path == "/api/objective":
+                r = STORE.edit_objective(b["id"], b.get("changes", {}), actor, reason or "edited objective")
+            elif u.path == "/api/kpi":
+                r = STORE.edit_kpi(b["id"], b.get("changes", {}), actor, reason or "edited KPI")
+            elif u.path == "/api/initiative":
+                op = b.get("op")
+                if op == "add":
+                    r = STORE.add_initiative(b.get("id", ""), b.get("name", ""), actor, reason or "added initiative",
+                                             objective_refs=b.get("objective_refs"), process_refs=b.get("process_refs"),
+                                             owner_role=b.get("owner_role"), description=b.get("description", ""))
+                elif op == "edit":
+                    r = STORE.edit_initiative(b["id"], b.get("changes", {}), actor, reason or "edited initiative")
+                elif op == "remove":
+                    r = STORE.remove_initiative(b["id"], actor, reason or "retired initiative")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/role":
                 op = b.get("op")
                 if op == "add":

@@ -6,6 +6,36 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Phase 2: strategy layer — OKR, X-matrix, alignment, KPI hierarchy
+
+### D40 — Enterprise MVV + Hoshin X-matrix wired to the process model & KPIs
+**Context:** the platform had objectives + KPIs and a dashboard rollup, but no OKR board, no X-matrix, and
+no explicit KPI hierarchy / mission-vision-values. Requested: an OKR viz, a web X-matrix integrated with
+the modeler, objectives applicable at any level 1–5, KPI linkage between X-matrix and processes with
+fulfilment + a KPI hierarchy, and version control of every change.
+**Decision & build.** New locked entities **`Enterprise`** (mission / vision / values — one active record)
+and **`Initiative`** (X-matrix improvement priorities → objectives + processes). Extended
+**`StrategicObjective`** with `type` (breakthrough / annual / foundational), `parent_ref` (annual→breakthrough),
+`applies_to_levels` (1–5); extended **`KPI`** with `parent_ref` (a **KPI hierarchy** — lower KPIs roll up to
+higher). Seeded MVV, 2 initiatives, objective types + a hierarchy, a KPI parent. Governance write paths:
+`edit_enterprise` / `edit_objective` / `edit_kpi` / `add_/edit_/remove_initiative` — all versioned + hash-chained
+(so who/when/why is captured for every strategy change; the existing audit trail *is* the version control).
+**`maps/strategy.py`** assembles it: `strategy(g)` (OKR — objectives→KPIs with fulfilment→supporting processes,
+KPI hierarchy, gaps) and `xmatrix(g)` (breakthrough × annual × KPIs × initiatives with correlations). **Key
+design win:** the X-matrix KPIs *are* the same governed KPI ids the processes move (shared refs), so
+"X-matrix KPI not fulfilled" is derived live from the process KPI's value vs target — no parallel data.
+Process↔objective alignment is derived (explicit `objective_refs` ∪ the KPI path), at any level 1–5, with
+honest gaps (objectives with no process, processes with no objective, KPIs off target). Served at
+`GET /api/strategy`; edits via `POST /api/enterprise|objective|kpi|initiative`. UI: a **Strategy** view with
+three tabs — **OKR board** (MVV banner + breakthrough→annual objectives, key-result KPIs with ✓/✗ status +
+KPI hierarchy + supporting-process chips), **X-matrix** (the Hoshin grid, ✗ on off-target KPIs), **Alignment**
+(objective→process rows + gaps + click-to-highlight navigation, click a process to open it). Reuses the
+dashboard's rollup concepts without duplicating them. `maps/test_strategy.py` (16). Full suite **456**.
+Verified live: all three tabs render; X-matrix flags off-target KPIs; alignment highlights an objective and
+its processes; edited an objective's type, a KPI target, an initiative, and the vision — all audited.
+
+---
+
 ## 2026-09-16 — Phase 1: process hierarchy (L1–L5) + master-data metadata
 
 ### D39 — Governed process hierarchy + custom master data on domains & processes

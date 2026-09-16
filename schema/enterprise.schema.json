@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/enterprise",
+  "title": "Enterprise",
+  "description": "The organization's strategic north star (Core Model \u00a705) \u2014 mission, vision, values \u2014 that the X-matrix and every objective ladder up to. A single active record.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^enterprise$"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "mission": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "vision": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 80
+      }
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}

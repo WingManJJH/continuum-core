@@ -76,6 +76,10 @@ class GovernanceStore:
             self._role_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "process-group.schema.json")) as f:
             self._group_validator = Draft202012Validator(json.load(f))
+        for _t, _fn in (("enterprise", "enterprise"), ("objective", "strategic-objective"),
+                        ("kpi", "kpi"), ("initiative", "initiative")):
+            with open(os.path.join(SCHEMA_DIR, _fn + ".schema.json")) as f:
+                setattr(self, "_%s_validator" % _t, Draft202012Validator(json.load(f)))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -577,6 +581,82 @@ class GovernanceStore:
         if errs:
             raise EditError("; ".join(f"{list(e.path) or '(root)'}: {e.message}" for e in errs[:2]))
         cc.append_edit_event("Process", process_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    # --- strategy layer (enterprise / objectives / KPIs / initiatives) -------
+    def _edit_entity(self, etype: str, entity_id: str, changes: dict, editable: set,
+                     validator, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get(etype, entity_id)
+        if cur is None or cur.get("status") != "active":
+            raise EditError(f"unknown or retired {etype} {entity_id}")
+        unknown = set(changes) - editable
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        new = copy.deepcopy(cur)
+        for k, v in changes.items():
+            new[k] = v
+        new["version"] = cur.get("version", 1) + 1
+        errs = sorted(validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(f"{list(e.path) or '(root)'}: {e.message}" for e in errs[:2]))
+        cc.append_edit_event(etype, entity_id, "update", cur.get("version"), new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def edit_enterprise(self, changes: dict, actor: str, reason: str) -> dict:
+        return self._edit_entity("Enterprise", "enterprise", changes,
+                                 {"name", "mission", "vision", "values"}, self._enterprise_validator, actor, reason)
+
+    def edit_objective(self, obj_id: str, changes: dict, actor: str, reason: str) -> dict:
+        return self._edit_entity("StrategicObjective", obj_id, changes,
+                                 {"name", "description", "type", "parent_ref", "kpi_refs", "target",
+                                  "owner_role", "horizon", "applies_to_levels"},
+                                 self._objective_validator, actor, reason)
+
+    def edit_kpi(self, kpi_id: str, changes: dict, actor: str, reason: str) -> dict:
+        return self._edit_entity("KPI", kpi_id, changes,
+                                 {"name", "parent_ref", "target", "live_value", "direction", "unit",
+                                  "formula", "objective_refs", "as_of"},
+                                 self._kpi_validator, actor, reason)
+
+    def add_initiative(self, init_id: str, name: str, actor: str, reason: str,
+                       objective_refs=None, process_refs=None, owner_role=None, description="") -> dict:
+        self._require(reason, actor)
+        if not re.match(r"^init\.[a-z0-9_.]+$", init_id or ""):
+            raise EditError("an initiative id looks like init.name (lowercase)")
+        if not name or not name.strip():
+            raise EditError("an initiative name is required")
+        g = self.graph()
+        if g.get("Initiative", init_id) is not None:
+            raise EditError(f"initiative {init_id} already exists")
+        it = {"id": init_id, "name": name.strip(), "description": (description or "").strip(),
+              "objective_refs": objective_refs or [], "process_refs": process_refs or [],
+              "owner_role": owner_role or None, "version": 1, "status": "active"}
+        errs = sorted(self._initiative_validator.iter_errors(it), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Initiative", init_id, "create", None, 1,
+                             {"kind": "human", "id": actor}, it, reason.strip())
+        return it
+
+    def edit_initiative(self, init_id: str, changes: dict, actor: str, reason: str) -> dict:
+        return self._edit_entity("Initiative", init_id, changes,
+                                 {"name", "description", "objective_refs", "process_refs", "owner_role"},
+                                 self._initiative_validator, actor, reason)
+
+    def remove_initiative(self, init_id: str, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("Initiative", init_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or already-retired initiative {init_id}")
+        new = copy.deepcopy(cur)
+        new["status"] = "deprecated"
+        new["version"] = cur["version"] + 1
+        cc.append_edit_event("Initiative", init_id, "deprecate", cur["version"], new["version"],
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
 

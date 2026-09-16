@@ -2,32 +2,96 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://continuum.dev/schema/v1/kpi",
   "title": "KPI",
-  "description": "One measured number, referenced from strategy, process, and dashboard alike — never copy-pasted (Core Model §01). The same KPI object a leadership tile reads is the one a process rolls its performance up into (§05). LOCKED for Phase 1.",
+  "description": "One measured number, referenced from strategy, process, and dashboard alike \u2014 never copy-pasted (Core Model \u00a701). The same KPI object a leadership tile reads is the one a process rolls its performance up into (\u00a705). LOCKED for Phase 1.",
   "type": "object",
-  "required": ["id", "name", "formula", "unit", "direction", "target", "version", "status"],
+  "required": [
+    "id",
+    "name",
+    "formula",
+    "unit",
+    "direction",
+    "target",
+    "version",
+    "status"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": {"type": "string", "pattern": "^kpi\\.[a-z0-9_.]+$", "description": "e.g. kpi.time_to_verify."},
-    "name": {"type": "string", "maxLength": 120},
-    "formula": {"type": "string", "description": "How the value is computed, as an auditable expression or SQL-ish string. Not free prose."},
-    "unit": {"type": "string", "examples": ["hours", "percent", "count", "usd"]},
+    "id": {
+      "type": "string",
+      "pattern": "^kpi\\.[a-z0-9_.]+$",
+      "description": "e.g. kpi.time_to_verify."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "formula": {
+      "type": "string",
+      "description": "How the value is computed, as an auditable expression or SQL-ish string. Not free prose."
+    },
+    "unit": {
+      "type": "string",
+      "examples": [
+        "hours",
+        "percent",
+        "count",
+        "usd"
+      ]
+    },
     "direction": {
       "type": "string",
-      "enum": ["higher_is_better", "lower_is_better"],
-      "description": "Which way is good — required so a rollup can color status without a human reinterpreting each KPI."
+      "enum": [
+        "higher_is_better",
+        "lower_is_better"
+      ],
+      "description": "Which way is good \u2014 required so a rollup can color status without a human reinterpreting each KPI."
     },
-    "target": {"type": "number", "description": "The value the KPI is aiming at."},
+    "target": {
+      "type": "number",
+      "description": "The value the KPI is aiming at."
+    },
     "live_value": {
-      "type": ["number", "null"],
-      "description": "Most recent observed value, written by the signal layer / rollup (§05, §06). null until first observation."
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Most recent observed value, written by the signal layer / rollup (\u00a705, \u00a706). null until first observation."
     },
-    "as_of": {"type": ["string", "null"], "format": "date-time", "description": "Timestamp of live_value."},
+    "as_of": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Timestamp of live_value."
+    },
     "objective_refs": {
       "type": "array",
-      "items": {"type": "string", "pattern": "^obj\\.[a-z0-9_.]+$"},
+      "items": {
+        "type": "string",
+        "pattern": "^obj\\.[a-z0-9_.]+$"
+      },
       "description": "Objectives this KPI serves (inverse of StrategicObjective.kpi_refs)."
     },
-    "version": {"type": "integer", "minimum": 1},
-    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "parent_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^kpi\\.[a-z0-9_.]+$",
+      "description": "A higher-level KPI this one rolls up to (KPI hierarchy)."
+    }
   }
 }

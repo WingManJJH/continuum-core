@@ -52,6 +52,7 @@ class Graph:
             "Gateway", "SequenceFlow",  # Phase B: explicit process-flow graph
             "Event",  # Phase F: timer / message events (BPMN interchange)
             "ProcessGroup",  # L1–L5 hierarchy (management architecture view)
+            "Enterprise", "Initiative",  # Phase 2: strategy layer (OKR / X-matrix)
         ):
             self._by_type[etype] = {e["id"]: e for e in raw.get(etype, [])}
         # Fold the change-control log on top of the seed baseline so the state an

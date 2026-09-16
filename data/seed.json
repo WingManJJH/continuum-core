@@ -18,7 +18,8 @@
         "kpi.error_rate"
       ],
       "version": 2,
-      "status": "active"
+      "status": "active",
+      "type": "breakthrough"
     },
     {
       "id": "obj.improve_working_capital",
@@ -35,7 +36,9 @@
         "kpi.po_cycle_time"
       ],
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "type": "annual",
+      "parent_ref": "obj.reduce_onboarding_friction"
     },
     {
       "id": "obj.grow_qualified_pipeline",
@@ -51,7 +54,9 @@
         "kpi.lead_conversion"
       ],
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "type": "annual",
+      "parent_ref": "obj.reduce_onboarding_friction"
     },
     {
       "id": "obj.strengthen_security_posture",
@@ -67,7 +72,8 @@
         "kpi.access_review_sla"
       ],
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "type": "annual"
     },
     {
       "id": "obj.raise_product_quality",
@@ -83,7 +89,8 @@
         "kpi.defect_resolution_time"
       ],
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "type": "annual"
     },
     {
       "id": "obj.accelerate_strategic_planning",
@@ -98,6 +105,54 @@
       "kpi_refs": [
         "kpi.strategy_cycle_time"
       ],
+      "version": 1,
+      "status": "active",
+      "type": "annual"
+    }
+  ],
+  "Enterprise": [
+    {
+      "id": "enterprise",
+      "name": "SMRTR Solutions",
+      "mission": "Help organizations run governed, AI-assisted operations that stay compliant as they scale.",
+      "vision": "Every process an organization runs is modeled, measured, and safely automatable from one source of truth.",
+      "values": [
+        "Integrity",
+        "Customer outcomes",
+        "Simplicity",
+        "Continuous improvement",
+        "Trust by design"
+      ],
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "Initiative": [
+    {
+      "id": "init.kyc_automation",
+      "name": "Automate KYC verification end-to-end",
+      "description": "Cut manual verification time by binding agents to the KYC steps under a reviewed guardrail.",
+      "objective_refs": [
+        "obj.reduce_onboarding_friction"
+      ],
+      "process_refs": [
+        "CO.3.2.7"
+      ],
+      "owner_role": "role.ops.head_of_operations",
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "init.ap_touchless",
+      "name": "Touchless invoice processing",
+      "description": "Straight-through payables for low-risk invoices with human escalation on exceptions.",
+      "objective_refs": [
+        "obj.improve_working_capital"
+      ],
+      "process_refs": [
+        "FN.9.3.1"
+      ],
+      "owner_role": "role.finance.cfo",
       "version": 1,
       "status": "active"
     }
@@ -131,7 +186,8 @@
         "obj.reduce_onboarding_friction"
       ],
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "kpi.time_to_verify"
     },
     {
       "id": "kpi.expense_cycle_time",
