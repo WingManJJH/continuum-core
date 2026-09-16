@@ -24,6 +24,8 @@
         <div class="tile" draggable="true" data-name="Approval step" data-kind="task">+ Approval step</div>
         <div class="tile gw-tile" draggable="true" data-kind="gateway" data-gtype="exclusive">&times; Decision</div>
         <div class="tile gw-tile" draggable="true" data-kind="gateway" data-gtype="parallel">+ Parallel</div>
+        <div class="tile ev-tile" draggable="true" data-kind="event" data-ekind="intermediate" data-trigger="timer">&#9201; Timer event</div>
+        <div class="tile ev-tile" draggable="true" data-kind="event" data-ekind="intermediate" data-trigger="message">&#9993; Message event</div>
         <button id="new-proc" class="add-btn" type="button">+ New process</button>
         <div class="phint">Drag a tile onto the flow to insert a step. Drag a step box to reposition it (visual only — order still follows the sequence). <b>Tidy up</b> re-arranges automatically.</div>
       </div>
@@ -34,6 +36,7 @@
       <div class="viewbar">
         <button id="landscape-btn" class="add-btn ghost-btn" type="button" title="See the whole organization's process landscape">Landscape</button>
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
+        <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
         <button id="enable-branch" class="add-btn" type="button" hidden title="Turn the linear steps into an editable branching flow">Enable branching</button>

@@ -15,13 +15,13 @@
     "process_ref": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
     "from_node": {
       "type": "string",
-      "pattern": "^(__start__|[A-Z]{2}\\.[0-9.]+\\.(t|g)[0-9]+)$",
-      "description": "Source node: the process start (__start__), a task (.tN), or a gateway (.gN)."
+      "pattern": "^(__start__|[A-Z]{2}\\.[0-9.]+\\.(t|g|e)[0-9]+)$",
+      "description": "Source node: the process start (__start__), a task (.tN), a gateway (.gN), or an event (.eN)."
     },
     "to_node": {
       "type": "string",
-      "pattern": "^(__end__|[A-Z]{2}\\.[0-9.]+\\.(t|g)[0-9]+)$",
-      "description": "Target node: the process end (__end__), a task (.tN), or a gateway (.gN)."
+      "pattern": "^(__end__|[A-Z]{2}\\.[0-9.]+\\.(t|g|e)[0-9]+)$",
+      "description": "Target node: the process end (__end__), a task (.tN), a gateway (.gN), or an event (.eN)."
     },
     "condition": {
       "type": ["string", "null"],

@@ -208,6 +208,7 @@ def validate_seed(g_path: str = cc.DATA) -> bool:
         "HumanRole": "Human Role", "AgentBinding": "Agent Binding",
         "GuardrailPolicy": "Guardrail Policy", "RiskControl": "Risk & Control",
         "Gateway": "Gateway", "SequenceFlow": "Sequence Flow",
+        "Event": "Event",
     }
     ok = True
     print("=" * 78)
