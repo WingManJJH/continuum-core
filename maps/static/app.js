@@ -55,11 +55,11 @@ function renderCenter() {
   var p = getProc(); if (!p) return;
   if (state.view === "raci") $("#canvas").innerHTML = renderRaci(p);
   else if (state.view === "checklist") $("#canvas").innerHTML = renderChecklist(p);
-  else $("#canvas").innerHTML = renderFlow(p);
+  else { $("#canvas").innerHTML = renderFlow(p); if (p.tasks.length) wireFlow(p); }
 }
 
-// ---------- flowchart (clickable SVG) ----------
-var PAD = 16, R = 14, NW = 160, NH = 62, GAP = 46, LANE = 26;
+// ---------- flowchart (free-form, draggable SVG) ----------
+var PAD = 24, R = 15, NW = 172, NH = 64, GAP = 58, LANE = 26, AY = 44;
 function wrap(name, max) {
   var words = String(name).split(" "), lines = [], cur = "";
   for (var i = 0; i < words.length; i++) { var t = cur ? cur + " " + words[i] : words[i]; if (t.length > max && cur) { lines.push(cur); cur = words[i]; } else { cur = t; } }
@@ -77,49 +77,139 @@ function renderEmptyFlow(m) {
     + '<text class="hintmsg" x="' + ((sx + ex) / 2) + '" y="' + (cy - 12) + '" text-anchor="middle">drag a step here</text>'
     + '<circle class="tip" cx="' + ex + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (cy + 3) + '" text-anchor="middle">end</text></svg>';
 }
+// resolve each task's position: saved layout, else an auto left-to-right flow
+function nodePos(m) {
+  var lay = m.layout || {}, pos = {};
+  m.tasks.forEach(function (t, i) {
+    var s = lay[t.id];
+    pos[t.id] = (s && isFinite(s.x) && isFinite(s.y))
+      ? { x: +s.x, y: +s.y } : { x: 70 + i * (NW + GAP), y: AY };
+  });
+  return pos;
+}
+function ctr(pt) { return { x: pt.x + NW / 2, y: pt.y + NH / 2 }; }
+// border point of a rect (half-width hw, hh) in the direction of (tx,ty)
+function edgePt(cx, cy, hw, hh, tx, ty) {
+  var dx = tx - cx, dy = ty - cy; if (!dx && !dy) return { x: cx, y: cy };
+  var t = Infinity;
+  if (dx) t = Math.min(t, hw / Math.abs(dx));
+  if (dy) t = Math.min(t, hh / Math.abs(dy));
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+function circPt(cx, cy, r, tx, ty) { var dx = tx - cx, dy = ty - cy, d = Math.hypot(dx, dy) || 1; return { x: cx + dx * r / d, y: cy + dy * r / d }; }
+
 function renderFlow(m) {
   var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), tasks = m.tasks;
   if (!tasks.length) return renderEmptyFlow(m);
-  var hasEsc = tasks.some(function (t) { return t.agents.length && t.escalate_if; });
-  var escY = LANE + NH + 54, H = hasEsc ? escY + 44 : LANE + NH + 18;
-  var firstX = PAD + 2 * R + GAP, lastX = firstX + (tasks.length - 1) * (NW + GAP);
-  var endCx = lastX + NW + GAP + R, W = endCx + R + PAD, cy = LANE + NH / 2, p = [];
-  p.push('<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">');
+  var pos = nodePos(m); state.flowPos = pos;
+  var p = ['<svg xmlns="http://www.w3.org/2000/svg">'];  // viewBox/size set by updateGeom
   p.push('<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker>'
     + '<marker id="eh_' + uid + '" markerWidth="7" markerHeight="7" refX="3" refY="6" orient="auto"><path d="M0,0 L6,0 L3,6 z" class="esc-arrow"/></marker></defs>');
-  p.push('<circle class="tip" cx="' + (PAD + R) + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + (PAD + R) + '" y="' + (cy + 3) + '" text-anchor="middle">start</text>');
-  p.push('<line class="conn" x1="' + (PAD + 2 * R) + '" y1="' + cy + '" x2="' + firstX + '" y2="' + cy + '" marker-end="url(#ah_' + uid + ')"/>');
-  tasks.forEach(function (t, i) {
-    var x = firstX + i * (NW + GAP);
+  // sequence connectors — endpoints filled in live by updateGeom
+  var chain = ["start"].concat(tasks.map(function (t) { return t.id; })).concat(["end"]);
+  for (var i = 0; i < chain.length - 1; i++) {
+    p.push('<line class="conn" data-a="' + esc(chain[i]) + '" data-b="' + esc(chain[i + 1]) + '" marker-end="url(#ah_' + uid + ')"/>');
+  }
+  p.push('<g id="tip-start"><circle class="tip" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">start</text></g>');
+  p.push('<g id="tip-end"><circle class="tip" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">end</text></g>');
+  tasks.forEach(function (t) {
     var ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
-    p.push('<g class="tnode' + (t.id === state.task ? " sel" : "") + '" data-task="' + esc(t.id) + '">');
-    p.push('<rect class="' + ncls + '" x="' + x + '" y="' + LANE + '" width="' + NW + '" height="' + NH + '" rx="9"/>');
-    p.push('<text class="tseq" x="' + (x + 9) + '" y="' + (LANE + 15) + '">t' + t.seq + '</text>');
-    if (t.agents.length) { p.push('<rect class="badge-bg" x="' + (x + NW - 26) + '" y="' + (LANE - 7) + '" width="24" height="15" rx="3.5"/><text class="badge" x="' + (x + NW - 14) + '" y="' + (LANE + 3.5) + '" text-anchor="middle">AI</text>'); }
-    if (t.override) p.push('<text class="tag" x="' + (x + NW - 6) + '" y="' + (LANE - 4) + '" text-anchor="end">override</text>');
-    var lines = wrap(t.name, 22), sy = lines.length === 2 ? LANE + 24 : LANE + 31;
-    lines.forEach(function (ln, k) { p.push('<text class="tname" x="' + (x + 10) + '" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
+    p.push('<g class="tnode' + (t.id === state.task ? " sel" : "") + '" data-task="' + esc(t.id) + '" transform="translate(' + pos[t.id].x + ',' + pos[t.id].y + ')">');
+    p.push('<rect class="' + ncls + '" x="0" y="0" width="' + NW + '" height="' + NH + '" rx="9"/>');
+    p.push('<text class="tseq" x="9" y="15">t' + t.seq + '</text>');
+    if (t.agents.length) { p.push('<rect class="badge-bg" x="' + (NW - 26) + '" y="-7" width="24" height="15" rx="3.5"/><text class="badge" x="' + (NW - 14) + '" y="3.5" text-anchor="middle">AI</text>'); }
+    if (t.override) p.push('<text class="tag" x="' + (NW - 6) + '" y="-4" text-anchor="end">override</text>');
+    var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
+    lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
     var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
-    p.push('<text class="tperf" x="' + (x + 10) + '" y="' + (LANE + NH - 9) + '">' + esc(trunc(who, 24)) + "</text>");
-    p.push("</g>");
-    var nextX = i < tasks.length - 1 ? firstX + (i + 1) * (NW + GAP) : endCx - R;
-    p.push('<line class="conn" x1="' + (x + NW) + '" y1="' + cy + '" x2="' + nextX + '" y2="' + cy + '" marker-end="url(#ah_' + uid + ')"/>');
-    if (t.agents.length && t.escalate_if) {
-      var bx = x + NW / 2, pw = 172, px = Math.max(PAD, bx - pw / 2);
-      p.push('<line class="esc-line" x1="' + bx + '" y1="' + (LANE + NH) + '" x2="' + bx + '" y2="' + escY + '" marker-end="url(#eh_' + uid + ')"/>');
-      p.push('<rect class="esc" x="' + px + '" y="' + escY + '" width="' + pw + '" height="34" rx="7"/>');
-      p.push('<text class="esc" x="' + (px + 10) + '" y="' + (escY + 14) + '">escalate → ' + esc(shortRole(t.escalation_path || "")) + "</text>");
-      p.push('<text class="esc-cond" x="' + (px + 10) + '" y="' + (escY + 27) + '">if ' + esc(trunc(t.escalate_if, 26)) + "</text>");
+    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>");
+    if (t.agents.length && t.escalate_if) {  // escalation branch travels with the node
+      var bx = NW / 2, by = NH + 26, pw = 172, pxx = bx - pw / 2;
+      p.push('<line class="esc-line" x1="' + bx + '" y1="' + NH + '" x2="' + bx + '" y2="' + by + '" marker-end="url(#eh_' + uid + ')"/>');
+      p.push('<rect class="esc" x="' + pxx + '" y="' + by + '" width="' + pw + '" height="34" rx="7"/>');
+      p.push('<text class="esc" x="' + (pxx + 10) + '" y="' + (by + 14) + '">escalate → ' + esc(shortRole(t.escalation_path || "")) + "</text>");
+      p.push('<text class="esc-cond" x="' + (pxx + 10) + '" y="' + (by + 27) + '">if ' + esc(trunc(t.escalate_if, 26)) + "</text>");
     }
+    p.push("</g>");
   });
-  p.push('<circle class="tip" cx="' + endCx + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + endCx + '" y="' + (cy + 3) + '" text-anchor="middle">end</text>');
   p.push("</svg>");
   return p.join("");
 }
-$("#canvas").addEventListener("click", function (e) {
-  var g = e.target.closest("g.tnode[data-task]"); if (!g) return;
-  state.task = g.getAttribute("data-task");
-  renderCenter(); renderProps();
+
+// recompute every connector + tip + the viewBox from the current node positions
+function updateGeom(m) {
+  var svg = $("#canvas svg"); if (!svg) return;
+  var pos = state.flowPos, tasks = m.tasks; if (!tasks.length) return;
+  var first = tasks[0].id, last = tasks[tasks.length - 1].id;
+  var startP = { x: pos[first].x - GAP, y: pos[first].y + NH / 2 };
+  var endP = { x: pos[last].x + NW + GAP, y: pos[last].y + NH / 2 };
+  var ts = svg.querySelector("#tip-start"), te = svg.querySelector("#tip-end");
+  if (ts) ts.setAttribute("transform", "translate(" + startP.x + "," + startP.y + ")");
+  if (te) te.setAttribute("transform", "translate(" + endP.x + "," + endP.y + ")");
+  svg.querySelectorAll("line.conn").forEach(function (ln) {
+    var a = ln.getAttribute("data-a"), b = ln.getAttribute("data-b");
+    var A = a === "start" ? startP : ctr(pos[a]);
+    var B = b === "end" ? endP : ctr(pos[b]);
+    var p1 = a === "start" ? circPt(A.x, A.y, R, B.x, B.y) : edgePt(A.x, A.y, NW / 2, NH / 2, B.x, B.y);
+    var p2 = b === "end" ? circPt(B.x, B.y, R, A.x, A.y) : edgePt(B.x, B.y, NW / 2, NH / 2, A.x, A.y);
+    ln.setAttribute("x1", p1.x); ln.setAttribute("y1", p1.y); ln.setAttribute("x2", p2.x); ln.setAttribute("y2", p2.y);
+  });
+  var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  tasks.forEach(function (t) {
+    var pp = pos[t.id];
+    minX = Math.min(minX, pp.x); minY = Math.min(minY, pp.y);
+    maxX = Math.max(maxX, pp.x + NW);
+    maxY = Math.max(maxY, pp.y + NH + (t.agents.length && t.escalate_if ? 62 : 0));
+  });
+  minX = Math.min(minX, startP.x - R); maxX = Math.max(maxX, endP.x + R);
+  minY = Math.min(minY, startP.y - R); maxY = Math.max(maxY, endP.y + R);
+  var vx = minX - PAD, vy = minY - PAD, W = (maxX - minX) + 2 * PAD, H = (maxY - minY) + 2 * PAD;
+  svg.setAttribute("viewBox", vx + " " + vy + " " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+}
+
+// drag a node to reposition it (decorative only — never reorders the process)
+function wireFlow(m) {
+  var svg = $("#canvas svg"); if (!svg) return;
+  state.flowPos = nodePos(m);
+  updateGeom(m);
+  var drag = null;
+  svg.querySelectorAll("g.tnode").forEach(function (g) {
+    var tid = g.getAttribute("data-task");
+    g.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      drag = { sx: e.clientX, sy: e.clientY, ox: state.flowPos[tid].x, oy: state.flowPos[tid].y, moved: false };
+      g.setPointerCapture(e.pointerId); g.classList.add("dragging"); e.preventDefault();
+    });
+    g.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.moved = true;
+      var nx = Math.max(0, drag.ox + dx), ny = Math.max(0, drag.oy + dy);
+      state.flowPos[tid] = { x: nx, y: ny };
+      g.setAttribute("transform", "translate(" + nx + "," + ny + ")");
+      updateGeom(m);
+    });
+    g.addEventListener("pointerup", function (e) {
+      if (!drag) return;
+      try { g.releasePointerCapture(e.pointerId); } catch (err) {}
+      g.classList.remove("dragging");
+      var moved = drag.moved; drag = null;
+      if (moved) saveLayout(m);
+      else { state.task = tid; renderCenter(); renderProps(); }
+    });
+  });
+}
+function saveLayout(m) {
+  getProc().layout = JSON.parse(JSON.stringify(state.flowPos));  // keep across re-renders
+  fetch("/api/layout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ process: m.id, positions: state.flowPos }) })
+    .then(function (r) { return r.json(); }).catch(function () {});
+}
+var tidyBtn = document.getElementById("tidy");
+if (tidyBtn) tidyBtn.addEventListener("click", function () {
+  var p = getProc(); if (!p) return;
+  fetch("/api/layout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "reset", process: p.id }) })
+    .then(function (r) { return r.json(); }).then(function () { load(); });
 });
 
 // ---------- RACI view ----------

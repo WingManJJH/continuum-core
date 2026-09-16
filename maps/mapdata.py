@@ -15,7 +15,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
+sys.path.insert(0, HERE)
 import continuum_core as cc  # noqa: E402
+import layout  # decorative node positions, kept out of the governed model  # noqa: E402
 
 
 def all_maps(g: cc.Graph | None = None) -> list[dict]:
@@ -57,6 +59,7 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],
             "guardrail": f"{p['guardrail_ref']}.v{pgr['version']}" if pgr else None,
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
+            "layout": layout.load_process(p["id"]),  # {task_id: {x,y}} — decorative
         })
     return out
 

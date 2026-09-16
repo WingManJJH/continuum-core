@@ -23,7 +23,7 @@
         <div class="tile" draggable="true" data-name="Step">+ Step</div>
         <div class="tile" draggable="true" data-name="Approval step">+ Approval step</div>
         <button id="new-proc" class="add-btn" type="button">+ New process</button>
-        <div class="phint">Drag a tile onto the flow to insert a step at that spot.</div>
+        <div class="phint">Drag a tile onto the flow to insert a step. Drag a step box to reposition it (visual only — order still follows the sequence). <b>Tidy up</b> re-arranges automatically.</div>
       </div>
     </aside>
 
@@ -32,6 +32,7 @@
       <div class="viewbar">
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
+        <button id="tidy" class="add-btn ghost-btn" type="button" title="Auto-arrange the steps left to right">Tidy up</button>
         <nav class="views">
           <button data-view="flow" class="active">Flowchart</button>
           <button data-view="raci">RACI</button>
