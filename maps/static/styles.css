@@ -236,3 +236,25 @@ button:disabled { opacity: .5; cursor: default; }
 .msg.ok { background: var(--good-bg); color: var(--good); } .msg.err { background: var(--crit-bg); color: var(--crit); }
 
 @media (max-width: 960px) { .shell { grid-template-columns: 1fr; height: auto; } .pane { max-height: 70vh; } }
+
+/* ---- Phase E: share modal ---- */
+.modal { position: fixed; inset: 0; background: rgba(20,22,28,.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); width: min(560px, 92vw); max-height: 86vh; overflow: auto; padding: 20px 22px; }
+.modal-head { display: flex; align-items: center; }
+.modal-head h2 { margin: 0; font-size: 17px; }
+.modal-head .x { margin-left: auto; border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); }
+.modal-sub { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 8px 0 14px; }
+.share-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.share-list { margin-top: 14px; }
+.share-h { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 4px 0 8px; }
+.share-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.share-row.off { opacity: .6; }
+.share-meta { flex: 1; font-size: 13px; }
+.share-meta .muted { font-size: 11.5px; margin-top: 2px; }
+.share-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; border-radius: 999px; padding: 1px 7px; margin-left: 7px; border: 1px solid var(--line); color: var(--muted); }
+.share-tag.active { color: var(--good); border-color: var(--good); }
+.share-tag.revoked, .share-tag.expired { color: var(--warn); border-color: var(--warn); }
+.share-btns { display: flex; gap: 6px; align-items: center; }
+.mini { font: inherit; font-size: 12px; text-decoration: none; cursor: pointer; border: 1px solid var(--line); background: var(--ground); color: var(--ink); border-radius: 6px; padding: 4px 9px; }
+.mini:hover { border-color: var(--accent); }
+.mini.danger:hover { border-color: var(--crit); color: var(--crit); }

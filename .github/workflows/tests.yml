@@ -36,7 +36,7 @@ jobs:
           python mcp_server/traceability.py
           python mcp_server/scenario.py
 
-      - name: Test suites (219 assertions)
+      - name: Test suites (308 assertions)
         run: |
           python governance/test_store.py
           python enforcement/test_enforce.py
@@ -48,10 +48,15 @@ jobs:
           python governance/test_taskedit.py
           python governance/test_authoring.py
           python governance/test_binding.py
+          python governance/test_flow.py
+          python governance/test_subprocess.py
           python maps/test_mapdata.py
+          python maps/test_layout.py
+          python maps/test_landscape.py
+          python maps/test_portal.py
           python advisor/test_advisor.py
           python ask/test_agent.py
           python test_run.py
 
       - name: All green
-        run: echo "ALL GREEN -- 219 assertions + 3 harness checks"
+        run: echo "ALL GREEN -- 308 assertions + 3 harness checks"
