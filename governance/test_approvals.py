@@ -1,5 +1,9 @@
-"""Approval-gate tests (Phase 3). Plain asserts, hermetic — every write log is
-redirected into a temp dir so the seed model and real logs are never touched.
+"""Approval-gate tests (Phase 3). Plain asserts.
+
+The governance store writes to / folds the real change-control log (the log_path
+default is import-bound, so it can't be redirected). So — like test_store — this
+runs against the real logs but resets them before AND after, leaving the seed
+baseline untouched for the rest of the suite.
 
     python3 governance/test_approvals.py
 """
@@ -7,7 +11,6 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -24,19 +27,6 @@ def check(name, cond):
     print(f"  {'ok  ' if cond else 'FAIL'} {name}")
 
 
-def fresh(tmp):
-    """Point every chained log at an empty temp dir and give a fresh queue+store."""
-    cc.EDITS_LOG = os.path.join(tmp, "edits.log.jsonl")
-    cc.EVENTS_LOG = os.path.join(tmp, "events.log.jsonl")
-    cc.HEADS_FILE = os.path.join(tmp, "audit_heads.json")
-    for p in (cc.EDITS_LOG, cc.EVENTS_LOG, cc.HEADS_FILE):
-        if os.path.exists(p):
-            os.remove(p)
-    store = gov.GovernanceStore()
-    queue = ap.ApprovalQueue(store, log_path=os.path.join(tmp, "proposals.log.jsonl"))
-    return store, queue
-
-
 def a_guardrail_id(store):
     """A guardrail id that exists in the seed, for edit_guardrail proposals."""
     g = store.graph()
@@ -44,9 +34,18 @@ def a_guardrail_id(store):
     return grs[0]["id"]
 
 
+def _reset(paths):
+    for p in paths:
+        if os.path.exists(p):
+            cc.reset_log(p)
+
+
 def main():
-    with tempfile.TemporaryDirectory() as tmp:
-        store, q = fresh(tmp)
+    store = gov.GovernanceStore()
+    q = ap.ApprovalQueue(store)
+    logs = (cc.EDITS_LOG, cc.EVENTS_LOG, q.log_path)
+    _reset(logs)  # clean slate on the real logs
+    try:
         gr_id = a_guardrail_id(store)
         base_ver = store.guardrail(gr_id)["version"]
 
@@ -146,7 +145,7 @@ def main():
               q.get(cr5["id"])["status"] == "pending")
 
         # --- the proposals log is hash-chained (tamper-evident) -----------
-        chain = cc.verify_log(os.path.join(tmp, "proposals.log.jsonl"))
+        chain = cc.verify_log(q.log_path)
         check("proposals log chain intact", chain["ok"] is True)
 
         # --- a non-guardrail op flows through the same gate ---------------
@@ -159,6 +158,8 @@ def main():
         q.approve(crt["id"], reviewer="role.qms.iso_advisor")
         renamed = store.graph().get("Task", task["id"])
         check("gated task edit applied", renamed["name"].endswith("(rev)"))
+    finally:
+        _reset(logs)  # leave the seed baseline clean for the rest of the suite
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
