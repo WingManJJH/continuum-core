@@ -105,33 +105,73 @@ def strategy(g: cc.Graph | None = None) -> dict:
 
 
 def xmatrix(g: cc.Graph | None = None) -> dict:
-    """Hoshin X-matrix axes + correlations, derived from the same links. Rows =
-    breakthrough objectives; columns = annual objectives; right = KPIs/targets;
-    bottom = initiatives; plus the delivering processes."""
+    """Full Hoshin X-matrix (the ISOX Nexus layout), backed by the governed graph.
+    Five axes — organizational goals (breakthroughs), annual objectives, change
+    initiatives, metrics (the live process KPIs), and owners — with the four
+    correlation corners derived from the graph's links:
+      objectives ↔ goals   (annual rolls up to a breakthrough)
+      initiatives ↔ objectives (an initiative advances an objective)
+      initiatives ↔ metrics (an initiative moves a KPI, via a shared objective or its process)
+      initiatives ↔ owners (an initiative's accountable role)
+    Metrics carry live fulfilment (on/off target). Read-only, one source of truth."""
+    g = g or cc.Graph()
     m = strategy(g)
     by_id = {o["id"]: o for o in m["objectives"]}
-    breakthroughs = [by_id[i] for i in m["breakthroughs"]]
-    annuals = [by_id[i] for i in m["annuals"]]
-    # all KPIs referenced by annual objectives (the results axis)
-    kpi_ids, kpi_map = [], {}
-    for a in annuals:
+    goals = [{"id": by_id[i]["id"], "name": by_id[i]["name"]} for i in m["breakthroughs"]]
+    objectives = [{"id": by_id[i]["id"], "name": by_id[i]["name"], "parent_ref": by_id[i]["parent_ref"]} for i in m["annuals"]]
+
+    # metrics = every KPI referenced by an annual objective (the results axis), live
+    metrics, seen = [], set()
+    obj_kpis = {}
+    for a in [by_id[i] for i in m["annuals"]]:
+        obj_kpis[a["id"]] = set()
         for kk in a["kpis"]:
-            if kk["id"] not in kpi_map:
-                kpi_map[kk["id"]] = kk
-                kpi_ids.append(kk["id"])
-    corr = []
-    for a in annuals:                                   # annual ↔ breakthrough
-        if a["parent_ref"]:
-            corr.append({"row": a["parent_ref"], "col": a["id"], "kind": "obj_obj", "strong": True})
-        for kk in a["kpis"]:                            # annual ↔ KPI
-            corr.append({"col": a["id"], "kpi": kk["id"], "kind": "obj_kpi",
-                         "strong": kk["status"] == "off_target"})
-    for it in m["initiatives"]:                         # initiative ↔ annual
-        for oid in it["objective_refs"]:
-            corr.append({"col": oid, "init": it["id"], "kind": "init_obj", "strong": True})
+            obj_kpis[a["id"]].add(kk["id"])
+            if kk["id"] not in seen:
+                seen.add(kk["id"])
+                metrics.append({"id": kk["id"], "name": kk["name"], "value": kk.get("value"),
+                                "target": kk.get("target"), "unit": kk.get("unit", ""), "status": kk.get("status")})
+
+    initiatives = m["initiatives"]
+    # process → its KPIs (for the init↔metric link via a delivering process)
+    proc_kpis = {p["id"]: set(p.get("kpi_refs", [])) for p in g.all("Process") if p["status"] == "active"}
+
+    # owners axis — the roles that own objectives or initiatives
+    def role_name(rid):
+        r = g.get("HumanRole", rid)
+        return r["name"] if r and r.get("name") else rid
+    owner_ids = []
+    for o in m["objectives"]:
+        if o.get("owner") and o["owner"] not in owner_ids:
+            owner_ids.append(o["owner"])
+    for it in initiatives:
+        if it.get("owner") and it["owner"] not in owner_ids:
+            owner_ids.append(it["owner"])
+    owners = [{"id": rid, "name": role_name(rid)} for rid in owner_ids]
+
+    links = []
+    for o in objectives:                                        # objectives ↔ goals (corner I)
+        if o["parent_ref"]:
+            links.append({"type": "obj_goal", "a": o["id"], "b": o["parent_ref"], "strength": "primary"})
+    for it in initiatives:
+        for oid in it["objective_refs"]:                        # initiatives ↔ objectives (corner A)
+            if oid in by_id:
+                links.append({"type": "init_obj", "a": it["id"], "b": oid, "strength": "primary"})
+        init_objs = set(it["objective_refs"])
+        init_proc_kpis = set()
+        for pid in it.get("process_refs", []):
+            init_proc_kpis |= proc_kpis.get(pid, set())
+        for mm in metrics:                                      # initiatives ↔ metrics (corner C)
+            via_obj = any(mm["id"] in obj_kpis.get(oid, set()) for oid in init_objs)
+            via_proc = mm["id"] in init_proc_kpis
+            if via_obj or via_proc:
+                links.append({"type": "init_metric", "a": it["id"], "b": mm["id"],
+                              "strength": "primary" if via_obj else "supporting"})
+        if it.get("owner"):                                     # initiatives ↔ owners (corner D)
+            links.append({"type": "init_owner", "a": it["id"], "b": it["owner"], "strength": "leading"})
+
     return {
         "enterprise": m["enterprise"],
-        "breakthroughs": breakthroughs, "annuals": annuals,
-        "kpis": [kpi_map[i] for i in kpi_ids], "initiatives": m["initiatives"],
-        "correlations": corr, "gaps": m["gaps"],
+        "goals": goals, "objectives": objectives, "initiatives": initiatives,
+        "metrics": metrics, "owners": owners, "links": links, "gaps": m["gaps"],
     }

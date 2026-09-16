@@ -53,39 +53,52 @@ function entBanner(e) {
     + (vals ? '<div class="entvals">' + vals + "</div>" : "") + "</div>";
 }
 
-// ---------- X-matrix ----------
+// ---------- X-matrix (ISOX Nexus Hoshin layout, governed data) ----------
+function xLink(L, type, a, b) { var m = L.find(function (x) { return x.type === type && x.a === a && x.b === b; }); return m ? m.strength : ""; }
+function xGrid(rows, cols, stateFn) {
+  var cells = "";
+  for (var r = 0; r < rows.length; r++) for (var c = 0; c < cols.length; c++) {
+    var s = stateFn(rows[r], cols[c]);
+    cells += '<div class="agc ' + (s || "empty") + '"></div>';
+  }
+  return '<div class="agrid" style="grid-template-columns:repeat(' + (cols.length || 1) + ',1fr)">' + cells + "</div>";
+}
 function renderXMatrix(X) {
-  var annuals = X.annuals, bts = X.breakthroughs, kpis = X.kpis, inits = X.initiatives, corr = X.correlations;
-  function has(pred) { return corr.some(pred); }
-  var head = '<tr><th class="xcorner">X-matrix</th>' + annuals.map(function (a) { return '<th class="xtop" data-obj="' + esc(a.id) + '">' + esc(a.name) + "</th>"; }).join("") + "</tr>";
-  var btRows = bts.map(function (b) {
-    var cells = annuals.map(function (a) {
-      var on = has(function (c) { return c.kind === "obj_obj" && c.row === b.id && c.col === a.id; });
-      return '<td class="' + (on ? "xon" : "") + '">' + (on ? "●" : "") + "</td>";
-    }).join("");
-    return '<tr><th class="xleft" data-obj="' + esc(b.id) + '">' + esc(b.name) + "</th>" + cells + "</tr>";
+  var O = X.objectives, G = X.goals, I = X.initiatives, M = X.metrics, W = X.owners, L = X.links;
+  var initList = I.map(function (it) { return '<div class="nxitem nx-init">' + esc(it.name) + "</div>"; }).join("");
+  var objList = O.map(function (o) { return '<div class="nxitem nx-obj" data-obj="' + esc(o.id) + '">' + esc(o.name) + "</div>"; }).join("");
+  var metList = M.map(function (m) {
+    var cls = m.status === "on_target" ? "good" : m.status === "off_target" ? "crit" : "";
+    return '<div class="nxitem nx-met ' + cls + '" data-kpi="' + esc(m.id) + '">' + esc(m.name)
+      + '<span class="nxval">' + (m.value == null ? "—" : esc(String(m.value))) + "/" + esc(String(m.target)) + (m.status === "off_target" ? " ✗" : m.status === "on_target" ? " ✓" : "") + "</span></div>";
   }).join("");
-  var kpiRows = kpis.map(function (k) {
-    var cells = annuals.map(function (a) {
-      var on = has(function (c) { return c.kind === "obj_kpi" && c.col === a.id && c.kpi === k.id; });
-      var cls = on ? (k.status === "off_target" ? "xon crit" : k.status === "on_target" ? "xon good" : "xon") : "";
-      return '<td class="' + cls + '">' + (on ? (k.status === "off_target" ? "✗" : "●") : "") + "</td>";
-    }).join("");
-    return '<tr><th class="xkpi" data-kpi="' + esc(k.id) + '">' + esc(k.name) + ' <span class="muted">' + (k.value == null ? "" : k.value) + "/" + esc(String(k.target)) + "</span></th>" + cells + "</tr>";
-  }).join("");
-  var initRows = inits.map(function (it) {
-    var cells = annuals.map(function (a) {
-      var on = has(function (c) { return c.kind === "init_obj" && c.col === a.id && c.init === it.id; });
-      return '<td class="' + (on ? "xon" : "") + '">' + (on ? "●" : "") + "</td>";
-    }).join("");
-    return '<tr><th class="xinit">' + esc(it.name) + "</th>" + cells + "</tr>";
-  }).join("");
+  var ownList = W.map(function (o) { return '<div class="nxitem nx-own">' + esc(o.name) + "</div>"; }).join("");
+  var goalList = G.map(function (g) { return '<div class="nxitem nx-goal" data-obj="' + esc(g.id) + '">' + esc(g.name) + "</div>"; }).join("");
+
+  var A = xGrid(I, O, function (it, o) { return xLink(L, "init_obj", it.id, o.id); });      // init ↔ obj
+  var C = xGrid(I, M, function (it, m) { return xLink(L, "init_metric", it.id, m.id); });   // init ↔ metric
+  var D = xGrid(I, W, function (it, w) { return xLink(L, "init_owner", it.id, w.id); });     // init ↔ owner
+  var Icorner = xGrid(G, O, function (g, o) { return xLink(L, "obj_goal", o.id, g.id); });   // obj ↔ goal
+
+  var grid = '<div class="nexus"><div class="nexus-grid">'
+    + '<div class="nq tl"><span class="clab">A · init × objective</span>' + A + "</div>"
+    + '<div class="nq initiatives"><div class="qlab">▲ Change initiatives</div>' + initList + "</div>"
+    + '<div class="nq tr"><span class="clab">C · init × metric</span>' + C + "</div>"
+    + '<div class="nq tr2"><span class="clab">D · init × owner</span>' + D + "</div>"
+    + '<div class="nq objectives"><div class="qlab vert">◄ Objectives</div><div class="qitems">' + objList + "</div></div>"
+    + '<div class="nq center"><div class="xcross"><span>X</span></div></div>'
+    + '<div class="nq metrics"><div class="qlab vert">Metrics ►</div><div class="qitems">' + metList + "</div></div>"
+    + '<div class="nq owners"><div class="qlab vert">Owners</div><div class="qitems">' + ownList + "</div></div>"
+    + '<div class="nq bl"><span class="clab">I · objective × goal</span>' + Icorner + "</div>"
+    + '<div class="nq goals"><div class="qlab">▼ Organizational goals</div>' + goalList + "</div>"
+    + "</div></div>";
+
+  var key = '<div class="nxkey"><b>Correlation</b> <span class="agc primary"></span> primary '
+    + '<span class="agc supporting"></span> supporting <span class="agc leading"></span> owner · '
+    + '<span class="kpi crit" style="padding:0 6px">✗</span> KPI off target</div>';
   return '<div class="xmatrix">' + entBanner(X.enterprise)
-    + '<div class="okrhead">Hoshin X-matrix — breakthrough ▲, annual objectives ►, KPIs/results, and improvement initiatives, correlated. ✗ marks an off-target KPI.</div>'
-    + '<div class="xwrap"><table class="xtable"><thead>' + head + "</thead><tbody>"
-    + btRows + '<tr class="xsplit"><td colspan="' + (annuals.length + 1) + '">Key results (KPIs)</td></tr>' + kpiRows
-    + '<tr class="xsplit"><td colspan="' + (annuals.length + 1) + '">Improvement initiatives</td></tr>' + initRows
-    + "</tbody></table></div>" + gapsPanel(X.gaps) + "</div>";
+    + '<div class="okrhead">Hoshin X-matrix (ISOX Nexus layout), live over the governed model — objectives roll up to goals, initiatives drive objectives / metrics / owners, and the metrics are the process KPIs (✗ = off target).</div>'
+    + '<div class="nxwrap">' + grid + "</div>" + key + gapsPanel(X.gaps) + "</div>";
 }
 
 function gapsPanel(g) {
