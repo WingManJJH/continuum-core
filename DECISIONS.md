@@ -6,6 +6,33 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Adopt the ISOX Nexus X-matrix design (their layout, our governed data)
+
+### D42 — Reviewed the user's existing X-matrix app; adopted its superior visualization
+**Context:** the user shared their existing web X-matrix (`/Volumes/X10 Pro/ISOX/X Matrix/` — React "ISOX
+Nexus", `App.tsx` + `browser-app/store.ts` + `index.css`) and asked to use it unless ours is more robust.
+**Review finding:** their X-matrix is a **faithful, complete Hoshin X-matrix** — five axes (organizational
+goals, objectives, change initiatives, metrics, owners), four correlation corners (A init×objective,
+C init×metric, D init×owner, I objective×goal), link-strength types (primary/secondary/leading/supporting),
+a 5×3 grid with the classic X and a fixed brand palette (`--quad-initiatives #59b197`, `--quad-objectives
+#c28b4c`, `--quad-goals #1e88c1`, `--quad-metrics #f06a4f`, brand `#14425a`). That **visualization is more
+robust than our earlier tabular grid**; our **data model is the more robust foundation** (governed graph,
+live KPI fulfilment, process linkage, audit, levels 1–5) — and their app is standalone (localStorage, its
+own types). **Decision:** adopt their design, keep our data. `strategy.xmatrix(g)` now returns their five
+axes mapped to governed entities — goals ← breakthrough objectives, objectives ← annual objectives,
+initiatives ← `Initiative`, **metrics ← the live process KPIs**, owners ← the `HumanRole`s that own
+objectives/initiatives — with the four correlation types derived from the graph's links (annual.parent_ref,
+initiative.objective_refs, KPI↔objective / process↔KPI, initiative.owner_role) and metric fulfilment.
+`renderXMatrix` rebuilt to their nexus-grid layout (A/C/D/I corners, colored quad panels, the centre X,
+their palette + link-strength cells). `maps/test_strategy.py` updated → 17 (five axes, KPI-id linkage,
+four correlation corners, live off-target flag, real owner names). Full suite **465**. Verified live: the
+X renders with the governed data — objectives (gold), live metrics (orange) with ✓/✗ (e.g. "Inbound lead
+conversion 19/25 ✗"), correlation cells, owners. Note their manual link-strength toggling is not yet an
+editor (ours derives strength from the graph); aligning that + their exact styling further is a follow-on
+if wanted.
+
+---
+
 ## 2026-09-16 — Version history & compare (comparison between models)
 
 ### D41 — Browse who/when/why and diff any two versions of any entity

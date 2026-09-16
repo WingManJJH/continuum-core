@@ -43,14 +43,18 @@ def main():
     check("a KPI hierarchy surfaces (a root KPI has children)", any(k.get("children") for k in m["kpi_roots"]))
     check("gaps are surfaced honestly", "kpis_off_target" in m["gaps"] and len(m["gaps"]["kpis_off_target"]) >= 1)
 
-    # 2. the X-matrix KPIs ARE the process KPIs (same ids), and correlations exist
+    # 2. the ISOX Nexus X-matrix — 5 axes + 4 correlation types, governed data
     xm = strat.xmatrix()
-    check("X-matrix has breakthrough rows + annual cols + KPI results + initiatives",
-          len(xm["breakthroughs"]) >= 1 and len(xm["annuals"]) >= 1 and len(xm["kpis"]) >= 1 and len(xm["initiatives"]) >= 1)
-    check("X-matrix KPIs are the same governed KPI ids the processes move",
-          all(k["id"].startswith("kpi.") for k in xm["kpis"]))
-    check("correlations connect annual objectives to breakthroughs / KPIs", len(xm["correlations"]) >= 2)
-    check("an off-target X-matrix KPI is flagged", any(k["status"] == "off_target" for k in xm["kpis"]))
+    check("X-matrix has all five Hoshin axes (goals/objectives/initiatives/metrics/owners)",
+          len(xm["goals"]) >= 1 and len(xm["objectives"]) >= 1 and len(xm["initiatives"]) >= 1
+          and len(xm["metrics"]) >= 1 and len(xm["owners"]) >= 1)
+    check("X-matrix metrics are the same governed KPI ids the processes move",
+          all(mm["id"].startswith("kpi.") for mm in xm["metrics"]))
+    types = {l["type"] for l in xm["links"]}
+    check("the four correlation corners are derived from the graph",
+          {"obj_goal", "init_obj", "init_metric", "init_owner"} <= types)
+    check("an off-target metric is flagged live", any(mm["status"] == "off_target" for mm in xm["metrics"]))
+    check("owners axis carries real role names", all(o.get("name") for o in xm["owners"]))
 
     # 3. write paths — versioned + audited
     s = gov.GovernanceStore()
