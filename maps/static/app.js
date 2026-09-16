@@ -987,7 +987,7 @@ function taskProps(p, t) {
     + ["timestamp_outcome", "inputs_outputs", "full_capture"].map(function (o) { return '<option ' + (o === g.audit_requirement ? "selected" : "") + ">" + o + "</option>"; }).join("")
     + "</select></label>"
     + '<label>Reason for change <span class="hint">required · §7.5</span><input id="f-reason" type="text" placeholder="why?"></label>'
-    + '<label class="ck"><input type="checkbox" id="f-approve"> Submit for approval instead of saving directly <span class="hint">routes through the review queue</span></label>'
+    + (typeof gateControlHTML === "function" ? gateControlHTML("GuardrailPolicy") : "")
     + '<div id="gr-msg" class="msg" hidden></div>'
     + '<div class="actions"><button type="button" id="gr-reset" class="ghost">Reset</button><button type="submit" class="save">Save new version</button></div>'
     + '<input type="hidden" id="f-grid" value="' + esc(g.id) + '"></form></div>';
@@ -1007,16 +1007,12 @@ function saveGuardrail(e) {
   };
   var reason = $("#f-reason").value.trim();
   var btn = $("#gr-form .save"); btn.disabled = true;
-  // Route through the approval gate instead of committing directly.
-  if ($("#f-approve") && $("#f-approve").checked && typeof proposeChange === "function") {
-    proposeChange("edit_guardrail", { gr_id: $("#f-grid").value, changes: changes },
-      "Guardrail change · " + $("#f-grid").value, reason).then(function (res) {
-      btn.disabled = false;
-      var m = $("#gr-msg");
-      if (res.ok) { m.textContent = "Submitted for approval — it will go live once a reviewer approves it (see the Approvals queue)."; m.className = "msg ok"; }
-      else { m.textContent = "Rejected: " + res.error; m.className = "msg err"; }
-      if (m) m.hidden = false;
-    });
+  // Route through the approval gate when policy/toggle asks for it.
+  if (typeof routeThroughGate === "function" && routeThroughGate(
+      "GuardrailPolicy", $("#gr-form"), "edit_guardrail",
+      { gr_id: $("#f-grid").value, changes: changes },
+      "Guardrail change · " + $("#f-grid").value, reason, $("#gr-msg"),
+      function () { btn.disabled = false; })) {
     return;
   }
   fetch("/api/guardrail?id=" + encodeURIComponent($("#f-grid").value), {
@@ -1259,6 +1255,7 @@ function renderRoleEdit(r) {
     + ["responsible", "accountable", "consulted", "informed"].map(function (k) {
         return '<label><input type="checkbox" data-raci="' + k + '"' + (raci[k] ? " checked" : "") + "> " + k.charAt(0).toUpperCase() + k.slice(1) + "</label>";
       }).join("") + "</div></div>"
+    + (typeof gateControlHTML === "function" ? '<div class="dw-sec">' + gateControlHTML("HumanRole") + "</div>" : "")
     + '<div id="dw-msg"></div>'
     + '<div class="dw-actions"><button class="add-btn" id="dw-save" type="button">Save new version</button>'
     + '<button class="add-btn ghost-btn" id="dw-cancel" type="button">Cancel</button></div>';
@@ -1268,6 +1265,11 @@ function renderRoleEdit(r) {
     var raciObj = {};
     body.querySelectorAll("[data-raci]").forEach(function (c) { raciObj[c.getAttribute("data-raci")] = c.checked; });
     var changes = { name: $("#dw-name").value.trim(), skills: parseCsv($("#dw-skills").value), raci: raciObj };
+    if (typeof routeThroughGate === "function" && routeThroughGate(
+        "HumanRole", body, "edit_role", { role_id: r.id, changes: changes },
+        "Role change · " + r.id, "edited role via drawer", $("#dw-msg"))) {
+      return;
+    }
     postRole({ op: "edit", id: r.id, changes: changes, actor: ACTOR, reason: "edited role via drawer" }).then(function (res) {
       if (!res.ok) { $("#dw-msg").innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
       state.roleEdit = false;
@@ -1362,6 +1364,7 @@ function refreshLive() {
   else if (state.view === "architecture") fetch("/api/architecture").then(function (r) { return r.json(); }).then(function (d) { state.architecture = d.architecture; if (state.view === "architecture") renderCenter(); });
   else if (state.view === "strategy") fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; if (state.view === "strategy") renderCenter(); });
   if (typeof refreshApprovalsBadge === "function") refreshApprovalsBadge();
+  if (typeof loadGatePolicy === "function") loadGatePolicy();
 }
 (function () {
   if (!window.EventSource) return;

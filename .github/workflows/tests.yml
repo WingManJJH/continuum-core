@@ -56,6 +56,7 @@ jobs:
           python governance/test_graphedit.py
           python governance/test_group.py
           python governance/test_approvals.py
+          python governance/test_approval_policy.py
           python maps/test_mapdata.py
           python maps/test_layout.py
           python maps/test_landscape.py
