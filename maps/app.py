@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -106,6 +107,33 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json_code({"ok": False, "error": "This share link is unknown, "
                                         "revoked, or expired."}, 404)
             return self._json({"ok": True, "view": view})
+        if u.path == "/api/stream":
+            # Server-Sent Events: push "changed" whenever the governed model's
+            # change log grows, so every open board/canvas refreshes live. Each
+            # connection runs in its own thread (ThreadingHTTPServer).
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                log = cc.EDITS_LOG
+                last = os.path.getsize(log) if os.path.exists(log) else 0
+                self.wfile.write(b"retry: 3000\ndata: hello\n\n")
+                self.wfile.flush()
+                while True:
+                    time.sleep(1.5)
+                    cur = os.path.getsize(log) if os.path.exists(log) else 0
+                    if cur != last:
+                        last = cur
+                        self.wfile.write(b"data: changed\n\n")
+                    else:
+                        self.wfile.write(b": ping\n\n")   # comment heartbeat keeps the socket alive
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                return
+            return
         if u.path in ("/portal", "/portal.html"):
             return self._static("/portal.html")
         if u.path == "/api/export/bpmn":

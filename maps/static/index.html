@@ -10,6 +10,8 @@
   <header>
     <div class="brand">Continuum <span>· Process Canvas</span></div>
     <div class="spacer"></div>
+    <span id="live-dot" class="live-dot" title="Live — the model updates in real time"></span>
+    <button class="toggle" id="present-btn" type="button">▶ Present</button>
     <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
@@ -149,6 +151,22 @@
     </div>
   </div>
 
+  <!-- Present / board mode bar (full-screen live board) -->
+  <div id="present-bar" class="present-bar" hidden>
+    <div class="pb-brand">Continuum <span>· Live board</span></div>
+    <nav class="pb-views">
+      <button data-pv="landscape" type="button">Landscape</button>
+      <button data-pv="architecture" type="button">Architecture</button>
+      <button data-pv="okr" type="button">OKRs</button>
+      <button data-pv="xmatrix" type="button">X-matrix</button>
+      <button data-pv="align" type="button">Alignment</button>
+    </nav>
+    <select id="pb-proc" class="pb-proc" title="Show a process flow"></select>
+    <div class="pb-spacer"></div>
+    <span class="pb-live"><span class="live-dot on"></span> live</span>
+    <button id="pb-exit" class="pb-exit" type="button">Exit ✕</button>
+  </div>
+
   <!-- Version history & compare -->
   <div id="hist-modal" class="modal" hidden>
     <div class="modal-card">
@@ -194,6 +212,7 @@
   <script src="architecture.js"></script>
   <script src="strategy.js"></script>
   <script src="history.js"></script>
+  <script src="present.js"></script>
   <script src="docs.js"></script>
 </body>
 </html>

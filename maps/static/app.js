@@ -1339,3 +1339,20 @@ function postBuild(body) { return fetch("/api/build", { method: "POST", headers:
     });
   });
 })();
+
+// ---------- Phase 3: real-time updates (Server-Sent Events) ----------
+function setLive(on) { document.querySelectorAll("#live-dot").forEach(function (d) { d.classList.toggle("on", on); }); }
+function refreshLive() {
+  load();  // procs + nav + the current flow-family view
+  if (state.view === "landscape") fetch("/api/landscape").then(function (r) { return r.json(); }).then(function (d) { state.landscape = d.landscape; if (state.view === "landscape") renderCenter(); });
+  else if (state.view === "architecture") fetch("/api/architecture").then(function (r) { return r.json(); }).then(function (d) { state.architecture = d.architecture; if (state.view === "architecture") renderCenter(); });
+  else if (state.view === "strategy") fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; if (state.view === "strategy") renderCenter(); });
+}
+(function () {
+  if (!window.EventSource) return;
+  var es;
+  try { es = new EventSource("/api/stream"); } catch (e) { return; }
+  es.onopen = function () { setLive(true); };
+  es.onmessage = function (e) { if (e.data === "changed") { setLive(true); refreshLive(); } };
+  es.onerror = function () { setLive(false); };   // EventSource auto-reconnects
+})();
