@@ -30,6 +30,7 @@ import portal  # noqa: E402  — read-only share links (operational, not a model
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
+import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
 
 STORE = gov.GovernanceStore()
 
@@ -153,6 +154,18 @@ class Handler(BaseHTTPRequestHandler):
                                          g=cc.Graph(), ttl_days=b.get("ttl_days"))
                     return self._json({"ok": True, "link": rec})
                 except ValueError as e:
+                    return self._json_code({"ok": False, "error": str(e)}, 400)
+            if u.path == "/api/import/bpmn":
+                # bring a BPMN 2.0 file into the model. op=plan is a write-free
+                # dry-run; op=apply creates a new process via the audited write path.
+                try:
+                    if b.get("op") == "apply":
+                        res = bpmn_import.apply_import(b.get("xml", ""), code=(b.get("code") or None),
+                                                       owner=(b.get("owner") or None), actor=actor,
+                                                       reason=reason or "imported from BPMN 2.0", store=STORE)
+                        return self._json({"ok": True, "result": res})
+                    return self._json({"ok": True, "plan": bpmn_import.plan_import(b.get("xml", ""))})
+                except (bpmn_import.ImportError_, gov.EditError) as e:
                     return self._json_code({"ok": False, "error": str(e)}, 400)
             if u.path == "/api/process":
                 r = STORE.add_process(b.get("code", ""), b.get("name", ""),

@@ -6,6 +6,36 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Visual modeler Phase F (part 2): BPMN 2.0 import
+
+### D32 — Import a BPMN 2.0 file as a new governed process (round-trips the export)
+**Context:** the other half of interoperability — bring an existing BPMN process (from Camunda, bpmn.io,
+Signavio, anyone) *into* Continuum, so a customer isn't re-drawing what they already have.
+**Decision & build:** `bpmn/import_bpmn.py`, deliberately two-step so nothing enters the model by accident:
+`parse_bpmn(xml)` (write-free reading + warnings) → `plan_import(xml)` (a dry-run summary of what would be
+created) → `apply_import(...)` (creates it). **Apply goes through the same versioned, hash-chained
+governance write path** as everything else — `add_process` → `add_task` (+ `bind_agent` for service
+tasks) → `add_gateway` → `add_event` → `add_flow` — so an imported process is governed and audited from
+its first event, and a test asserts the audit chain is still intact after a full import. Mapping is the
+inverse of D31's export: user/manual/script tasks → human steps; service/send/receive/businessRule tasks
+→ steps that are then **agent-bound**; exclusive/parallel gateways → gateways; plain start/end events →
+the process start/end pseudo-nodes; timer/message (and any intermediate) events → `Event`s; sequence
+flows (+ conditionExpression) → flows. BPMN node ids are remapped to freshly-minted Continuum ids as
+nodes are created, then flows are wired against the map. Unsupported constructs (pools/collaboration,
+sub-processes, inclusive/complex gateways, data objects) are **skipped with a warning, never silently
+dropped**. Endpoint `POST /api/import/bpmn` (op `plan` = dry-run, op `apply` = create); the canvas gets an
+**Import BPMN** dialog (load a `.bpmn` file client-side or paste XML → Preview shows counts + warnings →
+Import opens the new process). `bpmn/test_import.py` — **17 asserts**, headed by a real **round-trip**:
+build a branching process → export → import as a new process → the steps, agent binding, gateway, timer
+event (with its schedule), flows, and a branch condition all come back; the imported process itself
+re-exports to well-formed BPMN (double round-trip). Verified live in the browser: exported a seed process,
+imported it via the dialog, and the new `IM.1.1` process appeared and opened with its agent step intact.
+**Test-isolation note:** this suite creates a persistent new process in the shared edit log, so it resets
+the log at the end to leave the 8-process seed baseline for order-independent reader tests (ask/test_agent).
+Full suite **353**. **Phase F complete — the model now interoperates with BPMN both ways.**
+
+---
+
 ## 2026-09-16 — Visual modeler Phase F (part 1): events + BPMN 2.0 export
 
 ### D31 — Timer / message events, and BPMN 2.0 XML export that renders in a real tool
