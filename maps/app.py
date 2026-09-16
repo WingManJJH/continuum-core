@@ -131,6 +131,26 @@ class Handler(BaseHTTPRequestHandler):
                     r = STORE.unbind_agent(b["id"], actor, reason or "make step human-only")
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+            elif u.path == "/api/gateway":
+                op = b.get("op")
+                if op == "add":
+                    r = STORE.add_gateway(b["process"], b.get("gtype", "exclusive"), actor,
+                                          reason or "added gateway via canvas", name=b.get("name", ""))
+                elif op == "remove":
+                    r = STORE.remove_gateway(b["id"], actor, reason or "removed gateway via canvas")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+            elif u.path == "/api/flow":
+                op = b.get("op")
+                if op == "add":
+                    r = STORE.add_flow(b["process"], b["from"], b["to"], actor,
+                                       reason or "drew flow via canvas", condition=b.get("condition"))
+                elif op == "remove":
+                    r = STORE.remove_flow(b["id"], actor, reason or "removed flow via canvas")
+                elif op == "enable":
+                    r = STORE.enable_branching(b["process"], actor, reason or "enabled branching via canvas")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             else:
                 return self.send_error(404)
             return self._json({"ok": True, "result": r})

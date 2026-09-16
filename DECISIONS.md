@@ -6,6 +6,34 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Visual modeler Phase B: branching (gateways + drawn flows)
+
+### D27 — Explicit process-flow graph on top of the linear task model
+**Context:** Phase A made the canvas free-form but arrows still followed the linear step sequence.
+Phase B lets a user draw a real **branching** diagram — decisions, parallel forks, and arbitrary edges —
+the thing that makes it comparable to Camunda/Mavim/GBTEC.
+**Decision & build (additive, so nothing downstream breaks):** two **new, locked entity types** —
+**`Gateway`** (exclusive/XOR decision or parallel/AND fork-join) and **`SequenceFlow`** (a directed edge
+between tasks / gateways / `__start__` / `__end__`, with an optional `condition` on a branch). Registered
+in `continuum_core` and seeded as empty arrays; the 4 other apps and the whole suite iterate specific
+types, so they are unaffected (270 green, harness re-validates both new schemas). Unlike Phase A's
+layout, **flows and gateways ARE model data** and go through the **versioned, hash-chained governance
+write path**: new `store` methods `add_gateway` / `remove_gateway` (cascades incident flows) /
+`add_flow` / `remove_flow` / `enable_branching` (seeds explicit flows from the current sequence so a
+linear process becomes editable without losing its order), each validated (endpoints exist & belong to
+the process, no self-loop, no wrong-direction into start / out of end, no duplicate) and audited.
+`mapdata` attaches `gateways` / `flows` / `explicit`; `maps/app.py` gains `POST /api/gateway` and
+`/api/flow`. Canvas: when a process is explicit it renders the **graph** (tasks + diamond gateways +
+drawn flow edges with condition labels, all draggable); **Connect** mode (click a node, then a target)
+draws a flow; the gateway palette tiles drop a decision/parallel node where they land; clicking an edge
+removes it; a gateway's panel removes it. `governance/test_flow.py` — **24 asserts**. Verified live:
+enabled branching, added a decision gateway, drew a conditioned branch, and drew a new edge via Connect
+mode — all on the audit trail. Full suite **270**.
+**Next (Phase C):** swimlanes/pools bound to roles + sub-process drill-down. (Events — timer/message —
+also still to come; start/end are the implicit endpoints reused as flow anchors.)
+
+---
+
 ## 2026-09-15 — Visual modeler Phase A: free-form draggable canvas
 
 ### D26 — Drag-and-reposition process canvas (in-house modeler, step 1)

@@ -20,8 +20,10 @@
       <ul id="proc-list" class="proc-list"><li class="muted">loading…</li></ul>
       <div class="palette">
         <h2>Palette</h2>
-        <div class="tile" draggable="true" data-name="Step">+ Step</div>
-        <div class="tile" draggable="true" data-name="Approval step">+ Approval step</div>
+        <div class="tile" draggable="true" data-name="Step" data-kind="task">+ Step</div>
+        <div class="tile" draggable="true" data-name="Approval step" data-kind="task">+ Approval step</div>
+        <div class="tile gw-tile" draggable="true" data-kind="gateway" data-gtype="exclusive">&times; Decision</div>
+        <div class="tile gw-tile" draggable="true" data-kind="gateway" data-gtype="parallel">+ Parallel</div>
         <button id="new-proc" class="add-btn" type="button">+ New process</button>
         <div class="phint">Drag a tile onto the flow to insert a step. Drag a step box to reposition it (visual only — order still follows the sequence). <b>Tidy up</b> re-arranges automatically.</div>
       </div>
@@ -32,6 +34,8 @@
       <div class="viewbar">
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
+        <button id="enable-branch" class="add-btn" type="button" hidden title="Turn the linear steps into an editable branching flow">Enable branching</button>
+        <button id="connect" class="add-btn ghost-btn" type="button" hidden title="Click a node, then a target, to draw a flow between them">Connect</button>
         <button id="tidy" class="add-btn ghost-btn" type="button" title="Auto-arrange the steps left to right">Tidy up</button>
         <nav class="views">
           <button data-view="flow" class="active">Flowchart</button>

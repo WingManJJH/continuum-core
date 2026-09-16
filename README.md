@@ -1,7 +1,7 @@
 # Continuum Core — Phases 1–4
 
 [![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
-[![assertions](https://img.shields.io/badge/assertions-246%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![assertions](https://img.shields.io/badge/assertions-270%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -77,6 +77,7 @@ python3 governance/test_store.py                # guardrail write-path assertion
 python3 governance/test_taskedit.py             # 16 asserts: Task write path — add/rename/reorder/remove a step
 python3 governance/test_authoring.py            # 18 asserts: author a process (auto default guardrail) + drag-insert steps
 python3 governance/test_binding.py              # 13 asserts: bind/unbind an agent to a step from the canvas
+python3 governance/test_flow.py                 # 24 asserts: Phase B gateways + sequence flows (versioned, audited)
 python3 governance/app.py                       # http://localhost:8787 — the editor UI
 
 # Phase 3 — signal & agent infrastructure
@@ -100,7 +101,7 @@ python3 governance/retention.py                    # retention plan (add --apply
 # Process canvas — interactive §03 Canvas View
 python3 maps/test_mapdata.py                       # 12 asserts: flow / agent step / escalation / override / editor payload
 python3 maps/test_layout.py                        # 10 asserts: free-form canvas layout layer (save/reset, decorative-only)
-python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart/RACI/checklist + in-canvas guardrail editing
+python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart with branching (gateways + drawn flows) / RACI / checklist + in-canvas guardrail editing
 
 # Advisor — analyze anything vs best practices & standards
 python3 advisor/test_advisor.py                    # 26 asserts: rules + LLM-augmentation across every subject

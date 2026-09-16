@@ -63,6 +63,10 @@ class GovernanceStore:
             self._process_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "agent-binding.schema.json")) as f:
             self._binding_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "gateway.schema.json")) as f:
+            self._gateway_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "sequence-flow.schema.json")) as f:
+            self._flow_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -406,6 +410,122 @@ class GovernanceStore:
         cc.append_edit_event("Task", task_id, "deprecate", t["version"], new["version"],
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
+
+    # --- Phase B: gateways + sequence flows (explicit process-flow graph) ---
+    def _active(self, g: cc.Graph, etype: str, process_ref: str) -> list[dict]:
+        return [e for e in g.all(etype)
+                if e.get("process_ref") == process_ref and e.get("status") == "active"]
+
+    def _node_ok(self, g: cc.Graph, process_ref: str, node: str) -> bool:
+        if node in ("__start__", "__end__"):
+            return True
+        for et in ("Task", "Gateway"):
+            e = g.get(et, node)
+            if e and e.get("process_ref") == process_ref and e.get("status") == "active":
+                return True
+        return False
+
+    def add_gateway(self, process_ref: str, gtype: str, actor: str, reason: str,
+                    name: str = "") -> dict:
+        """Create a decision (exclusive/XOR) or fork-join (parallel/AND) node."""
+        self._require(reason, actor)
+        if gtype not in ("exclusive", "parallel"):
+            raise EditError("gateway type must be 'exclusive' or 'parallel'")
+        g = self.graph()
+        if g.get("Process", process_ref) is None:
+            raise EditError(f"unknown process {process_ref}")
+        num = max((int(x["id"].split(".g")[-1]) for x in g.all("Gateway")
+                   if x["process_ref"] == process_ref), default=0) + 1
+        gw = {"id": f"{process_ref}.g{num}", "process_ref": process_ref, "type": gtype,
+              "name": name.strip(), "version": 1, "status": "active"}
+        errs = sorted(self._gateway_validator.iter_errors(gw), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Gateway", gw["id"], "create", None, 1,
+                             {"kind": "human", "id": actor}, gw, reason.strip())
+        return gw
+
+    def remove_gateway(self, gateway_id: str, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        gw = g.get("Gateway", gateway_id)
+        if gw is None or gw["status"] != "active":
+            raise EditError(f"unknown or already-retired gateway {gateway_id}")
+        # cascade: retire the flows touching it, so no edge dangles (all versioned)
+        for f in self._active(g, "SequenceFlow", gw["process_ref"]):
+            if gateway_id in (f["from_node"], f["to_node"]):
+                self._retire_flow(f, actor, "gateway removed")
+        new = copy.deepcopy(gw)
+        new["status"] = "deprecated"
+        new["version"] = gw["version"] + 1
+        cc.append_edit_event("Gateway", gateway_id, "deprecate", gw["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def _retire_flow(self, f: dict, actor: str, reason: str) -> dict:
+        new = copy.deepcopy(f)
+        new["status"] = "deprecated"
+        new["version"] = f["version"] + 1
+        cc.append_edit_event("SequenceFlow", f["id"], "deprecate", f["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason)
+        return new
+
+    def add_flow(self, process_ref: str, from_node: str, to_node: str, actor: str,
+                 reason: str, condition: str | None = None) -> dict:
+        """Draw a directed edge between two nodes (task / gateway / start / end)."""
+        self._require(reason, actor)
+        g = self.graph()
+        if g.get("Process", process_ref) is None:
+            raise EditError(f"unknown process {process_ref}")
+        if from_node == to_node:
+            raise EditError("a flow cannot loop a node to itself")
+        if from_node == "__end__" or to_node == "__start__":
+            raise EditError("flows go start -> ... -> end, not the other way")
+        if not self._node_ok(g, process_ref, from_node):
+            raise EditError(f"unknown source node {from_node}")
+        if not self._node_ok(g, process_ref, to_node):
+            raise EditError(f"unknown target node {to_node}")
+        for f in self._active(g, "SequenceFlow", process_ref):
+            if f["from_node"] == from_node and f["to_node"] == to_node:
+                raise EditError("that flow already exists")
+        num = max((int(x["id"].split(".f")[-1]) for x in g.all("SequenceFlow")
+                   if x["process_ref"] == process_ref), default=0) + 1
+        flow = {"id": f"{process_ref}.f{num}", "process_ref": process_ref,
+                "from_node": from_node, "to_node": to_node,
+                "condition": (condition.strip() or None) if condition else None,
+                "version": 1, "status": "active"}
+        errs = sorted(self._flow_validator.iter_errors(flow), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("SequenceFlow", flow["id"], "create", None, 1,
+                             {"kind": "human", "id": actor}, flow, reason.strip())
+        return flow
+
+    def remove_flow(self, flow_id: str, actor: str, reason: str) -> dict:
+        self._require(reason, actor)
+        g = self.graph()
+        f = g.get("SequenceFlow", flow_id)
+        if f is None or f["status"] != "active":
+            raise EditError(f"unknown or already-retired flow {flow_id}")
+        return self._retire_flow(f, actor, reason.strip())
+
+    def enable_branching(self, process_ref: str, actor: str, reason: str) -> list[dict]:
+        """Seed explicit flows from the current linear task sequence, so a process
+        that has only an implicit order gains an editable graph without losing it."""
+        self._require(reason, actor)
+        g = self.graph()
+        if g.get("Process", process_ref) is None:
+            raise EditError(f"unknown process {process_ref}")
+        if self._active(g, "SequenceFlow", process_ref):
+            raise EditError("this process already has an explicit flow")
+        tasks = sorted(self._active_tasks(g, process_ref), key=lambda t: t["seq"])
+        if not tasks:
+            raise EditError("add at least one step before enabling branching")
+        chain = ["__start__"] + [t["id"] for t in tasks] + ["__end__"]
+        out = []
+        for a, b in zip(chain, chain[1:]):
+            out.append(self.add_flow(process_ref, a, b, actor, reason))
+        return out
 
     # --- helpers -----------------------------------------------------------
     @staticmethod

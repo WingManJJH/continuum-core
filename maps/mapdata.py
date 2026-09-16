@@ -55,11 +55,21 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
                 "data_scope": t.get("data_scope", []), "kpi_refs": t.get("kpi_refs", []),
                 "guardrail_full": gfull,
             })
+        gateways = [{"id": x["id"], "type": x["type"], "name": x.get("name", "")}
+                    for x in sorted((x for x in g.all("Gateway")
+                                     if x["process_ref"] == p["id"] and x["status"] == "active"),
+                                    key=lambda x: x["id"])]
+        flows = [{"id": f["id"], "from": f["from_node"], "to": f["to_node"],
+                  "condition": f.get("condition")}
+                 for f in sorted((f for f in g.all("SequenceFlow")
+                                  if f["process_ref"] == p["id"] and f["status"] == "active"),
+                                 key=lambda f: f["id"])]
         out.append({
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],
             "guardrail": f"{p['guardrail_ref']}.v{pgr['version']}" if pgr else None,
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
-            "layout": layout.load_process(p["id"]),  # {task_id: {x,y}} — decorative
+            "gateways": gateways, "flows": flows, "explicit": bool(flows),
+            "layout": layout.load_process(p["id"]),  # {node_id: {x,y}} — decorative
         })
     return out
 

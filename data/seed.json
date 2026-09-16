@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-built Phase-1 seed graph: 8 processes across 8 APQC domains (Core Model \u00a713 step 4 \u2014 widen before UI). Includes deliberate variety for the harness: a financial-threshold escalate_if (FN/SC), a task-level guardrail override stricter than its process (IT.8.4.2.t3), an orphaned KPI (kpi.unused_metric), and a process with no strategic parent (HR.7.2.5 via kpi.applicant_pass_rate). CO.3.2.7.t3 + gr.CO.3.2.7 v3 reproduce the \u00a703 worked example verbatim.",
+  "_note": "Hand-built Phase-1 seed graph: 8 processes across 8 APQC domains (Core Model §13 step 4 — widen before UI). Includes deliberate variety for the harness: a financial-threshold escalate_if (FN/SC), a task-level guardrail override stricter than its process (IT.8.4.2.t3), an orphaned KPI (kpi.unused_metric), and a process with no strategic parent (HR.7.2.5 via kpi.applicant_pass_rate). CO.3.2.7.t3 + gr.CO.3.2.7 v3 reproduce the §03 worked example verbatim.",
   "model_sig": "2026-08-r2",
   "StrategicObjective": [
     {
@@ -1755,5 +1755,7 @@
       "version": 1,
       "status": "active"
     }
-  ]
+  ],
+  "Gateway": [],
+  "SequenceFlow": []
 }

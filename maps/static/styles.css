@@ -94,8 +94,29 @@ text.hintmsg { fill: var(--muted); font-size: 12px; }
 
 /* SVG flow */
 .tnode { cursor: grab; touch-action: none; }
-.tnode.dragging { cursor: grabbing; }
+.tnode.dragging, .gwnode.dragging, .tip-node.dragging { cursor: grabbing; }
 .tnode.dragging .node { filter: brightness(1.03); }
+g[data-node] { cursor: grab; touch-action: none; }
+.selrect { stroke: var(--accent) !important; stroke-width: 3 !important; }
+.node.selrect.override { stroke: var(--warn) !important; }
+
+/* gateways (diamonds) */
+.gw { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.6; }
+.gwglyph { font-family: var(--mono); font-size: 20px; font-weight: 700; fill: var(--ink); }
+.gwname { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+.gw-tile { border-style: dashed; text-align: center; }
+
+/* drawn flow edges + condition labels */
+line.flow { cursor: pointer; }
+line.flow:hover { stroke: var(--accent); stroke-width: 2.2; }
+.flabel rect { fill: var(--surface); stroke: var(--line); }
+.flabel text { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+
+/* connect mode */
+.canvas.connecting g[data-node] { cursor: crosshair; }
+.canvas.connecting .node, .canvas.connecting .gw { stroke-dasharray: 3 3; }
+g.connsrc .node, g.connsrc .gw, g.connsrc .tip { stroke: var(--accent) !important; stroke-width: 3 !important; }
+#connect.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .ghost-btn { border-style: solid; border-color: var(--line); color: var(--muted); }
 .ghost-btn:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
 .node { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; }
