@@ -10,6 +10,8 @@
   <header>
     <div class="brand">Continuum <span>· Process Canvas</span></div>
     <div class="spacer"></div>
+    <button class="toggle" id="docs-btn" type="button">Documentation</button>
+    <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
     <button class="toggle" id="themeBtn" type="button">theme: auto</button>
   </header>
 
@@ -118,6 +120,40 @@
     <div class="drawer-inner" id="role-drawer-body"></div>
   </aside>
 
+  <!-- Documentation panel -->
+  <div id="docs-modal" class="docs-modal" hidden>
+    <div class="docs-shell">
+      <header class="docs-top">
+        <b>Continuum — Documentation</b>
+        <input id="docs-search" class="docs-search" type="search" placeholder="Filter sections…">
+        <button id="docs-close" class="x" type="button">&times;</button>
+      </header>
+      <div class="docs-body">
+        <nav id="docs-toc" class="docs-toc"></nav>
+        <main id="docs-content" class="docs-content"></main>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guided tour overlay (non-blocking: page stays interactive) -->
+  <div id="tour-overlay" class="tour-overlay" hidden>
+    <div id="tour-spot" class="tour-spot"></div>
+    <div id="tour-pop" class="tour-pop">
+      <div class="tour-head"><span id="tour-chap" class="tour-chap"></span><button id="tour-x" class="x" type="button">&times;</button></div>
+      <h3 id="tour-title"></h3>
+      <div id="tour-body" class="tour-bd"></div>
+      <div class="tour-foot">
+        <button id="tour-chapters" class="mini" type="button">Chapters ▾</button>
+        <span id="tour-count" class="muted"></span>
+        <span class="tour-sp"></span>
+        <button id="tour-back" class="mini" type="button">Back</button>
+        <button id="tour-next" class="mini primary" type="button">Next</button>
+      </div>
+      <div id="tour-chaplist" class="tour-chaplist" hidden></div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script src="docs.js"></script>
 </body>
 </html>
