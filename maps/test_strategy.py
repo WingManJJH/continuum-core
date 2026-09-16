@@ -70,6 +70,27 @@ def main():
     check("duplicate initiative refused", rejects(lambda: s.add_initiative("init.test_priority", "d", A, "y"), "already exists"))
     s.edit_enterprise({"vision": "A governed operating system for every organization."}, A, "sharpen vision")
     check("edit_enterprise updates the vision", strat.strategy()["enterprise"]["vision"].startswith("A governed"))
+
+    # 4. manual X-matrix cell overrides (governed) — set / none / clear
+    xm0 = strat.xmatrix()
+    goal, obj = xm0["goals"][0]["id"], xm0["objectives"][0]["id"]
+    s.set_correlation("obj_goal", obj, goal, "secondary", A, "pin this correlation")
+    links = strat.xmatrix()["links"]
+    ov = next((l for l in links if l["type"] == "obj_goal" and l["a"] == obj and l["b"] == goal), None)
+    check("a manual override sets a cell strength (and flags it manual)", ov and ov["strength"] == "secondary" and ov["manual"] is True)
+    # 'none' forces a derived link empty but keeps it marked manual
+    it = xm0["initiatives"][0]["id"]
+    io = next((l for l in xm0["links"] if l["type"] == "init_owner"), None)
+    if io:
+        s.set_correlation("init_owner", io["a"], io["b"], "none", A, "explicitly no correlation")
+        l2 = next((l for l in strat.xmatrix()["links"] if l["type"] == "init_owner" and l["a"] == io["a"] and l["b"] == io["b"]), None)
+        check("'none' override keeps the cell manual-empty", l2 and l2["strength"] == "none" and l2["manual"] is True)
+    check("bad correlation type refused", rejects(lambda: s.set_correlation("bogus", obj, goal, "primary", A, "x"), "type"))
+    check("bad strength refused", rejects(lambda: s.set_correlation("obj_goal", obj, goal, "huge", A, "x"), "strength"))
+    s.clear_correlation("obj_goal", obj, goal, A, "revert to derived")
+    ov2 = next((l for l in strat.xmatrix()["links"] if l["type"] == "obj_goal" and l["a"] == obj and l["b"] == goal), None)
+    check("clearing reverts a cell to the derived value", ov2 is not None and ov2["manual"] is False)
+
     check("audit chain intact after strategy edits", cc.verify_log(cc.EDITS_LOG)["ok"] is True)
 
     cc.reset_log(cc.EDITS_LOG)

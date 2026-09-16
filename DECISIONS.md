@@ -6,6 +6,31 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — X-matrix: editable link strengths + fidelity styling
+
+### D43 — Click-to-cycle governed cell overrides + rotated-label Nexus fidelity
+**Context:** the two follow-ons from the D42 review — (1) their **manual link-strength toggling** (click a
+cell to cycle primary/secondary/leading/supporting/off), and (2) closer **visual fidelity** (rotated axis
+labels, their bar cells). Note on "the .env/Prisma backend": deliberately not ported — their standalone
+persistence is superseded by our governed/audited backend (their overrides would live in SQLite; ours live
+in the versioned graph).
+**Decision & build — editable strengths:** a new locked entity **`Correlation`** (a manual X-matrix cell
+override: `type` ∈ init_obj/init_metric/init_owner/obj_goal, `a`, `b`, `strength` ∈
+primary/secondary/leading/supporting/none). Governance write path `set_correlation` (upsert, deterministic
+id) / `clear_correlation` (revert to derived) — versioned + hash-chained, so **every cell change is
+audited** (verified: a single cell cycled create→update→update→update on the chain). `strategy.xmatrix(g)`
+merges derived links with overrides (override wins; `none` forces a manual-empty cell; each link carries
+`manual`). Endpoint `POST /api/correlation` (op set / clear). UI: every corner cell is clickable and
+**cycles derived → primary → secondary → leading → supporting → off → back to derived**, refreshing live;
+manual cells get a marker; a legend explains it. **Fidelity styling:** rotated vertical axis labels
+(objectives / owners `writing-mode: vertical-rl`, metrics upright), taller clickable bar cells with hover,
+their exact quad palette + A/C/D/I labeled corners (from D42). `maps/test_strategy.py` → **22** (override
+sets + flags manual, `none` keeps manual-empty, bad type/strength refused, clear reverts to derived,
+audited). Full suite **470**. Verified live: cycled a cell through all strengths, each persisted + audited;
+the X reads like their Nexus design over the governed data.
+
+---
+
 ## 2026-09-16 — Adopt the ISOX Nexus X-matrix design (their layout, our governed data)
 
 ### D42 — Reviewed the user's existing X-matrix app; adopted its superior visualization

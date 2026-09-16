@@ -157,6 +157,7 @@
       "status": "active"
     }
   ],
+  "Correlation": [],
   "KPI": [
     {
       "id": "kpi.time_to_verify",

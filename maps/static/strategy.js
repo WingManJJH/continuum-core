@@ -54,12 +54,20 @@ function entBanner(e) {
 }
 
 // ---------- X-matrix (ISOX Nexus Hoshin layout, governed data) ----------
-function xLink(L, type, a, b) { var m = L.find(function (x) { return x.type === type && x.a === a && x.b === b; }); return m ? m.strength : ""; }
-function xGrid(rows, cols, stateFn) {
+function xCell(L, type, a, b) {
+  var m = L.find(function (x) { return x.type === type && x.a === a && x.b === b; });
+  var strength = m ? m.strength : "";                 // "" = derived-empty; "none" = manual-empty
+  var manual = m && m.manual;
+  var state = manual ? strength : "derived";
+  var cls = (strength && strength !== "none" ? strength : "empty") + (manual ? " manual" : "");
+  return '<div class="agc ' + cls + '" data-ct="' + esc(type) + '" data-a="' + esc(a) + '" data-b="' + esc(b)
+    + '" data-state="' + esc(state) + '" title="' + esc(strength || "none") + (manual ? " (manual — click to change)" : " (derived — click to pin)") + '"></div>';
+}
+function xGrid(rows, cols, type, abFn, L) {
   var cells = "";
   for (var r = 0; r < rows.length; r++) for (var c = 0; c < cols.length; c++) {
-    var s = stateFn(rows[r], cols[c]);
-    cells += '<div class="agc ' + (s || "empty") + '"></div>';
+    var ab = abFn(rows[r], cols[c]);
+    cells += xCell(L, type, ab[0], ab[1]);
   }
   return '<div class="agrid" style="grid-template-columns:repeat(' + (cols.length || 1) + ',1fr)">' + cells + "</div>";
 }
@@ -75,10 +83,10 @@ function renderXMatrix(X) {
   var ownList = W.map(function (o) { return '<div class="nxitem nx-own">' + esc(o.name) + "</div>"; }).join("");
   var goalList = G.map(function (g) { return '<div class="nxitem nx-goal" data-obj="' + esc(g.id) + '">' + esc(g.name) + "</div>"; }).join("");
 
-  var A = xGrid(I, O, function (it, o) { return xLink(L, "init_obj", it.id, o.id); });      // init ↔ obj
-  var C = xGrid(I, M, function (it, m) { return xLink(L, "init_metric", it.id, m.id); });   // init ↔ metric
-  var D = xGrid(I, W, function (it, w) { return xLink(L, "init_owner", it.id, w.id); });     // init ↔ owner
-  var Icorner = xGrid(G, O, function (g, o) { return xLink(L, "obj_goal", o.id, g.id); });   // obj ↔ goal
+  var A = xGrid(I, O, "init_obj", function (it, o) { return [it.id, o.id]; }, L);       // init ↔ obj
+  var C = xGrid(I, M, "init_metric", function (it, m) { return [it.id, m.id]; }, L);    // init ↔ metric
+  var D = xGrid(I, W, "init_owner", function (it, w) { return [it.id, w.id]; }, L);     // init ↔ owner
+  var Icorner = xGrid(G, O, "obj_goal", function (g, o) { return [o.id, g.id]; }, L);   // obj ↔ goal
 
   var grid = '<div class="nexus"><div class="nexus-grid">'
     + '<div class="nq tl"><span class="clab">A · init × objective</span>' + A + "</div>"
@@ -94,10 +102,11 @@ function renderXMatrix(X) {
     + "</div></div>";
 
   var key = '<div class="nxkey"><b>Correlation</b> <span class="agc primary"></span> primary '
-    + '<span class="agc supporting"></span> supporting <span class="agc leading"></span> owner · '
-    + '<span class="kpi crit" style="padding:0 6px">✗</span> KPI off target</div>';
+    + '<span class="agc secondary"></span> secondary <span class="agc leading"></span> leading '
+    + '<span class="agc supporting"></span> supporting · <span class="agc manual empty" style="border:1px solid #14425a"></span> manual override · '
+    + '<span class="kpi crit" style="padding:0 6px">✗</span> KPI off target &nbsp;—&nbsp; <b>click a cell</b> to cycle its strength (audited).</div>';
   return '<div class="xmatrix">' + entBanner(X.enterprise)
-    + '<div class="okrhead">Hoshin X-matrix (ISOX Nexus layout), live over the governed model — objectives roll up to goals, initiatives drive objectives / metrics / owners, and the metrics are the process KPIs (✗ = off target).</div>'
+    + '<div class="okrhead">Hoshin X-matrix (ISOX Nexus layout), live over the governed model — objectives roll up to goals, initiatives drive objectives / metrics / owners, and the metrics are the process KPIs (✗ = off target). Derived from the graph; click any corner cell to set a manual strength.</div>'
     + '<div class="nxwrap">' + grid + "</div>" + key + gapsPanel(X.gaps) + "</div>";
 }
 
@@ -130,10 +139,27 @@ function renderStrategy(data, tab) {
   var body = tab === "xmatrix" ? renderXMatrix(data.xmatrix) : tab === "align" ? renderAlignment(data.strategy) : renderOKR(data.strategy);
   return bar + '<div class="strat-body">' + body + "</div>";
 }
+function postCorrelation(body) { return fetch("/api/correlation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+var CORR_CYCLE = { derived: "primary", primary: "secondary", secondary: "leading", leading: "supporting", supporting: "none", none: "__clear__" };
 function wireStrategy() {
   var c = document.getElementById("canvas"); if (!c) return;
   c.querySelectorAll("[data-stab]").forEach(function (b) {
     b.addEventListener("click", function () { state.stratTab = b.getAttribute("data-stab"); renderCenter(); });
+  });
+  // click an X-matrix cell to cycle its strength (derived → primary → … → off → derived)
+  c.querySelectorAll(".agc[data-ct]").forEach(function (cell) {
+    cell.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var ct = cell.getAttribute("data-ct"), a = cell.getAttribute("data-a"), b = cell.getAttribute("data-b");
+      var next = CORR_CYCLE[cell.getAttribute("data-state") || "derived"] || "primary";
+      var body = next === "__clear__"
+        ? { op: "clear", type: ct, a: a, b: b, actor: ACTOR, reason: "cleared X-matrix cell (revert to derived)" }
+        : { type: ct, a: a, b: b, strength: next, actor: ACTOR, reason: "set X-matrix cell strength via canvas" };
+      postCorrelation(body).then(function (res) {
+        if (!res.ok) { alert("Rejected: " + res.error); return; }
+        fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; renderCenter(); });
+      });
+    });
   });
   c.querySelectorAll("[data-open]").forEach(function (el) {
     el.addEventListener("click", function () { openProcess(el.getAttribute("data-open")); });
