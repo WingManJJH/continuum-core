@@ -33,6 +33,7 @@ import layout  # noqa: E402  — decorative node positions (not a model edit)
 import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 import approvals as approvals_mod  # noqa: E402  — approval-gate workflow (Phase 3)
+import approval_policy as policy_mod  # noqa: E402  — which changes need approval (Phase 3)
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
@@ -42,6 +43,7 @@ import build as builder  # noqa: E402  — build a process from instructions
 
 STORE = gov.GovernanceStore()
 QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
+POLICY = policy_mod.ApprovalPolicy()        # which entity types must be gated
 
 STATIC = os.path.join(HERE, "static")
 CONTENT = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
@@ -80,6 +82,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _gate_guard(self, entity_type):
+        """Refuse a DIRECT edit whose entity type is policy-required — it must be
+        submitted for approval instead. The gate's own approve path applies via the
+        store directly and never passes through here, so approvals are unaffected."""
+        if POLICY.requires_gate(entity_type):
+            raise gov.EditError(
+                f"Changes to {policy_mod.ENTITY_LABEL.get(entity_type, entity_type)} "
+                "require approval — submit this change for review instead of saving directly.")
+
     def do_GET(self):
         u = urlparse(self.path)
         if u.path == "/api/maps":
@@ -99,6 +110,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"approvals": QUEUE.list(status),
                                "pending": QUEUE.pending_count(),
                                "ops": sorted(approvals_mod.PROPOSABLE_OPS)})
+        if u.path == "/api/approval-policy":
+            return self._json({"entities": POLICY.entities(), "modes": list(policy_mod.MODES),
+                               "op_entity": policy_mod.OP_ENTITY})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
@@ -169,12 +183,13 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         payload = json.loads(self.rfile.read(length) or b"{}")
         try:
+            self._gate_guard("GuardrailPolicy")
             new = STORE.edit_guardrail(
                 parse_qs(u.query).get("id", [""])[0],
                 changes=payload.get("changes", {}), actor=payload.get("actor", "role.unknown"),
                 reason=payload.get("reason", ""), reviewer=payload.get("reviewer", ""))
             return self._json({"ok": True, "guardrail": new})
-        except gov.EditError as e:
+        except (gov.EditError, policy_mod.PolicyError) as e:
             return self._json_code({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             return self._json_code({"ok": False, "error": repr(e)}, 500)
@@ -209,6 +224,10 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
                 return self._json({"ok": True, "cr": cr, "pending": QUEUE.pending_count()})
+            if u.path == "/api/approval-policy":
+                pol = POLICY.set(b.get("entity", ""), b.get("mode", ""), actor,
+                                 reason or "changed approval policy")
+                return self._json({"ok": True, "entities": POLICY.entities()})
             if u.path == "/api/layout":
                 # decorative node positions only — NOT a model edit, so it does not
                 # go through the governance store, the version chain, or the audit log.
@@ -266,9 +285,11 @@ class Handler(BaseHTTPRequestHandler):
                 except (bpmn_import.ImportError_, gov.EditError) as e:
                     return self._json_code({"ok": False, "error": str(e)}, 400)
             if u.path == "/api/process":
+                self._gate_guard("Process")
                 r = STORE.add_process(b.get("code", ""), b.get("name", ""),
                                       b.get("owner", ""), actor, reason)
             elif u.path == "/api/task":
+                self._gate_guard("Task")
                 op = b.get("op")
                 if op == "edit":
                     r = STORE.edit_task(b["id"], b.get("changes", {}), actor, reason)
@@ -286,6 +307,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/gateway":
+                self._gate_guard("Structural")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_gateway(b["process"], b.get("gtype", "exclusive"), actor,
@@ -298,6 +320,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/group":
+                self._gate_guard("ProcessGroup")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_group(b.get("id", ""), b.get("name", ""), b.get("level", 1), actor,
@@ -311,20 +334,26 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/process/edit":
+                self._gate_guard("Process")
                 r = STORE.edit_process(b["id"], b.get("changes", {}), actor, reason or "edited process header")
             elif u.path == "/api/correlation":
+                self._gate_guard("Correlation")
                 if b.get("op") == "clear":
                     r = STORE.clear_correlation(b["type"], b["a"], b["b"], actor, reason or "cleared X-matrix cell")
                 else:
                     r = STORE.set_correlation(b["type"], b["a"], b["b"], b.get("strength", "primary"),
                                               actor, reason or "set X-matrix cell")
             elif u.path == "/api/enterprise":
+                self._gate_guard("Enterprise")
                 r = STORE.edit_enterprise(b.get("changes", {}), actor, reason or "edited enterprise")
             elif u.path == "/api/objective":
+                self._gate_guard("StrategicObjective")
                 r = STORE.edit_objective(b["id"], b.get("changes", {}), actor, reason or "edited objective")
             elif u.path == "/api/kpi":
+                self._gate_guard("KPI")
                 r = STORE.edit_kpi(b["id"], b.get("changes", {}), actor, reason or "edited KPI")
             elif u.path == "/api/initiative":
+                self._gate_guard("Initiative")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_initiative(b.get("id", ""), b.get("name", ""), actor, reason or "added initiative",
@@ -337,6 +366,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/role":
+                self._gate_guard("HumanRole")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_role(b.get("id", ""), b.get("name", ""), actor,
@@ -350,6 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/event":
+                self._gate_guard("Structural")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_event(b["process"], b.get("kind", "intermediate"),
@@ -364,6 +395,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/flow":
+                self._gate_guard("Structural")
                 op = b.get("op")
                 if op == "add":
                     r = STORE.add_flow(b["process"], b["from"], b["to"], actor,
@@ -380,7 +412,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 return self.send_error(404)
             return self._json({"ok": True, "result": r})
-        except (gov.EditError, approvals_mod.ApprovalError) as e:
+        except (gov.EditError, approvals_mod.ApprovalError, policy_mod.PolicyError) as e:
             return self._json_code({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             return self._json_code({"ok": False, "error": repr(e)}, 500)

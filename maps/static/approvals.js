@@ -22,6 +22,50 @@ function proposeChange(targetOp, args, title, reason) {
   });
 }
 
+// ---- approval policy (which entity types need review) --------------------
+var gatePolicy = null;  // { entityKey: "off"|"optional"|"required" }
+function loadGatePolicy() {
+  return fetch("/api/approval-policy").then(function (r) { return r.json(); }).then(function (d) {
+    gatePolicy = {}; (d.entities || []).forEach(function (e) { gatePolicy[e.key] = e.mode; });
+    return gatePolicy;
+  }).catch(function () { return gatePolicy || {}; });
+}
+function gateModeFor(entity) { return (gatePolicy && gatePolicy[entity]) || "optional"; }
+
+// The "Submit for approval" control for an editor form, driven by policy:
+// off → nothing; optional → an unchecked checkbox; required → a locked notice.
+function gateControlHTML(entity) {
+  var mode = gateModeFor(entity);
+  if (mode === "off") return "";
+  if (mode === "required") {
+    return '<div class="gate-required"><input type="checkbox" class="gate-ck" data-entity="' + esc(entity) + '" checked disabled>'
+      + " This change <b>requires approval</b> — it will be submitted for review.</div>";
+  }
+  return '<label class="ck gate-optional"><input type="checkbox" class="gate-ck" data-entity="' + esc(entity) + '">'
+    + ' Submit for approval instead of saving directly <span class="hint">routes through the review queue</span></label>';
+}
+
+// Decide the save path. Returns true if it routed the change through the gate
+// (caller should stop); false to let the caller do its normal direct save.
+function routeThroughGate(entity, containerEl, targetOp, args, title, reason, msgEl, onGated) {
+  var mode = gateModeFor(entity);
+  var ck = containerEl ? containerEl.querySelector(".gate-ck") : null;
+  var wants = mode === "required" || (ck && ck.checked);
+  if (!wants) return false;
+  proposeChange(targetOp, args, title, reason).then(function (res) {
+    if (msgEl) {
+      msgEl.textContent = res.ok
+        ? "Submitted for approval — it will go live once a reviewer approves it (see the Approvals queue)."
+        : "Rejected: " + res.error;
+      msgEl.className = "msg " + (res.ok ? "ok" : "err");
+      msgEl.hidden = false;
+    }
+    refreshApprovalsBadge();
+    if (onGated) onGated(res);
+  });
+  return true;
+}
+
 function refreshApprovalsBadge() {
   var badge = document.getElementById("appr-badge");
   if (!badge) return Promise.resolve(0);
@@ -78,6 +122,8 @@ function renderApprovals(list, filter) {
 var _apprFilter = "pending";
 function openApprovals() {
   var modal = document.getElementById("appr-modal"), body = document.getElementById("appr-body");
+  _apprFilter = "pending";
+  document.querySelectorAll(".appr-tabs button").forEach(function (x) { x.classList.toggle("active", x.getAttribute("data-af") === "pending"); });
   body.innerHTML = '<div class="muted">Loading…</div>';
   modal.hidden = false;
   loadApprovals();
@@ -120,6 +166,40 @@ function decide(op, id) {
   });
 }
 
+// ---- policy settings tab -------------------------------------------------
+function renderPolicy() {
+  var body = document.getElementById("appr-body");
+  body.innerHTML = '<div class="muted">Loading…</div>';
+  fetch("/api/approval-policy").then(function (r) { return r.json(); }).then(function (d) {
+    var modes = d.modes || ["off", "optional", "required"];
+    gatePolicy = {}; (d.entities || []).forEach(function (e) { gatePolicy[e.key] = e.mode; });
+    var rows = (d.entities || []).map(function (e) {
+      var opts = modes.map(function (m) { return '<option value="' + m + '"' + (m === e.mode ? " selected" : "") + ">" + m + "</option>"; }).join("");
+      return '<div class="pol-row"><div class="pol-label">' + esc(e.label) + "</div>"
+        + '<select class="pol-mode" data-entity="' + esc(e.key) + '">' + opts + "</select></div>";
+    }).join("");
+    body.innerHTML = '<p class="modal-sub">Which <b>kinds</b> of change must go through review. '
+      + "<b>required</b> — a direct edit is refused, the change must be submitted; "
+      + "<b>optional</b> — the editor offers a “Submit for approval” choice; "
+      + "<b>off</b> — commits directly. Each change is itself governed (who / when / why).</p>"
+      + '<div class="pol-grid">' + rows + "</div>"
+      + '<div id="pol-msg" class="msg" hidden></div>';
+    body.querySelectorAll(".pol-mode").forEach(function (sel) {
+      sel.addEventListener("change", function () { setPolicy(sel.getAttribute("data-entity"), sel.value); });
+    });
+  });
+}
+function setPolicy(entity, mode) {
+  fetch("/api/approval-policy", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entity: entity, mode: mode, actor: APPR_REVIEWER, reason: "set approval policy for " + entity }),
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    var m = document.getElementById("pol-msg");
+    if (res.ok) { if (gatePolicy) gatePolicy[entity] = mode; if (m) { m.textContent = entity + " → " + mode + ". Saved."; m.className = "msg ok"; m.hidden = false; } }
+    else if (m) { m.textContent = "Rejected: " + res.error; m.className = "msg err"; m.hidden = false; }
+  });
+}
+
 (function () {
   var ab = document.getElementById("approvals-btn"); if (!ab) return;
   ab.addEventListener("click", openApprovals);
@@ -131,8 +211,9 @@ function decide(op, id) {
     b.addEventListener("click", function () {
       _apprFilter = b.getAttribute("data-af");
       document.querySelectorAll(".appr-tabs button").forEach(function (x) { x.classList.toggle("active", x === b); });
-      loadApprovals();
+      if (_apprFilter === "policy") renderPolicy(); else loadApprovals();
     });
   });
+  loadGatePolicy();
   refreshApprovalsBadge();
 })();

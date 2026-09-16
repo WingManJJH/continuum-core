@@ -51,7 +51,8 @@ var DOCS = [
     + "<p>A reviewer opens the queue and <b>Approves</b> it — which applies the change through the exact same audited, versioned, hash-chained path a direct edit uses — or <b>Rejects</b> it with a reason (no model change). The proposer can <b>Withdraw</b> a request they no longer want.</p>"
     + "<ul><li><b>Separation of duties</b> is recorded: if the reviewer is also the proposer the decision is allowed but flagged <b>self-approved</b> on the trail.</li>"
     + "<li>If the model moved on and a queued change no longer applies cleanly, Approve surfaces the reason and leaves the request pending.</li>"
-    + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li></ul>" },
+    + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li></ul>"
+    + "<p><b>Policy — which changes need review.</b> The <b>Policy</b> tab in the Approvals window sets a mode per kind of change: <b>required</b> (a direct edit is refused — it must be submitted), <b>optional</b> (the editor offers the “Submit for approval” choice), or <b>off</b> (commits directly). The gate toggle appears on the guardrail, role, and master-data (process / hierarchy) editors; setting a kind to <i>required</i> forces every one of its edits through review. Changing the policy is itself governed (who / when / why).</p>" },
 
   { id: "board", title: "Live board (Present mode)", html:
     "<p><b>▶ Present</b> (top of the screen) turns the canvas into a full-screen, touch-friendly <b>board</b> a leadership team can drive on a video wall. A dark bar switches between <b>Landscape, Architecture, OKRs, X-matrix, Alignment</b>, or opens any process flow; app chrome hides and the canvas fills the screen. <b>Esc</b> or <b>Exit</b> returns.</p>"
@@ -183,6 +184,9 @@ var TOUR = [
       title: "Submit for approval", body: "Editing a guardrail? Tick this to route the change through <b>review</b> instead of saving it directly. It queues as a Change Request and doesn't touch the live model until someone approves it." },
     { sel: function () { return openModalCard(); }, before: function () { tourOpenModalBtn("approvals-btn"); },
       title: "The approval queue", body: "Pending changes wait here. A reviewer <b>Approves</b> — applying it through the same audited, versioned path a direct edit uses — or <b>Rejects</b> it with a reason; the proposer can <b>Withdraw</b>. Self-approval is allowed but flagged. Every decision is on the tamper-evident trail." },
+    { sel: function () { return document.querySelector('.appr-tabs [data-af="policy"]'); },
+      before: function () { tourReset(); document.getElementById("approvals-btn").click(); var t = document.querySelector('.appr-tabs [data-af="policy"]'); if (t) t.click(); },
+      title: "Set what needs review", body: "The <b>Policy</b> tab decides which <i>kinds</i> of change need approval: <b>required</b> (must be submitted), <b>optional</b> (the editor offers the choice), or <b>off</b>. Set guardrails to <i>required</i> and every guardrail edit routes through review automatically." },
     { sel: "#present-btn", before: function () { tourReset(); tourOpen("CO.3.2.7"); tourView("flow"); },
       title: "Present — the live board", body: "Go full-screen and touch-friendly for a video wall: switch between <b>Landscape, OKRs, the X-matrix</b>, or open any process. <b>Esc</b> exits." },
     { sel: "#live-dot", title: "Everything is live",

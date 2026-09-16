@@ -89,6 +89,7 @@ function openMasterData(kind, id) {
       + '<label>Objectives <span class="hint">comma · obj.*</span><input id="md-obj" value="' + esc((g.objective_refs || []).join(", ")) + '"></label>'
       + '<label>Description<input id="md-desc" value="' + esc(g.description || "") + '"></label>'
       + '<div class="p-sec">' + _customEditor(g.custom) + "</div>"
+      + (typeof gateControlHTML === "function" ? '<div class="p-sec">' + gateControlHTML("ProcessGroup") + "</div>" : "")
       + '<div class="import-actions"><button id="md-save" class="add-btn" type="button">Save</button>'
       + '<button id="md-remove" class="add-btn ghost-btn danger" type="button">Retire level</button></div>';
     modal.hidden = false; _wireKv();
@@ -98,6 +99,11 @@ function openMasterData(kind, id) {
                       description: document.getElementById("md-desc").value.trim(),
                       objective_refs: parseCsv(document.getElementById("md-obj").value),
                       custom: _collectKv() };
+      if (typeof routeThroughGate === "function" && routeThroughGate(
+          "ProcessGroup", body, "edit_group", { group_id: id, changes: changes },
+          "Group change · " + id, "edited master data via panel", document.getElementById("md-msg"))) {
+        return;
+      }
       postGroup({ op: "edit", id: id, changes: changes, actor: ACTOR, reason: "edited master data via panel" })
         .then(function (res) { _mdDone(res); });
     };
@@ -114,12 +120,18 @@ function openMasterData(kind, id) {
       '<label>Parent (hierarchy)<select id="md-parent">' + opts + "</select></label>"
       + '<label>Objectives <span class="hint">comma · obj.*</span><input id="md-obj" value="' + esc((p.objective_refs || []).join(", ")) + '"></label>'
       + '<div class="p-sec">' + _customEditor(p.custom) + "</div>"
+      + (typeof gateControlHTML === "function" ? '<div class="p-sec">' + gateControlHTML("Process") + "</div>" : "")
       + '<div class="import-actions"><button id="md-save" class="add-btn" type="button">Save</button></div>';
     modal.hidden = false; _wireKv();
     document.getElementById("md-save").onclick = function () {
       var changes = { parent_ref: document.getElementById("md-parent").value || null,
                       objective_refs: parseCsv(document.getElementById("md-obj").value),
                       custom: _collectKv() };
+      if (typeof routeThroughGate === "function" && routeThroughGate(
+          "Process", body, "edit_process", { process_id: id, changes: changes },
+          "Process change · " + id, "edited process master data via panel", document.getElementById("md-msg"))) {
+        return;
+      }
       postProcEdit({ id: id, changes: changes, actor: ACTOR, reason: "edited process master data via panel" })
         .then(function (res) { _mdDone(res); });
     };

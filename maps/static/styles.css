@@ -627,3 +627,15 @@ body.presenting { overflow: hidden; }
 .pill.warn { background: #fff3d6; color: #8a6100; }
 label.ck { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; cursor: pointer; }
 label.ck input { width: auto; margin: 0; }
+
+/* ── Phase 3: approval policy (which changes need review) ────────────── */
+.gate-required { display: flex; align-items: center; gap: 8px; font-size: 13px;
+  margin: 8px 0; padding: 8px 11px; border-radius: 8px;
+  background: #fff3d6; color: #6b4e00; border: 1px solid #e6c964; }
+.gate-required input { width: auto; margin: 0; }
+.pol-grid { margin: 8px 2px; }
+.pol-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 4px; border-bottom: 1px solid var(--line); }
+.pol-label { font-size: 14px; }
+.pol-mode { min-width: 130px; padding: 7px 10px; font-size: 13px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
