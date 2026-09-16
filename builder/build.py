@@ -78,7 +78,9 @@ def _actor_ok(actor: str) -> bool:
     words = actor.lower().split()
     if not words:
         return False
-    return words[0] not in _VERB_STOP and words[-1] not in _NOUN_STOP and actor.lower() != "system"
+    if "system" in words or "automatically" in words:   # "the system (automatically) …" is an agent, not a role
+        return False
+    return words[0] not in _VERB_STOP and words[-1] not in _NOUN_STOP
 
 
 def _role_from_line(line: str):
