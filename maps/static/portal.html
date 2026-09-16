@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Continuum · Shared process view</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Portal chrome — a clean, single-column read-only reader, reusing the
+       canvas node/table styles so a shared view looks like the real thing. */
+    .p-wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px 64px; }
+    .p-top { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+    .p-top .brand { font-weight: 700; letter-spacing: .2px; }
+    .p-top .brand span { color: var(--muted); font-weight: 500; }
+    .p-ro { margin-left: auto; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+    .p-head { padding: 24px 0 8px; }
+    .p-head h1 { font-size: 22px; margin: 0 0 4px; }
+    .p-sub { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .p-badge { font-size: 12px; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--line); }
+    .p-badge.current { color: #1a7f4b; border-color: #1a7f4b55; background: #1a7f4b12; }
+    .p-badge.stale { color: #9a6a00; border-color: #9a6a0055; background: #9a6a0012; }
+    .p-copy { margin-left: auto; }
+    .p-copy button { font: inherit; font-size: 12px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 5px 10px; }
+    .p-copy button:hover { border-color: var(--accent); }
+    .p-tabs { display: flex; gap: 4px; margin: 18px 0 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+    .p-tabs button { font: inherit; font-size: 13px; cursor: pointer; border: 0; background: none; color: var(--muted); padding: 8px 12px; border-bottom: 2px solid transparent; }
+    .p-tabs button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+    .p-view { padding: 14px 2px; overflow-x: auto; }
+    .p-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+    .p-chip { font-size: 12px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; color: var(--muted); }
+    .p-chip b { color: var(--ink); font-weight: 600; }
+    .p-foot { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .p-error { padding: 60px 20px; text-align: center; color: var(--muted); }
+    .p-error h2 { color: var(--ink); }
+    /* read-only lane strip (HTML, not the draggable SVG canvas) */
+    .rlane { display: grid; grid-template-columns: 168px 1fr; border-top: 1px solid var(--line); }
+    .rlane:last-child { border-bottom: 1px solid var(--line); }
+    .rlane .rl-name { padding: 12px 14px; font-size: 12px; color: var(--muted); background: var(--surface); border-right: 1px solid var(--line); display: flex; align-items: center; }
+    .rlane .rl-steps { padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .rstep { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; min-width: 140px; }
+    .rstep.agent { border-color: var(--accent); }
+    .rstep .rs-seq { font-size: 11px; color: var(--muted); }
+    .rstep .rs-nm { font-size: 13px; }
+    .rstep .rs-ai { font-size: 10px; font-weight: 700; color: var(--accent); }
+    .dtable { border-collapse: collapse; width: 100%; font-size: 13px; }
+    .dtable th, .dtable td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .dtable th { color: var(--muted); font-weight: 600; }
+    .dtable .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="p-top">
+    <div class="brand">Continuum <span>· shared view</span></div>
+    <div class="p-ro">Read-only</div>
+  </div>
+  <div class="p-wrap" id="root">
+    <div class="p-error"><h2>Loading…</h2></div>
+  </div>
+  <script src="portal.js"></script>
+</body>
+</html>

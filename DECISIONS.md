@@ -6,6 +6,39 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Visual modeler Phase E: read-only publish portal
+
+### D30 — Shareable, revocable, read-only process viewer
+**Context:** Phase E — let a process owner *share* a process (or the whole landscape) with people who
+should read it but never edit it: reviewers, auditors, a design partner. This is what Camunda/Mavim
+"publish" or a Confluence export do, but from the one governed model.
+**Decision & build:** a **publish registry** `maps/portal.py` mints an unguessable token for a target
+(a process id, or `__landscape__`) and stores it in `data/portal.json`. Like the layout layer (D26),
+minting/revoking a link is **operational state, not a governed-model edit** (Core Model §08): it never
+touches the versioned / hash-chained governance write path and never changes what an agent reads — a
+test asserts the edit log is untouched and `Portal` is not a graph entity type. The view it serves is
+**live** (reads the current graph every time) and reports whether the model has changed since the link
+was minted (`current`). New endpoints on the canvas app (:8789): `GET /api/portal` (author's manage
+list), `POST /api/portal` (publish / revoke), `GET /api/portal/view?token=…` (the read payload),
+`GET /portal` (the viewer page). The viewer `maps/static/portal.{html,js}` is a **self-contained,
+single-pass read-only renderer** — Flowchart (linear *and* branching, laid out by longest-path),
+Lanes, RACI, Checklist, Details (guardrail allow/deny/escalate per step) for a process, or the domain
+house + catalogs for the landscape — reusing the canvas node/table CSS so a shared view looks like the
+real thing, with **no authoring controls**. The canvas gains a **Share** dialog to mint / copy / open /
+revoke links. **Honest boundary (stated in code + UI):** a token is an unguessable *capability URL*
+served on the same host — not viewer authentication; real external hosting + per-viewer sign-in is a
+deployment step, declared like the connector OAuth seams. What is real and enforced here: minting,
+listing, revocation, and time-boxed expiry. `maps/test_portal.py` — **19 asserts** (mint/resolve,
+unknown-target + non-role refusal, landscape target, revoke kills + is idempotent, expiry enforced,
+manage-list status/staleness, and the §08 no-model-mutation guarantee). Verified live end-to-end: minted
+a link, all five views rendered read-only, revoked it, the viewer then 404s.
+**CI hardening (same PR):** the workflow's test list had drifted — it ran the D21-era 14 files (219
+asserts) and had silently *not* been running the Phase A–D suites (`test_flow`, `test_subprocess`,
+`test_layout`, `test_landscape`). Brought it current: it now runs all **19** suites. Full suite **308**.
+**Phase F next:** events (timer/message) + BPMN 2.0 XML import/export.
+
+---
+
 ## 2026-09-15 — Visual modeler Phase D: process landscape / repository
 
 ### D29 — Org-wide "process house" + linkable catalogs

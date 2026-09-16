@@ -33,6 +33,7 @@
     <section class="pane center">
       <div class="viewbar">
         <button id="landscape-btn" class="add-btn ghost-btn" type="button" title="See the whole organization's process landscape">Landscape</button>
+        <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
         <button id="enable-branch" class="add-btn" type="button" hidden title="Turn the linear steps into an editable branching flow">Enable branching</button>
@@ -54,6 +55,20 @@
       <div id="props"><div class="muted center">Select a step on the canvas to see its risks, KPIs, and guardrail — and edit the guardrail here.</div></div>
     </aside>
   </div>
+
+  <!-- Share dialog: mint / manage read-only publish links (Phase E) -->
+  <div id="share-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Share this process</h2><button id="share-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Publish a <b>read-only</b> link. Whoever has it sees a clean viewer — flow, lanes, RACI, checklist, guardrails — with no editing. The view is always live, and you can revoke a link any time.</p>
+      <div class="share-actions">
+        <button id="share-proc" class="add-btn" type="button">Publish this process</button>
+        <button id="share-land" class="add-btn ghost-btn" type="button">Publish whole landscape</button>
+      </div>
+      <div id="share-list" class="share-list"><div class="muted">Loading links…</div></div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

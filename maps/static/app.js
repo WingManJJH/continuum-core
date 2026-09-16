@@ -851,3 +851,56 @@ function saveGuardrail(e) {
   apply(cur);
   btn.addEventListener("click", function () { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); });
 })();
+
+// ---------- Phase E: publish / share ----------
+function postPortal(body) { return fetch("/api/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+function portalUrl(token) { return location.origin + "/portal?token=" + encodeURIComponent(token); }
+function openShare() { $("#share-modal").hidden = false; refreshShareList(); }
+function closeShare() { $("#share-modal").hidden = true; }
+function refreshShareList() {
+  fetch("/api/portal").then(function (r) { return r.json(); }).then(function (d) {
+    var links = d.links || [];
+    if (!links.length) { $("#share-list").innerHTML = '<div class="muted">No links yet. Publish one above.</div>'; return; }
+    $("#share-list").innerHTML = '<h3 class="share-h">Links</h3>' + links.map(function (l) {
+      var live = l.status === "active";
+      var meta = l.target === "__landscape__" ? "landscape" : esc(l.target);
+      return '<div class="share-row ' + (live ? "" : "off") + '">'
+        + '<div class="share-meta"><b>' + esc(l.title || meta) + '</b><span class="share-tag ' + esc(l.status) + '">' + esc(l.status) + '</span>'
+        + '<div class="muted">' + meta + (live && !l.current ? " · model changed since shared" : "") + '</div></div>'
+        + '<div class="share-btns">'
+        + (live ? '<button type="button" class="mini" data-copy="' + esc(l.token) + '">Copy</button>'
+                 + '<a class="mini" href="' + esc(portalUrl(l.token)) + '" target="_blank" rel="noopener">Open</a>'
+                 + '<button type="button" class="mini danger" data-revoke="' + esc(l.token) + '">Revoke</button>' : "")
+        + "</div></div>";
+    }).join("");
+    $("#share-list").querySelectorAll("[data-copy]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var url = portalUrl(b.getAttribute("data-copy"));
+        var done = function () { b.textContent = "Copied ✓"; setTimeout(function () { b.textContent = "Copy"; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, done); else done();
+      });
+    });
+    $("#share-list").querySelectorAll("[data-revoke]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        postPortal({ op: "revoke", token: b.getAttribute("data-revoke") }).then(refreshShareList);
+      });
+    });
+  });
+}
+(function () {
+  var sb = $("#share-btn"); if (!sb) return;
+  sb.addEventListener("click", openShare);
+  $("#share-close").addEventListener("click", closeShare);
+  $("#share-modal").addEventListener("click", function (e) { if (e.target === this) closeShare(); });
+  $("#share-proc").addEventListener("click", function () {
+    var p = getProc(); if (!p) return;
+    postPortal({ target: p.id, title: p.name, actor: ACTOR }).then(function (res) {
+      if (res.ok) refreshShareList(); else alert("Could not publish: " + res.error);
+    });
+  });
+  $("#share-land").addEventListener("click", function () {
+    postPortal({ target: "__landscape__", title: "Process landscape", actor: ACTOR }).then(function (res) {
+      if (res.ok) refreshShareList(); else alert("Could not publish: " + res.error);
+    });
+  });
+})();

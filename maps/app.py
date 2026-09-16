@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
 from mapdata import all_maps, landscape  # noqa: E402
 import layout  # noqa: E402  — decorative node positions (not a model edit)
+import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 
 STORE = gov.GovernanceStore()
@@ -74,6 +75,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"model_sig": g.model_sig, "processes": all_maps(g)})
         if u.path == "/api/landscape":
             return self._json({"landscape": landscape(cc.Graph())})
+        if u.path == "/api/portal":
+            # the author's manage list — every minted share link + its status
+            return self._json({"links": portal.all_links(cc.Graph())})
+        if u.path == "/api/portal/view":
+            token = parse_qs(u.query).get("token", [""])[0]
+            view = portal.portal_view(token, cc.Graph())
+            if view is None:
+                return self._json_code({"ok": False, "error": "This share link is unknown, "
+                                        "revoked, or expired."}, 404)
+            return self._json({"ok": True, "view": view})
+        if u.path in ("/portal", "/portal.html"):
+            return self._static("/portal.html")
         return self._static(u.path)
 
     def do_PUT(self):
@@ -113,6 +126,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"ok": True, "layout": {}})
                 saved = layout.save_process(b.get("process", ""), b.get("positions", {}))
                 return self._json({"ok": True, "layout": saved})
+            if u.path == "/api/portal":
+                # mint / revoke a read-only share link — operational, NOT a model
+                # edit, so (like layout) it bypasses the governance write path.
+                try:
+                    if b.get("op") == "revoke":
+                        return self._json({"ok": True, "revoked": portal.revoke(b.get("token", ""))})
+                    rec = portal.publish(b.get("target", ""), b.get("title", ""), actor,
+                                         g=cc.Graph(), ttl_days=b.get("ttl_days"))
+                    return self._json({"ok": True, "link": rec})
+                except ValueError as e:
+                    return self._json_code({"ok": False, "error": str(e)}, 400)
             if u.path == "/api/process":
                 r = STORE.add_process(b.get("code", ""), b.get("name", ""),
                                       b.get("owner", ""), actor, reason)
