@@ -206,19 +206,35 @@ def apply_parsed(parsed: dict, code: str | None = None, owner: str | None = None
     owner = owner or DEFAULT_OWNER
 
     proc = s.add_process(code, parsed["name"], owner, actor, reason)
+    warnings = list(parsed.get("warnings", []))
     idmap: dict[str, str] = {}
     for bid in parsed["start_ids"]:
         idmap[bid] = "__start__"
     for bid in parsed["end_ids"]:
         idmap[bid] = "__end__"
 
-    made = {"steps": 0, "agent_steps": 0, "gateways": 0, "events": 0, "flows": 0}
+    # roles the plan wants to attach as performers (create first — a performer must
+    # reference a real HumanRole). Existing roles are reused; a bad one is skipped.
+    valid_roles = {r["id"] for r in cc.Graph().all("HumanRole") if r["status"] == "active"}
+    for role in parsed.get("roles", []):
+        rid = role.get("id")
+        if not rid or rid in valid_roles:
+            continue
+        try:
+            s.add_role(rid, role.get("name") or rid, actor, "role deduced from instructions")
+            valid_roles.add(rid)
+        except gov.EditError as e:
+            warnings.append(f"role {rid} not created: {e}")
+
+    made = {"steps": 0, "agent_steps": 0, "gateways": 0, "events": 0, "flows": 0, "roles": 0}
+    made["roles"] = len(valid_roles & {r.get("id") for r in parsed.get("roles", [])})
     for t in parsed["tasks"]:
-        r = s.add_task(code, t["name"], actor, reason)
+        performed_by = [t["role"]] if t.get("role") in valid_roles else None
+        r = s.add_task(code, t["name"], actor, reason, performed_by=performed_by)
         idmap[t["bpmn_id"]] = r["id"]
         made["steps"] += 1
         if t["agent"]:
-            s.bind_agent(r["id"], actor, "imported as an automated (service) task")
+            s.bind_agent(r["id"], actor, "automated step")
             made["agent_steps"] += 1
     for gw in parsed["gateways"]:
         r = s.add_gateway(code, gw["type"], actor, reason, name=gw["name"])
@@ -230,7 +246,6 @@ def apply_parsed(parsed: dict, code: str | None = None, owner: str | None = None
         idmap[ev["bpmn_id"]] = r["id"]
         made["events"] += 1
 
-    warnings = list(parsed["warnings"])
     for f in parsed["flows"]:
         src, tgt = idmap.get(f["source"]), idmap.get(f["target"])
         if not src or not tgt:

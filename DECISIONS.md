@@ -6,6 +6,36 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Build a process from instructions (text → governed process)
+
+### D37 — Deduce a process map + metadata from a list of instructions
+**Context:** now that the governed platform exists, the natural next step is to <b>generate</b> a process
+from a plain description instead of drawing it by hand.
+**Decision & build:** `builder/build.py` — two engines, one output, both producing the parsed structure the
+importer already applies (so a built process is created through the exact same versioned/audited write path
+and is fully editable). <b>Deterministic reader</b> (always on, no key): reads a numbered / bulleted /
+one-per-line list, extracts each step, deduces a performing <b>role</b> (`"AP Clerk: …"`, `"… by the …"`,
+`"Finance Manager approves …"`), flags automated steps (`"the system…"`, `"automatically…"`) as
+<b>agent</b> steps, and models decision lines (`"If…"`, `"…?"`, `"decide whether…"`) as <b>gateways</b>.
+<b>LLM reader</b> behind the existing `CONTINUUM_LLM_API_KEY` seam (`mcp_server/llm.py`): returns a
+<b>validated JSON plan</b> (data, not code) that is whitelisted/sanitized before anything is created — same
+safety pattern as the Ask planner; with no key it isn't used and the deterministic reader stands in; an
+unusable reply falls back too. Metadata it honestly deduces & attaches: ordered steps, performers (creating
+the `HumanRole`s), decisions, agent-binding, and the <b>default guardrail</b>; it <b>suggests</b>
+KPIs/risks/owner rather than fabricating them. Every guess is surfaced in an <b>assumptions</b> list.
+`apply_parsed` was extended (backward-compatibly) to create the deduced roles first, set each step's
+performer, and bind agent steps. Endpoint `POST /api/build` (op plan = write-free dry-run returning the plan
++ assumptions + a step preview and the exact `parsed` to build; op apply creates it from that parsed). UI:
+a <b>Build from text</b> toolbar button → a dialog (instructions textarea, an "use the AI planner" toggle,
+Preview showing the deduced steps with AI/decision/role tags + the assumptions, Build). `builder/test_build.py`
+— <b>17 asserts</b> (deterministic parse counts, decision/agent/role deduction, assumptions surfaced,
+apply → governed process with created roles + bound agent + intact audit chain, the LLM path via an injected
+transport, and its fallback). Fixed an over-eager decision regex that flagged imperative "Do …" steps as
+decisions. Verified live end-to-end: pasted a 5-line refund process, Previewed (4 steps · 1 automated · 1
+decision), Built it, and the new process opened on the canvas. Full suite <b>413</b>.
+
+---
+
 ## 2026-09-16 — In-app Documentation + Guided Tour
 
 ### D36 — Documentation panel and an interactive, chaptered Guided Tour

@@ -40,6 +40,7 @@
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
         <button id="import-btn" class="add-btn ghost-btn" type="button" title="Import a BPMN 2.0 or Visio (.vsdx) diagram as a new governed process">Import</button>
+        <button id="build-btn" class="add-btn ghost-btn" type="button" title="Build a process from a list of instructions">Build from text</button>
         <button id="roles-btn" class="add-btn ghost-btn" type="button" title="Manage the roles used across every process (master data)">Roles</button>
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
@@ -119,6 +120,21 @@
   <aside id="role-drawer" class="drawer" hidden aria-label="Role details">
     <div class="drawer-inner" id="role-drawer-body"></div>
   </aside>
+
+  <!-- Build from instructions: text -> a governed process -->
+  <div id="build-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Build from instructions</h2><button id="build-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Paste a list of steps — one per line, or numbered. Continuum deduces the steps, performers (and their roles), decisions, and automated steps, and builds a <b>governed, editable</b> process. Every assumption is shown. <b>Preview</b> first — nothing is written until you Build.</p>
+      <textarea id="build-text" class="import-xml" spellcheck="false" placeholder="Process: Invoice approval&#10;1. The AP clerk receives the invoice&#10;2. The system automatically checks it against the PO&#10;3. If the amount is over 500, the Finance Manager approves it&#10;4. Finance posts the payment"></textarea>
+      <label class="build-ai"><input type="checkbox" id="build-llm"> Use the AI planner for richer deduction <span class="muted">(only if CONTINUUM_LLM_API_KEY is set; otherwise the built-in reader is used)</span></label>
+      <div class="import-actions">
+        <button id="build-plan" class="add-btn" type="button">Preview</button>
+        <button id="build-apply" class="add-btn" type="button" disabled>Build process</button>
+      </div>
+      <div id="build-out" class="import-out"></div>
+    </div>
+  </div>
 
   <!-- Documentation panel -->
   <div id="docs-modal" class="docs-modal" hidden>
