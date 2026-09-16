@@ -6,6 +6,30 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Smarter deterministic builder (richer no-key drafts)
+
+### D38 — Catch lowercase / single-word roles, an unlabelled title, and draft branch conditions
+**Context:** the no-key built-in reader (D37) produced thin drafts on ordinary prose — it only caught
+Title-Case or explicitly-labelled performers, treated a bare first-line title as a step, and dropped a
+decision's branch logic.
+**Decision & build (`builder/build.py`, deterministic reader only — the LLM path is unchanged):**
+(1) **Roles** — a unified actor detector now reads a leading noun phrase (Title-case *or* lowercase, one
+to four words) before a 3rd-person verb (`"the ap clerk receives…"`, `"Buyer creates…"`,
+`"finance posts…"`), guarded by a verb stoplist and an object-noun stoplist so an imperative like
+`"Process payments"` / `"Notify the vendor"` is **not** misread as a performer. (2) **Title** — an
+unlabelled first line is used as the process name when the steps below are a list, or when it's a short
+phrase that doesn't itself read like an instruction. (3) **Branches** — an `"If <condition>, <action>"`
+line becomes a decision **gateway** *plus* the action step it routes to, with the **condition drafted onto
+that branch's connection** (e.g. `amount is over 500`), surfaced as an assumption to refine into an
+expression. Every guess still lands in the assumptions ledger, and everything remains editable. Nothing
+is fabricated (KPIs/risks still only suggested). `builder/test_build.py` +5 → **22 asserts** (title,
+lowercase + single-word roles, imperative-not-a-role, drafted branch condition, assumption surfaced).
+Full suite **418**. Honest boundary unchanged: the built-in reader is a heuristic first-draft engine; the
+AI planner (with the key) deduces performers and true fork/join branches far better, and both feed the
+same audited apply path so the result is always a governed, editable process.
+
+---
+
 ## 2026-09-16 — Build a process from instructions (text → governed process)
 
 ### D37 — Deduce a process map + metadata from a list of instructions
