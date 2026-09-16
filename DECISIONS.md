@@ -6,6 +6,29 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Visual modeler Phase A: free-form draggable canvas
+
+### D26 — Drag-and-reposition process canvas (in-house modeler, step 1)
+**Context:** to reach Camunda/Mavim/GBTEC-style visual process documentation we chose an **in-house
+easy modeler** (over adopting bpmn-js) so the "very easy user layer" and the governed-graph
+differentiator stay ours. Phase A turns the canvas from a fixed linear step-list into a **free-form
+diagram**: drag any step box anywhere, connectors re-route live, positions persist, and **Tidy up**
+auto-arranges.
+**Decision & build:** a new **layout layer** — `maps/layout.py` writing `data/layout.json` — holds node
+x/y. It is deliberately **outside the governed model**: per §08, decorative position is kept out of the
+agent-facing schema, and moving a box is **not** a versioned/audited model edit (it never touches the
+governance store, the version chain, or the hash-chained log). `mapdata.all_maps` attaches each
+process's saved layout; `maps/app.py` gains `POST /api/layout` (save positions / `op:reset`);
+`maps/static/app.js` renders nodes as transformed groups with edge-clipped connectors recomputed on
+every drag (pointer events), an auto-layout fallback, and a live-fitted viewBox. `data/layout.json` is
+gitignored. `maps/test_layout.py` — 10 asserts (save/load/reset, sanitize, clamp, mapdata attaches
+layout, and **layout never mutates the Task entity**). Verified live: dragged a step, connectors
+re-routed, position survived reload, Tidy up reset it. Full suite **246**.
+**Next (Phase B, not in this change):** typed `SequenceFlow` + gateways/events so users can draw
+*new* branches — Phase A repositions along the existing sequence; it does not yet add arbitrary edges.
+
+---
+
 ## 2026-09-15 — Resume the build: wider ask questions, deeper dashboard, §03 fold
 
 ### D24 — Widen the Ask-the-Agent question set

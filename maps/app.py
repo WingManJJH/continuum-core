@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
 from mapdata import all_maps  # noqa: E402
+import layout  # noqa: E402  — decorative node positions (not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 
 STORE = gov.GovernanceStore()
@@ -102,6 +103,14 @@ class Handler(BaseHTTPRequestHandler):
         actor = b.get("actor", "role.ops.support_lead")
         reason = b.get("reason", "")
         try:
+            if u.path == "/api/layout":
+                # decorative node positions only — NOT a model edit, so it does not
+                # go through the governance store, the version chain, or the audit log.
+                if b.get("op") == "reset":
+                    layout.reset_process(b.get("process", ""))
+                    return self._json({"ok": True, "layout": {}})
+                saved = layout.save_process(b.get("process", ""), b.get("positions", {}))
+                return self._json({"ok": True, "layout": saved})
             if u.path == "/api/process":
                 r = STORE.add_process(b.get("code", ""), b.get("name", ""),
                                       b.get("owner", ""), actor, reason)

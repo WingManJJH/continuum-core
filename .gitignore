@@ -9,3 +9,4 @@ data/audit_anchors.jsonl
 data/audit_archive.jsonl
 data/retention_ledger.jsonl
 data/legal_holds.json
+data/layout.json
