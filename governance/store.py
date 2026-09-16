@@ -43,6 +43,7 @@ EDITABLE_TASK_FIELDS = [
     "name", "seq", "performed_by", "inputs", "outputs", "data_scope",
     "kpi_refs", "guardrail_ref", "subprocess_ref",
 ]
+EDITABLE_ROLE_FIELDS = ["name", "raci", "skills"]
 
 
 class EditError(ValueError):
@@ -69,6 +70,8 @@ class GovernanceStore:
             self._flow_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "event.schema.json")) as f:
             self._event_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "human-role.schema.json")) as f:
+            self._role_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -385,6 +388,96 @@ class GovernanceStore:
         cc.append_edit_event("Process", code, "create", None, 1,
                              {"kind": "human", "id": actor}, proc, reason.strip())
         return proc
+
+    # --- roles (master data) ------------------------------------------------
+    def role_refs(self, g: cc.Graph, role_id: str) -> dict:
+        """Every active place a role is referenced, so a role is never edited or
+        removed blind. Returns {as_owner, as_performer, as_escalation, as_objective_owner}."""
+        owner = [p["id"] for p in g.all("Process")
+                 if p["status"] == "active" and p.get("owner_role") == role_id]
+        performer = [t["id"] for t in g.all("Task")
+                     if t["status"] == "active" and role_id in t.get("performed_by", [])]
+        escalation = [gr["id"] for gr in g.all("GuardrailPolicy")
+                      if gr.get("status") == "active" and gr.get("escalation_path") == role_id]
+        objective = [o["id"] for o in g.all("StrategicObjective")
+                     if o.get("owner_role") == role_id]
+        return {"as_owner": owner, "as_performer": performer,
+                "as_escalation": escalation, "as_objective_owner": objective}
+
+    def add_role(self, role_id: str, name: str, actor: str, reason: str,
+                 raci: dict | None = None, skills: list[str] | None = None) -> dict:
+        """Author a new HumanRole — a role, never a named person (§02). Validated
+        against the locked schema and recorded as a versioned, chained event."""
+        self._require(reason, actor)
+        if not re.match(r"^role\.[a-z0-9_.]+$", role_id or ""):
+            raise EditError("a role id must look like role.dept.name (lowercase, dots/underscores)")
+        if not name or not name.strip():
+            raise EditError("a role name is required")
+        g = self.graph()
+        if g.get("HumanRole", role_id) is not None:
+            raise EditError(f"role {role_id} already exists")
+        role = {"id": role_id, "name": name.strip(), "version": 1, "status": "active"}
+        if raci:
+            role["raci"] = {k: bool(v) for k, v in raci.items()
+                            if k in ("responsible", "accountable", "consulted", "informed")}
+        if skills:
+            role["skills"] = [str(s).strip() for s in skills if str(s).strip()]
+        errs = sorted(self._role_validator.iter_errors(role), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("HumanRole", role_id, "create", None, 1,
+                             {"kind": "human", "id": actor}, role, reason.strip())
+        return role
+
+    def edit_role(self, role_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Rename a role or update its standing RACI / skills. The id is immutable
+        (it is referenced across the graph); a new version, never an overwrite."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("HumanRole", role_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired role {role_id}")
+        unknown = set(changes) - set(EDITABLE_ROLE_FIELDS)
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)} (the role id is immutable)")
+        new = copy.deepcopy(cur)
+        for k, v in changes.items():
+            if k == "raci":
+                new["raci"] = {kk: bool(vv) for kk, vv in (v or {}).items()
+                               if kk in ("responsible", "accountable", "consulted", "informed")}
+            elif k == "skills":
+                new["skills"] = [str(s).strip() for s in (v or []) if str(s).strip()]
+            elif k == "name":
+                if not str(v).strip():
+                    raise EditError("a role name is required")
+                new["name"] = str(v).strip()
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._role_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("HumanRole", role_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def remove_role(self, role_id: str, actor: str, reason: str) -> dict:
+        """Retire a role — refused while anything still references it, so no owner,
+        performer, or escalation path is left pointing at nothing."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("HumanRole", role_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or already-retired role {role_id}")
+        refs = self.role_refs(g, role_id)
+        used = refs["as_owner"] + refs["as_performer"] + refs["as_escalation"] + refs["as_objective_owner"]
+        if used:
+            raise EditError(f"role {role_id} is still in use by {len(used)} item(s) "
+                            f"(e.g. {used[0]}); reassign them before retiring it")
+        new = copy.deepcopy(cur)
+        new["status"] = "deprecated"
+        new["version"] = cur["version"] + 1
+        cc.append_edit_event("HumanRole", role_id, "deprecate", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
 
     def move_task(self, task_id: str, direction: str, actor: str,
                   reason: str = "reorder step") -> dict:

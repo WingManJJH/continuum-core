@@ -38,6 +38,7 @@
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
         <button id="import-btn" class="add-btn ghost-btn" type="button" title="Import a BPMN 2.0 XML file as a new governed process">Import BPMN</button>
+        <button id="roles-btn" class="add-btn ghost-btn" type="button" title="Manage the roles used across every process (master data)">Roles</button>
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
         <button id="enable-branch" class="add-btn" type="button" hidden title="Turn the linear steps into an editable branching flow">Enable branching</button>
@@ -90,6 +91,28 @@
       <div id="import-out" class="import-out"></div>
     </div>
   </div>
+
+  <!-- Manage roles: the §02 HumanRole master data (add / list) -->
+  <div id="roles-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Manage roles</h2><button id="roles-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Roles are <b>master data</b> (Core Model &sect;02) — a role, never a named person, so coverage survives turnover. Referenced by process owners, step performers, and guardrail escalation paths. Every change is versioned and audited. Click a role to see where it's used and edit it.</p>
+      <form id="role-add" class="role-add">
+        <input id="role-add-id" placeholder="role.dept.name" spellcheck="false" required>
+        <input id="role-add-name" placeholder="Display name" required>
+        <input id="role-add-skills" placeholder="skills, comma-separated (optional)">
+        <button class="add-btn" type="submit">Add role</button>
+      </form>
+      <div id="role-add-msg"></div>
+      <div id="roles-list" class="roles-list"><div class="muted">Loading roles…</div></div>
+    </div>
+  </div>
+
+  <!-- Role drawer: a non-destructive side panel for any role reference (the
+       flowchart / RACI / lanes stay mounted underneath) -->
+  <aside id="role-drawer" class="drawer" hidden aria-label="Role details">
+    <div class="drawer-inner" id="role-drawer-body"></div>
+  </aside>
 
   <script src="app.js"></script>
 </body>

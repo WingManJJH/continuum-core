@@ -283,3 +283,43 @@ circle.ev-inner { fill: none; stroke: var(--ink); stroke-width: 1.2; }
 .imp-counts { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
 .imp-warn { margin-top: 9px; font-size: 12px; color: var(--warn); }
 .imp-warn ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* ---- Roles: clickable references, manage list, and the side drawer ---- */
+.rolelink { color: var(--accent); cursor: pointer; border-bottom: 1px dotted color-mix(in srgb, var(--accent) 55%, transparent); }
+.rolelink:hover { border-bottom-style: solid; }
+text.rolelink-svg { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: var(--accent); }
+text.rolelink-svg:hover { fill: var(--accent); }
+.agentref { color: var(--muted); }
+
+.role-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; }
+.role-add input { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); padding: 7px 9px; }
+.role-add input:first-child { font-family: var(--mono); font-size: 12px; }
+.role-add #role-add-skills { grid-column: 1 / 3; }
+.roles-list { margin-top: 10px; max-height: 46vh; overflow: auto; }
+.role-row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+.role-row:hover { background: var(--surface-2); }
+.role-main { flex: 1; }
+.role-main .role-id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-left: 8px; }
+.role-use { font-size: 12px; color: var(--muted); }
+
+.drawer { position: fixed; top: 0; right: 0; width: min(360px, 92vw); height: 100vh; z-index: 60;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 28px rgba(20,22,28,.14);
+  overflow-y: auto; }
+.drawer-inner { padding: 18px 20px 40px; }
+.dw-top { display: flex; align-items: flex-start; gap: 10px; }
+.dw-name { font-size: 18px; font-weight: 600; }
+.dw-id { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+.dw-top .x { margin-left: auto; border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); }
+.dw-sec { margin-top: 16px; }
+.dw-lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.raci-row, .raci-edit { display: flex; gap: 6px; flex-wrap: wrap; }
+.raci-chip { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); color: var(--muted); }
+.raci-chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.raci-edit label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink); }
+.skilltag, .usechip { display: inline-block; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; margin: 0 6px 6px 0; }
+.usechip { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.dw-use { margin: 8px 0; }
+.dw-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); padding: 7px 9px; }
+.dw-actions { display: flex; gap: 8px; margin-top: 20px; }
+.dw-actions .danger:hover:not(:disabled) { border-color: var(--crit); color: var(--crit); }
