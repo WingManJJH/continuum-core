@@ -88,6 +88,35 @@ DOMAIN_NAMES = {
 }
 
 
+def roles(g: cc.Graph | None = None) -> list[dict]:
+    """The role master data (§02 HumanRole), each annotated with where it is used —
+    owner of a process, performer of a step, a guardrail's escalation path, or an
+    objective owner. Read-only, from the one graph; feeds the manage-roles panel and
+    the click-through role drawer."""
+    g = g or cc.Graph()
+    procs = [p for p in g.all("Process") if p["status"] == "active"]
+    tasks = [t for t in g.all("Task") if t["status"] == "active"]
+    grs = [x for x in g.all("GuardrailPolicy") if x.get("status") == "active"]
+    objs = g.all("StrategicObjective")
+    out = []
+    for r in sorted((x for x in g.all("HumanRole") if x["status"] == "active"), key=lambda x: x["id"]):
+        rid = r["id"]
+        owner = [p["id"] for p in procs if p.get("owner_role") == rid]
+        perf_tasks = [t["id"] for t in tasks if rid in t.get("performed_by", [])]
+        perf_procs = sorted({t["process_ref"] for t in tasks if rid in t.get("performed_by", [])})
+        esc = [gr["id"] for gr in grs if gr.get("escalation_path") == rid]
+        obj = [o["id"] for o in objs if o.get("owner_role") == rid]
+        count = len(owner) + len(perf_tasks) + len(esc) + len(obj)
+        out.append({
+            "id": rid, "name": r.get("name", rid), "raci": r.get("raci", {}),
+            "skills": r.get("skills", []),
+            "used_by": {"owner": owner, "performer_processes": perf_procs,
+                        "performer_tasks": perf_tasks, "escalation": esc, "objectives": obj},
+            "in_use": count > 0, "use_count": count,
+        })
+    return out
+
+
 def landscape(g: cc.Graph | None = None) -> dict:
     """The org's process house: every active process grouped by APQC domain, with
     per-process stats, plus catalogs (roles / KPIs / risks) that thread across

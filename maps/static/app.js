@@ -26,7 +26,11 @@ function subBadge(t) {
 
 // ---------- load ----------
 function load() {
-  return fetch("/api/maps").then(function (r) { return r.json(); }).then(function (d) {
+  return Promise.all([
+    fetch("/api/maps").then(function (r) { return r.json(); }),
+    loadRoles(true),   // role master data — so role names + click-through are ready to render
+  ]).then(function (res) {
+    var d = res[0];
     state.procs = d.processes;
     state.landscape = null;  // model changed — refetch the house next time it's opened
     if (!state.sel && state.procs.length) state.sel = state.procs[0].id;
@@ -184,7 +188,8 @@ function renderLinear(m) {
     var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
     lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
     var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
-    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t));
+    var rAttr = t.roles[0] ? ' class="tperf rolelink-svg" data-role="' + esc(t.roles[0]) + '"' : ' class="tperf"';
+    p.push('<text' + rAttr + ' x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t));
     if (t.agents.length && t.escalate_if) {  // escalation branch travels with the node
       var bx = NW / 2, by = NH + 26, pw = 172, pxx = bx - pw / 2;
       p.push('<line class="esc-line" x1="' + bx + '" y1="' + NH + '" x2="' + bx + '" y2="' + by + '" marker-end="url(#eh_' + uid + ')"/>');
@@ -323,7 +328,8 @@ function renderGraph(m) {
     var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
     lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
     var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
-    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t) + "</g>");
+    var rAttr = t.roles[0] ? ' class="tperf rolelink-svg" data-role="' + esc(t.roles[0]) + '"' : ' class="tperf"';
+    p.push('<text' + rAttr + ' x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t) + "</g>");
   });
   (m.gateways || []).forEach(function (gw) {
     var x = state.flowPos[gw.id].x, y = state.flowPos[gw.id].y, c = GW / 2;
@@ -472,7 +478,8 @@ function renderLanes(m) {
   lanes.forEach(function (l, i) {
     p.push('<rect class="lane' + (i % 2 ? " alt" : "") + '" x="0" y="' + (top + i * LH) + '" width="' + W + '" height="' + (LH - 4) + '"/>');
     p.push('<line class="lanediv" x1="' + LW + '" y1="' + (top + i * LH) + '" x2="' + LW + '" y2="' + (top + i * LH + LH - 4) + '"/>');
-    p.push('<text class="lanelbl" x="14" y="' + (top + i * LH + LH / 2) + '">' + esc(trunc(laneLabel(l), 20)) + "</text>");
+    var lblAttr = l.indexOf("role.") === 0 ? ' class="lanelbl rolelink-svg" data-role="' + esc(l) + '"' : ' class="lanelbl"';
+    p.push('<text' + lblAttr + ' x="14" y="' + (top + i * LH + LH / 2) + '">' + esc(trunc(laneLabel(l), 20)) + "</text>");
   });
   var f0 = pos[m.tasks[0].id], fl = pos[m.tasks[m.tasks.length - 1].id];
   var sx = padX - 44, sy = f0.cy, ex = fl.x + NW + 44, ey = fl.cy;
@@ -562,7 +569,7 @@ function renderLandscape(L) {
   var C = L.catalogs;
   function catcol(title, rows) { return '<div class="catcol"><h4>' + title + "</h4>" + rows + "</div>"; }
   var roleRows = C.roles.map(function (r) {
-    return '<div class="catrow"><div class="catmain"><span class="catname">' + esc(r.name) + '</span><span class="catcount">' + r.count + "</span></div>"
+    return '<div class="catrow"><div class="catmain"><span class="catname rolelink" data-role="' + esc(r.id) + '">' + esc(r.name) + '</span><span class="catcount">' + r.count + "</span></div>"
       + '<div class="catprocs">' + pchips(r.processes) + "</div></div>";
   }).join("");
   var kpiRows = C.kpis.map(function (k) {
@@ -610,7 +617,7 @@ function renderRaci(m) {
       if (t.escalation_path === r) parts.push('<span class="c">C</span>');
       return "<td>" + parts.join(" ") + "</td>";
     }).join("");
-    return '<tr><td class="role">' + esc(shortRole(r)) + "</td>" + cells + "</tr>";
+    return '<tr><td class="role rolelink" data-role="' + esc(r) + '">' + esc(roleName(r)) + "</td>" + cells + "</tr>";
   }).join("");
   return '<table class="raci"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table>"
     + '<div class="raci-legend"><b class="r" style="color:var(--accent)">R</b> responsible · '
@@ -839,7 +846,8 @@ function taskProps(p, t) {
   var g = t.guardrail_full;
   var head = '<div class="p-head"><span class="p-id">t' + t.seq + "</span> " + esc(t.name) + "</div>"
     + '<div class="p-sub">' + esc(t.id) + (t.override ? ' · <span style="color:var(--warn)">task override</span>' : "") + "</div>"
-    + '<div class="p-sec"><div class="lbl">performed by</div><div class="p-row">' + esc(t.roles.map(shortRole).join(", ") || "—") + (t.agents.length ? ' <span class="pill gr">' + esc(t.agents.map(lastSeg).join(", ")) + " (agent)</span>" : "") + "</div></div>"
+    + '<div class="p-sec"><div class="lbl">performed by</div><div class="p-row">' + (t.roles.length ? t.roles.map(function (r) { return roleLink(r); }).join(", ") : "—") + (t.agents.length ? ' <span class="pill gr">' + esc(t.agents.map(lastSeg).join(", ")) + " (agent)</span>" : "") + "</div></div>"
+    + (t.escalation_path ? '<div class="p-sec"><div class="lbl">escalates to</div><div class="p-row">' + roleLink(t.escalation_path) + "</div></div>" : "")
     + '<div class="p-sec"><div class="lbl">data</div><div class="p-row">in ' + esc(csv(t.inputs) || "—") + " · out " + esc(csv(t.outputs) || "—") + "</div>"
     + '<div class="p-row">' + t.kpi_refs.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("") + "</div></div>";
   var struct = '<div class="struct"><div class="lbl">step structure</div>'
@@ -1008,6 +1016,148 @@ function postImport(body) { return fetch("/api/import/bpmn", { method: "POST", h
   $("#share-land").addEventListener("click", function () {
     postPortal({ target: "__landscape__", title: "Process landscape", actor: ACTOR }).then(function (res) {
       if (res.ok) refreshShareList(); else alert("Could not publish: " + res.error);
+    });
+  });
+})();
+
+// ================= Roles: master data + click-through drawer =================
+function postRole(body) { return fetch("/api/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+function loadRoles(force) {
+  if (state.roles && !force) return Promise.resolve(state.roles);
+  return fetch("/api/roles").then(function (r) { return r.json(); }).then(function (d) { state.roles = d.roles || []; return state.roles; });
+}
+function roleById(id) { return (state.roles || []).find(function (x) { return x.id === id; }); }
+function roleName(id) { var r = roleById(id); return r ? r.name : shortRole(id); }
+// a clickable role reference — opens the drawer, never navigates
+function roleLink(id, label) {
+  if (!id) return "";
+  if (String(id).indexOf("agent.") === 0) return '<span class="agentref">' + esc(label || shortRole(id)) + "</span>";
+  return '<span class="rolelink" data-role="' + esc(id) + '" title="View role ' + esc(id) + '">' + esc(label || roleName(id)) + "</span>";
+}
+
+// delegated: any element carrying data-role opens the role drawer (works for the
+// SVG flow node performer text, RACI cells, lane labels, props, landscape catalog)
+document.addEventListener("click", function (e) {
+  var el = e.target.closest ? e.target.closest("[data-role]") : null;
+  if (el && el.getAttribute("data-role")) { e.stopPropagation(); openRoleDrawer(el.getAttribute("data-role")); }
+}, true);
+
+function openRoleDrawer(id) {
+  state.roleEdit = false;
+  loadRoles().then(function () { renderRoleDrawer(id); $("#role-drawer").hidden = false; });
+}
+function closeRoleDrawer() { $("#role-drawer").hidden = true; state.roleEdit = false; }
+
+function usedByBlock(r) {
+  function chips(ids, opener) {
+    return ids.map(function (x) { return '<span class="usechip"' + (opener ? ' data-open="' + esc(opener(x)) + '"' : "") + ">" + esc(x) + "</span>"; }).join("");
+  }
+  var u = r.used_by, rows = [];
+  if (u.owner.length) rows.push('<div class="dw-use"><div class="dw-lbl">Owns (process)</div><div>' + chips(u.owner, function (x) { return x; }) + "</div></div>");
+  if (u.performer_processes.length) rows.push('<div class="dw-use"><div class="dw-lbl">Performs steps in</div><div>' + chips(u.performer_processes, function (x) { return x; }) + "</div></div>");
+  if (u.escalation.length) rows.push('<div class="dw-use"><div class="dw-lbl">Escalation path for</div><div>' + chips(u.escalation, null) + "</div></div>");
+  if (u.objectives.length) rows.push('<div class="dw-use"><div class="dw-lbl">Owns objective</div><div>' + chips(u.objectives, null) + "</div></div>");
+  if (!rows.length) rows.push('<div class="muted" style="font-size:13px">Not referenced by any process yet.</div>');
+  return rows.join("");
+}
+function raciChips(raci) {
+  var map = [["responsible", "R"], ["accountable", "A"], ["consulted", "C"], ["informed", "I"]];
+  return map.map(function (m) { return '<span class="raci-chip ' + (raci && raci[m[0]] ? "on" : "") + '">' + m[1] + "</span>"; }).join("");
+}
+
+function renderRoleDrawer(id) {
+  var body = $("#role-drawer-body");
+  if (String(id).indexOf("agent.") === 0) {
+    body.innerHTML = '<div class="dw-top"><div><div class="dw-name">' + esc(shortRole(id)) + '</div><div class="dw-id">' + esc(id) + '</div></div>'
+      + '<button class="x" id="dw-close" type="button">&times;</button></div>'
+      + '<div class="muted" style="font-size:13px;margin-top:10px">This is an <b>agent</b>, not a human role — it runs the step automatically under a guardrail. Manage agent bindings from the step\'s properties panel.</div>';
+    $("#dw-close").onclick = closeRoleDrawer; return;
+  }
+  var r = roleById(id);
+  if (!r) {
+    body.innerHTML = '<div class="dw-top"><div><div class="dw-name">' + esc(shortRole(id)) + '</div><div class="dw-id">' + esc(id) + '</div></div>'
+      + '<button class="x" id="dw-close" type="button">&times;</button></div>'
+      + '<div class="muted" style="font-size:13px;margin-top:10px">This role id isn\'t in the active master list (it may have been retired).</div>';
+    $("#dw-close").onclick = closeRoleDrawer; return;
+  }
+  if (state.roleEdit) { renderRoleEdit(r); return; }
+  body.innerHTML =
+    '<div class="dw-top"><div><div class="dw-name">' + esc(r.name) + '</div><div class="dw-id">' + esc(r.id) + '</div></div>'
+    + '<button class="x" id="dw-close" type="button">&times;</button></div>'
+    + '<div class="dw-sec"><div class="dw-lbl">Standing RACI</div><div class="raci-row">' + raciChips(r.raci) + '</div></div>'
+    + (r.skills && r.skills.length ? '<div class="dw-sec"><div class="dw-lbl">Skills</div><div>' + r.skills.map(function (s) { return '<span class="skilltag">' + esc(s) + "</span>"; }).join("") + "</div></div>" : "")
+    + '<div class="dw-sec"><div class="dw-lbl">Used across the model</div>' + usedByBlock(r) + "</div>"
+    + '<div class="dw-actions"><button class="add-btn" id="dw-edit" type="button">Edit</button>'
+    + '<button class="add-btn ghost-btn danger" id="dw-remove" type="button"' + (r.in_use ? " disabled title=\"reassign its references first\"" : "") + ">Retire</button></div>";
+  $("#dw-close").onclick = closeRoleDrawer;
+  $("#dw-edit").onclick = function () { state.roleEdit = true; renderRoleDrawer(id); };
+  var rm = $("#dw-remove");
+  if (rm && !r.in_use) rm.onclick = function () {
+    if (!confirm("Retire role " + r.id + "? (deprecated on the audit trail, not destroyed)")) return;
+    postRole({ op: "remove", id: r.id, actor: ACTOR, reason: "retired role via drawer" }).then(function (res) {
+      if (res.ok) { loadRoles(true).then(function () { closeRoleDrawer(); refreshRolesList(); }); } else alert("Rejected: " + res.error);
+    });
+  };
+  body.querySelectorAll("[data-open]").forEach(function (c) { c.style.cursor = "pointer"; c.addEventListener("click", function () { closeRoleDrawer(); openProcess(c.getAttribute("data-open")); }); });
+}
+
+function renderRoleEdit(r) {
+  var body = $("#role-drawer-body");
+  var raci = r.raci || {};
+  body.innerHTML =
+    '<div class="dw-top"><div><div class="dw-name">Edit role</div><div class="dw-id">' + esc(r.id) + '</div></div>'
+    + '<button class="x" id="dw-close" type="button">&times;</button></div>'
+    + '<div class="dw-sec"><div class="dw-lbl">Display name</div><input id="dw-name" class="dw-input" value="' + esc(r.name) + '"></div>'
+    + '<div class="dw-sec"><div class="dw-lbl">Skills (comma-separated)</div><input id="dw-skills" class="dw-input" value="' + esc((r.skills || []).join(", ")) + '"></div>'
+    + '<div class="dw-sec"><div class="dw-lbl">Standing RACI</div><div class="raci-edit">'
+    + ["responsible", "accountable", "consulted", "informed"].map(function (k) {
+        return '<label><input type="checkbox" data-raci="' + k + '"' + (raci[k] ? " checked" : "") + "> " + k.charAt(0).toUpperCase() + k.slice(1) + "</label>";
+      }).join("") + "</div></div>"
+    + '<div id="dw-msg"></div>'
+    + '<div class="dw-actions"><button class="add-btn" id="dw-save" type="button">Save new version</button>'
+    + '<button class="add-btn ghost-btn" id="dw-cancel" type="button">Cancel</button></div>';
+  $("#dw-close").onclick = closeRoleDrawer;
+  $("#dw-cancel").onclick = function () { state.roleEdit = false; renderRoleDrawer(r.id); };
+  $("#dw-save").onclick = function () {
+    var raciObj = {};
+    body.querySelectorAll("[data-raci]").forEach(function (c) { raciObj[c.getAttribute("data-raci")] = c.checked; });
+    var changes = { name: $("#dw-name").value.trim(), skills: parseCsv($("#dw-skills").value), raci: raciObj };
+    postRole({ op: "edit", id: r.id, changes: changes, actor: ACTOR, reason: "edited role via drawer" }).then(function (res) {
+      if (!res.ok) { $("#dw-msg").innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
+      state.roleEdit = false;
+      loadRoles(true).then(function () { renderRoleDrawer(r.id); refreshRolesList(); load(); });
+    });
+  };
+}
+
+// ---- manage-roles modal ----
+function refreshRolesList() {
+  var host = $("#roles-list"); if (!host) return;
+  loadRoles(true).then(function (roles) {
+    if (!roles.length) { host.innerHTML = '<div class="muted">No roles yet.</div>'; return; }
+    host.innerHTML = roles.map(function (r) {
+      return '<div class="role-row" data-role="' + esc(r.id) + '">'
+        + '<div class="role-main"><b>' + esc(r.name) + '</b><span class="role-id">' + esc(r.id) + '</span></div>'
+        + '<div class="role-use">' + (r.in_use ? r.use_count + " use" + (r.use_count === 1 ? "" : "s") : '<span class="muted">unused</span>') + "</div></div>";
+    }).join("");
+  });
+}
+(function () {
+  var rb = $("#roles-btn"); if (!rb) return;
+  var modal = $("#roles-modal");
+  rb.addEventListener("click", function () { modal.hidden = false; refreshRolesList(); });
+  $("#roles-close").addEventListener("click", function () { modal.hidden = true; });
+  modal.addEventListener("click", function (e) { if (e.target === modal) modal.hidden = true; });
+  $("#role-add").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var body = { op: "add", id: $("#role-add-id").value.trim(), name: $("#role-add-name").value.trim(),
+                 skills: parseCsv($("#role-add-skills").value), actor: ACTOR, reason: "added role via manage panel" };
+    postRole(body).then(function (res) {
+      var m = $("#role-add-msg");
+      if (!res.ok) { m.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
+      m.innerHTML = '<div class="msg ok">Added ' + esc(res.result.id) + "</div>";
+      $("#role-add-id").value = ""; $("#role-add-name").value = ""; $("#role-add-skills").value = "";
+      refreshRolesList(); load();
     });
   });
 })();

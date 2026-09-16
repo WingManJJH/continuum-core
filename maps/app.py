@@ -24,7 +24,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
-from mapdata import all_maps, landscape  # noqa: E402
+from mapdata import all_maps, landscape, roles as role_list  # noqa: E402
 import layout  # noqa: E402  — decorative node positions (not a model edit)
 import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
@@ -78,6 +78,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"model_sig": g.model_sig, "processes": all_maps(g)})
         if u.path == "/api/landscape":
             return self._json({"landscape": landscape(cc.Graph())})
+        if u.path == "/api/roles":
+            return self._json({"roles": role_list(cc.Graph())})
         if u.path == "/api/portal":
             # the author's manage list — every minted share link + its status
             return self._json({"links": portal.all_links(cc.Graph())})
@@ -194,6 +196,19 @@ class Handler(BaseHTTPRequestHandler):
                                           reason or "added gateway via canvas", name=b.get("name", ""))
                 elif op == "remove":
                     r = STORE.remove_gateway(b["id"], actor, reason or "removed gateway via canvas")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+            elif u.path == "/api/role":
+                op = b.get("op")
+                if op == "add":
+                    r = STORE.add_role(b.get("id", ""), b.get("name", ""), actor,
+                                       reason or "added role via canvas",
+                                       raci=b.get("raci"), skills=b.get("skills"))
+                elif op == "edit":
+                    r = STORE.edit_role(b["id"], b.get("changes", {}), actor,
+                                        reason or "edited role via canvas")
+                elif op == "remove":
+                    r = STORE.remove_role(b["id"], actor, reason or "retired role via canvas")
                 else:
                     return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
             elif u.path == "/api/event":

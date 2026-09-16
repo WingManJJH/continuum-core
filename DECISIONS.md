@@ -6,6 +6,36 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Manage roles + click-through role drawer
+
+### D33 — In-app role master data, and role references that link to a non-destructive drawer
+**Context:** roles (`HumanRole`, Core Model §02) were master data with no in-app way to author or inspect
+them — you could assign an existing role to a step but adding/renaming one meant editing `data/seed.json`
+by hand. And a role shown on the flowchart (a performer, a lane, an escalation path) was just text.
+**Decision & build — write path:** `store.add_role` / `edit_role` / `remove_role` on the same versioned,
+hash-chained governance write path (validated against the locked `human-role.schema.json`; the role **id
+is immutable** since it's referenced across the graph; editable fields are name / raci / skills). Removal
+is **referential-integrity-guarded**: `store.role_refs(g, id)` finds every active reference (process owner,
+step performer, guardrail escalation path, objective owner) and `remove_role` refuses (with a clear
+message) while any exist — otherwise it deprecates (retained, never destroyed). `mapdata.roles(g)` reads
+the active roles annotated with where each is used. Endpoints `GET /api/roles` and `POST /api/role`
+(add/edit/remove). `governance/test_role.py` — **16 asserts** (author/validate/dupe, rename + id-immutable,
+in-use retire refused, unused retire deprecates, usage lookup, audited).
+**Decision & build — UI:** a **Manage roles** dialog (add a role; a list showing each role's use count;
+click a role → drawer). And the headline ask: **every role reference is now a link** — the performer text
+on a flow node, the RACI role column, the swimlane label, the props panel's performers + escalation path,
+and the landscape roles catalog all carry `data-role`, and a single delegated click opens a **role drawer**
+— a fixed right-side overlay showing the role's name, id, standing RACI, skills, and *used across the model*
+(owner of / performs steps in / escalation for / objective owner), with inline Edit and a use-guarded
+Retire. **Non-destructive by construction:** the drawer is an overlay, so the flowchart / RACI / lanes stay
+mounted underneath — opening a role never navigates away or rebuilds the view (the explicit requirement).
+Agent references (`agent.*`) get a distinct read-only note rather than a role drawer. Verified live:
+clicked a performer on the flow node and a RACI cell → the drawer opened with the flow/table still mounted;
+added a role from the panel, renamed + RACI-edited it in the drawer, retired it; all three (create / update
+/ deprecate) landed on the audit chain, which verified intact. Full suite **369**.
+
+---
+
 ## 2026-09-16 — Visual modeler Phase F (part 2): BPMN 2.0 import
 
 ### D32 — Import a BPMN 2.0 file as a new governed process (round-trips the export)
