@@ -76,6 +76,8 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
             "guardrail": f"{p['guardrail_ref']}.v{pgr['version']}" if pgr else None,
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
             "gateways": gateways, "flows": flows, "events": events, "explicit": bool(flows),
+            "parent_ref": p.get("parent_ref"), "objective_refs": p.get("objective_refs", []),
+            "custom": p.get("custom", {}), "maturity_score": p.get("maturity_score"),
             "layout": layout.load_process(p["id"]),  # {node_id: {x,y}} — decorative
         })
     return out
@@ -86,6 +88,52 @@ DOMAIN_NAMES = {
     "MS": "Marketing & Sales", "IT": "Information Technology",
     "PD": "Product Development", "HR": "Human Resources", "SV": "Strategy",
 }
+
+
+def _proc_card(g: cc.Graph, p: dict) -> dict:
+    tasks = [t for t in g.all("Task") if t["process_ref"] == p["id"] and t["status"] == "active"]
+    agent_steps = sum(1 for t in tasks if any(str(w).startswith("agent.") for w in t.get("performed_by", [])))
+    gr = g.get("GuardrailPolicy", p.get("guardrail_ref"))
+    return {"id": p["id"], "name": p["name"], "owner": p["owner_role"], "steps": len(tasks),
+            "agent_steps": agent_steps, "reviewed": bool(gr and gr.get("review", {}).get("reviewed_by")),
+            "risks": len(p.get("risk_refs", [])), "kpis": p.get("kpi_refs", []),
+            "objective_refs": p.get("objective_refs", []), "custom": p.get("custom", {}),
+            "parent_ref": p.get("parent_ref"), "maturity_score": p.get("maturity_score")}
+
+
+def architecture(g: cc.Graph | None = None) -> dict:
+    """The L1–L5 process hierarchy: ProcessGroups nested by parent, each with the
+    leaf Processes that roll up to it. Feeds the management Architecture view and the
+    master-data panels. Read-only, from the one graph."""
+    g = g or cc.Graph()
+    groups = [x for x in g.all("ProcessGroup") if x["status"] == "active"]
+    procs = [p for p in g.all("Process") if p["status"] == "active"]
+    by_id = {x["id"]: x for x in groups}
+    children = {}
+    for x in groups:
+        children.setdefault(x.get("parent_ref"), []).append(x["id"])
+    procs_of = {}
+    for p in procs:
+        procs_of.setdefault(p.get("parent_ref"), []).append(p)
+
+    def node(gid: str) -> dict:
+        x = by_id[gid]
+        return {"id": gid, "name": x["name"], "level": x["level"], "owner_role": x.get("owner_role"),
+                "objective_refs": x.get("objective_refs", []), "description": x.get("description", ""),
+                "custom": x.get("custom", {}),
+                "children": [node(c) for c in sorted(children.get(gid, []))],
+                "processes": [_proc_card(g, p) for p in sorted(procs_of.get(gid, []), key=lambda p: p["id"])]}
+
+    roots = [node(gid) for gid in sorted(children.get(None, []))]
+    known = set(by_id)
+    orphans = [_proc_card(g, p) for p in sorted(procs, key=lambda p: p["id"])
+               if not p.get("parent_ref") or p.get("parent_ref") not in known]
+    flat = [{"id": x["id"], "name": x["name"], "level": x["level"], "parent_ref": x.get("parent_ref"),
+             "owner_role": x.get("owner_role"), "objective_refs": x.get("objective_refs", []),
+             "description": x.get("description", ""), "custom": x.get("custom", {}),
+             "process_count": len(procs_of.get(x["id"], []))}
+            for x in sorted(groups, key=lambda x: (x["level"], x["id"]))]
+    return {"roots": roots, "orphans": orphans, "groups": flat, "process_total": len(procs)}
 
 
 def roles(g: cc.Graph | None = None) -> list[dict]:
