@@ -547,6 +547,31 @@ class GovernanceStore:
                              {"kind": "human", "id": actor}, gw, reason.strip())
         return gw
 
+    def edit_gateway(self, gateway_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Rename a gateway or switch its type (exclusive/parallel). Versioned."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("Gateway", gateway_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired gateway {gateway_id}")
+        unknown = set(changes) - {"name", "type"}
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        if "type" in changes and changes["type"] not in ("exclusive", "parallel"):
+            raise EditError("gateway type must be 'exclusive' or 'parallel'")
+        new = copy.deepcopy(cur)
+        if "name" in changes:
+            new["name"] = str(changes["name"]).strip()
+        if "type" in changes:
+            new["type"] = changes["type"]
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._gateway_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Gateway", gateway_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
     def remove_gateway(self, gateway_id: str, actor: str, reason: str) -> dict:
         self._require(reason, actor)
         g = self.graph()
@@ -597,6 +622,36 @@ class GovernanceStore:
         cc.append_edit_event("Event", ev["id"], "create", None, 1,
                              {"kind": "human", "id": actor}, ev, reason.strip())
         return ev
+
+    def edit_event(self, event_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Edit an event's name / kind / trigger / timer / message_ref. Versioned."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("Event", event_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired event {event_id}")
+        unknown = set(changes) - {"name", "kind", "trigger", "timer", "message_ref"}
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        if "kind" in changes and changes["kind"] not in ("start", "intermediate", "end"):
+            raise EditError("event kind must be 'start', 'intermediate', or 'end'")
+        if "trigger" in changes and changes["trigger"] not in ("none", "timer", "message"):
+            raise EditError("event trigger must be 'none', 'timer', or 'message'")
+        new = copy.deepcopy(cur)
+        for k in ("name", "kind", "trigger"):
+            if k in changes:
+                new[k] = str(changes[k]).strip() if k == "name" else changes[k]
+        for k in ("timer", "message_ref"):
+            if k in changes:
+                v = changes[k]
+                new[k] = (str(v).strip() or None) if v else None
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._event_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("Event", event_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
 
     def remove_event(self, event_id: str, actor: str, reason: str) -> dict:
         self._require(reason, actor)
@@ -653,6 +708,27 @@ class GovernanceStore:
         if f is None or f["status"] != "active":
             raise EditError(f"unknown or already-retired flow {flow_id}")
         return self._retire_flow(f, actor, reason.strip())
+
+    def edit_flow(self, flow_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Set or clear a flow's branch condition (e.g. 'risk_score > 0.7'). Versioned."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("SequenceFlow", flow_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired flow {flow_id}")
+        unknown = set(changes) - {"condition"}
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        new = copy.deepcopy(cur)
+        cond = changes.get("condition")
+        new["condition"] = (str(cond).strip() or None) if cond else None
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._flow_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("SequenceFlow", flow_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
 
     def enable_branching(self, process_ref: str, actor: str, reason: str) -> list[dict]:
         """Seed explicit flows from the current linear task sequence, so a process
