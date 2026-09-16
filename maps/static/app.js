@@ -1052,22 +1052,40 @@ function postImport(body) { return fetch("/api/import/bpmn", { method: "POST", h
 (function () {
   var ib = $("#import-btn"); if (!ib) return;
   var modal = $("#import-modal"), out = $("#import-out"), apply = $("#import-apply");
-  function open() { $("#import-xml").value = ""; out.innerHTML = ""; apply.disabled = true; modal.hidden = false; }
+  var vsdx = null;  // base64 of a loaded .vsdx (else we use the pasted/loaded XML)
+  function reset() { $("#import-xml").value = ""; out.innerHTML = ""; apply.disabled = true; vsdx = null; }
+  function open() { reset(); modal.hidden = false; }
   function close() { modal.hidden = true; }
+  function payload() { return vsdx ? { format: "vsdx", data_b64: vsdx } : { xml: $("#import-xml").value.trim() }; }
+  function haveInput() { return !!vsdx || !!$("#import-xml").value.trim(); }
   ib.addEventListener("click", open);
   $("#import-close").addEventListener("click", close);
   modal.addEventListener("click", function (e) { if (e.target === modal) close(); });
+  $("#import-xml").addEventListener("input", function () { vsdx = null; });  // typing XML clears a loaded vsdx
   $("#import-file").addEventListener("change", function (e) {
     var f = e.target.files[0]; if (!f) return;
-    var rd = new FileReader();
-    rd.onload = function () { $("#import-xml").value = rd.result; out.innerHTML = '<div class="muted">Loaded ' + esc(f.name) + " — press Preview.</div>"; apply.disabled = true; };
-    rd.readAsText(f);
+    apply.disabled = true;
+    if (/\.vsdx?$/i.test(f.name)) {
+      var rb = new FileReader();
+      rb.onload = function () {
+        var bytes = new Uint8Array(rb.result), bin = "";
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        vsdx = btoa(bin);
+        $("#import-xml").value = "";
+        out.innerHTML = '<div class="muted">Loaded Visio file <b>' + esc(f.name) + "</b> — press Preview.</div>";
+      };
+      rb.readAsArrayBuffer(f);
+    } else {
+      var rt = new FileReader();
+      rt.onload = function () { vsdx = null; $("#import-xml").value = rt.result; out.innerHTML = '<div class="muted">Loaded ' + esc(f.name) + " — press Preview.</div>"; };
+      rt.readAsText(f);
+    }
   });
   $("#import-plan").addEventListener("click", function () {
-    var xml = $("#import-xml").value.trim();
-    if (!xml) { out.innerHTML = '<div class="msg err">Paste some BPMN XML or load a file first.</div>'; return; }
+    if (!haveInput()) { out.innerHTML = '<div class="msg err">Load a BPMN/Visio file, or paste BPMN XML, first.</div>'; return; }
     out.innerHTML = '<div class="muted">Reading…</div>';
-    postImport({ op: "plan", xml: xml }).then(function (res) {
+    var body = payload(); body.op = "plan";
+    postImport(body).then(function (res) {
       if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; apply.disabled = true; return; }
       var c = res.plan.counts;
       var warns = res.plan.warnings.length ? '<div class="imp-warn"><b>' + res.plan.warnings.length + " note(s):</b><ul>"
@@ -1079,9 +1097,10 @@ function postImport(body) { return fetch("/api/import/bpmn", { method: "POST", h
     });
   });
   apply.addEventListener("click", function () {
-    var xml = $("#import-xml").value.trim(); if (!xml) return;
+    if (!haveInput()) return;
     apply.disabled = true; out.innerHTML = '<div class="muted">Importing…</div>';
-    postImport({ op: "apply", xml: xml, actor: ACTOR, reason: "imported from BPMN 2.0 via canvas" }).then(function (res) {
+    var body = payload(); body.op = "apply"; body.actor = ACTOR; body.reason = "imported via canvas";
+    postImport(body).then(function (res) {
       if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
       var code = res.result.code;
       out.innerHTML = '<div class="msg ok">Imported as <b>' + esc(code) + "</b> — opening it…</div>";

@@ -6,6 +6,33 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Import: add Visio (.vsdx)
+
+### D35 — Import a Visio flowchart as a new governed process
+**Context:** the import feature accepted BPMN 2.0 only; a lot of existing process documentation lives in
+**Visio**.
+**Decision & build:** `bpmn/visio_import.py` reads a **`.vsdx`** (an Open-Packaging-Convention ZIP of XML
+parts): it unzips, reads `visio/masters/masters.xml` for shape master names, and parses the first
+`visio/pages/pageN.xml` for shapes + connects. Mapping: a shape whose master is **Decision** → an exclusive
+gateway; **Terminator / Start-End** → the process start/end (classified start vs end by graph
+direction, else by x-position); other flow shapes (Process, Subprocess, …) → steps; a **connector** (a
+shape that is the `FromSheet` of a `Connect`) → a sequence flow whose begin/end come from the BeginX/EndX
+`Connect` rows and whose text becomes the branch condition. Data/annotation shapes and pages past the first
+are skipped **with a warning**; legacy binary **`.vsd`** (not a ZIP) is refused with a clear "re-save as
+.vsdx" message. To keep one write path, the BPMN importer was refactored to expose **`apply_parsed`** /
+`plan_from_parsed`, and the Visio importer feeds the same audited create sequence (so a Visio process is
+governed identically to a BPMN one and re-exports to BPMN). Endpoint: the existing `POST /api/import/bpmn`
+now takes `format:"vsdx"` with the file as **base64** (`data_b64`); the canvas **Import** dialog (renamed
+from "Import BPMN") accepts `.bpmn`/`.xml`/`.vsdx`, reads a `.vsdx` client-side as base64, and Previews +
+Imports it. `bpmn/test_visio.py` — **15 asserts** built around an **in-memory .vsdx** (Start→Receive→
+Decision→Approve/Auto-post→End with a labelled branch): parse counts, terminator classification, data-shape
+warning, condition survival, apply → governed process, audit chain intact, re-export to BPMN, and the .vsd
+refusal. Verified live end-to-end through the real file input: loaded a sample `invoice-approval.vsdx`,
+Previewed (3 steps · 1 gateway · 6 flows), Imported, and the new process opened on the canvas. Full suite
+**396**.
+
+---
+
 ## 2026-09-16 — Canvas fix: editable gateways/events/flows + an escapable Connect mode
 
 ### D34 — No hidden modal trap; edit any node/connection in place
