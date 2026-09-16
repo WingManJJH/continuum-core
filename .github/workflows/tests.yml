@@ -36,7 +36,7 @@ jobs:
           python mcp_server/traceability.py
           python mcp_server/scenario.py
 
-      - name: Test suites (456 assertions)
+      - name: Test suites (464 assertions)
         run: |
           python governance/test_store.py
           python enforcement/test_enforce.py
@@ -44,6 +44,7 @@ jobs:
           python dashboard/test_rollup.py
           python audit/test_audit_chain.py
           python audit/test_anchor.py
+          python audit/test_history.py
           python governance/test_retention.py
           python governance/test_taskedit.py
           python governance/test_authoring.py
@@ -69,4 +70,4 @@ jobs:
           python test_run.py
 
       - name: All green
-        run: echo "ALL GREEN -- 456 assertions + 3 harness checks"
+        run: echo "ALL GREEN -- 464 assertions + 3 harness checks"
