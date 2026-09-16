@@ -259,7 +259,7 @@
 
     <section id="tests">
       <h2><span class="no">&sect;</span> Run every test</h2>
-      <p>The fastest way to confirm the whole system is healthy &mdash; 270 assertions plus 3 harness
+      <p>The fastest way to confirm the whole system is healthy &mdash; 278 assertions plus 3 harness
         checks. The chain ends with <code class="inl">ALL GREEN</code>.</p>
       <div class="cmd">
         <div class="bar"><span class="dot"></span><span class="tag">bash</span>
@@ -278,6 +278,7 @@
   &amp;&amp; <span class="p">python3</span> governance/test_authoring.py \
   &amp;&amp; <span class="p">python3</span> governance/test_binding.py \
   &amp;&amp; <span class="p">python3</span> governance/test_flow.py \
+  &amp;&amp; <span class="p">python3</span> governance/test_subprocess.py \
   &amp;&amp; <span class="p">python3</span> maps/test_mapdata.py \
   &amp;&amp; <span class="p">python3</span> maps/test_layout.py \
   &amp;&amp; <span class="p">python3</span> advisor/test_advisor.py \
@@ -303,6 +304,7 @@
             <tr><td class="cmdcell">governance/test_authoring.py</td><td><span class="pill good">18 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">governance/test_binding.py</td><td><span class="pill good">13 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">governance/test_flow.py</td><td><span class="pill good">24 passed, 0 failed</span></td></tr>
+            <tr><td class="cmdcell">governance/test_subprocess.py</td><td><span class="pill good">8 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">maps/test_mapdata.py</td><td><span class="pill good">12 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">maps/test_layout.py</td><td><span class="pill good">10 passed, 0 failed</span></td></tr>
             <tr><td class="cmdcell">advisor/test_advisor.py</td><td><span class="pill good">26 passed, 0 failed</span></td></tr>
@@ -438,7 +440,7 @@
           <tbody>
             <tr><td>Governance editor</td><td class="cmdcell">governance/app.py</td><td><code>localhost:8787</code></td><td>edit guardrails (Phase 2)</td></tr>
             <tr><td>Strategy dashboard</td><td class="cmdcell">dashboard/app.py</td><td><code>localhost:8788</code></td><td>standing report (Phase 4)</td></tr>
-            <tr><td>Process canvas</td><td class="cmdcell">maps/app.py</td><td><code>localhost:8789</code></td><td>interactive &sect;03 canvas &mdash; free-form draggable flowchart with branching (gateways + drawn flows) / RACI / checklist; view + edit guardrails/structure + author processes + bind agents to steps</td></tr>
+            <tr><td>Process canvas</td><td class="cmdcell">maps/app.py</td><td><code>localhost:8789</code></td><td>interactive &sect;03 canvas &mdash; free-form draggable flowchart with branching (gateways + drawn flows) / swimlanes / RACI / checklist + sub-process drill-down; view + edit guardrails/structure + author processes + bind agents to steps</td></tr>
             <tr><td>Advisor</td><td class="cmdcell">advisor/app.py</td><td><code>localhost:8790</code></td><td>AI window &mdash; analyze anything vs best practices &amp; standards. Set <code>CONTINUUM_LLM_API_KEY</code> for the AI reviewer.</td></tr>
             <tr><td>Ask the Agent</td><td class="cmdcell">ask/app.py</td><td><code>localhost:8791</code></td><td>ask a plain-English question &mdash; the agent writes a read-only graph query, runs it, and answers with a table + Show query. Set <code>CONTINUUM_LLM_API_KEY</code> to enable the LLM planner for open-ended questions.</td></tr>
           </tbody>

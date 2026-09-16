@@ -112,6 +112,26 @@ line.flow:hover { stroke: var(--accent); stroke-width: 2.2; }
 .flabel rect { fill: var(--surface); stroke: var(--line); }
 .flabel text { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
 
+/* swimlanes */
+.lane { fill: var(--surface); stroke: var(--line); }
+.lane.alt { fill: var(--surface-2); }
+.lanediv { stroke: var(--line); stroke-width: 1; }
+.lanelbl { font-family: var(--mono); font-size: 12px; font-weight: 600; fill: var(--muted); dominant-baseline: middle; }
+.lane-node { cursor: grab; touch-action: none; }
+.lane-node.dragging { cursor: grabbing; }
+
+/* sub-process drill-down badge */
+.subbadge { fill: var(--accent); }
+text.subbadge { fill: var(--accent-ink); font-family: var(--mono); font-size: 8.5px; font-weight: 700; }
+
+/* breadcrumb (drill-down trail) */
+.crumbs { padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; background: var(--surface); }
+.crumb { color: var(--muted); }
+.crumb.cur { color: var(--ink); font-weight: 600; }
+a.crumb { color: var(--accent); cursor: pointer; text-decoration: none; }
+a.crumb:hover { text-decoration: underline; }
+.csep { color: var(--line-strong, var(--muted)); margin: 0 7px; }
+
 /* connect mode */
 .canvas.connecting g[data-node] { cursor: crosshair; }
 .canvas.connecting .node, .canvas.connecting .gw { stroke-dasharray: 3 3; }
