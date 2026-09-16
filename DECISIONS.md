@@ -6,6 +6,31 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Canvas fix: editable gateways/events/flows + an escapable Connect mode
+
+### D34 — No hidden modal trap; edit any node/connection in place
+**Context (reported bug):** after dropping a decision (gateway) onto a process and turning on **Connect**
+to wire it, the node felt frozen — it couldn't be moved or edited. Two problems: (1) **Connect** was a
+hidden modal state that both disabled dragging *and* repurposed every click, with only a faint button
+highlight and no easy way out — so once you turned it on to draw a flow you lost the ability to move or
+select the node; (2) gateways / events / flows had **no edit-in-place** — you could add and remove them but
+not rename, re-type, or set a branch condition after the fact.
+**Decision & build — interaction:** Connect mode now shows a **banner** ("click a node, then its target;
+dragging is paused"), the button reads *Done connecting* while active, **Esc** always exits, and clicking
+empty canvas exits Connect (or clears the selection). It is impossible to get stuck in a mode. Every node
+stays **drag-to-move** in the default mode. **Decision & build — edit-in-place:** `store.edit_gateway`
+(name + type), `store.edit_event` (name / kind / trigger / timer / message_ref), `store.edit_flow` (branch
+condition) — all on the same versioned, hash-chained write path, `op:"edit"` on `/api/gateway`,
+`/api/event`, `/api/flow`. The gateway panel gained rename + type select + an editable **branches-out**
+list (set/clear a condition, remove a connection) + *Draw a connection from here*; the event panel gained
+rename + kind/trigger + timer/message fields + the same connections list. `governance/test_graphedit.py` —
+**12 asserts** (edit gateway/event/flow, validation guards, audit chain intact). Note gateways/events are
+**structural** — they carry no role or guardrail (the panel says so); roles live on the steps they route
+to, which was the "can't edit roles" confusion. Verified live on FN.9.3.1: renamed + retyped a gateway from
+the panel, saw the Connect banner + Esc-to-exit, confirmed drag moves nodes. Full suite **381**.
+
+---
+
 ## 2026-09-16 — Manage roles + click-through role drawer
 
 ### D33 — In-app role master data, and role references that link to a non-destructive drawer

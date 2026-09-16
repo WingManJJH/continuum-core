@@ -194,6 +194,9 @@ class Handler(BaseHTTPRequestHandler):
                 if op == "add":
                     r = STORE.add_gateway(b["process"], b.get("gtype", "exclusive"), actor,
                                           reason or "added gateway via canvas", name=b.get("name", ""))
+                elif op == "edit":
+                    r = STORE.edit_gateway(b["id"], b.get("changes", {}), actor,
+                                           reason or "edited gateway via canvas")
                 elif op == "remove":
                     r = STORE.remove_gateway(b["id"], actor, reason or "removed gateway via canvas")
                 else:
@@ -218,6 +221,9 @@ class Handler(BaseHTTPRequestHandler):
                                         b.get("trigger", "timer"), actor,
                                         reason or "added event via canvas", name=b.get("name", ""),
                                         timer=b.get("timer"), message_ref=b.get("message_ref"))
+                elif op == "edit":
+                    r = STORE.edit_event(b["id"], b.get("changes", {}), actor,
+                                         reason or "edited event via canvas")
                 elif op == "remove":
                     r = STORE.remove_event(b["id"], actor, reason or "removed event via canvas")
                 else:
@@ -227,6 +233,9 @@ class Handler(BaseHTTPRequestHandler):
                 if op == "add":
                     r = STORE.add_flow(b["process"], b["from"], b["to"], actor,
                                        reason or "drew flow via canvas", condition=b.get("condition"))
+                elif op == "edit":
+                    r = STORE.edit_flow(b["id"], b.get("changes", {}), actor,
+                                        reason or "edited flow via canvas")
                 elif op == "remove":
                     r = STORE.remove_flow(b["id"], actor, reason or "removed flow via canvas")
                 elif op == "enable":

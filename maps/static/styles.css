@@ -323,3 +323,24 @@ text.rolelink-svg:hover { fill: var(--accent); }
 .dw-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); padding: 7px 9px; }
 .dw-actions { display: flex; gap: 8px; margin-top: 20px; }
 .dw-actions .danger:hover:not(:disabled) { border-color: var(--crit); color: var(--crit); }
+
+/* ---- Connect mode banner + editable connections list (D34) ---- */
+.connect-banner { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding: 9px 14px;
+  background: var(--accent); color: var(--accent-ink); border-radius: 9px; font-size: 13px; }
+.connect-banner button { margin-left: auto; font: inherit; font-size: 12px; cursor: pointer;
+  background: rgba(255,255,255,.18); color: var(--accent-ink); border: 1px solid rgba(255,255,255,.4);
+  border-radius: 6px; padding: 4px 10px; }
+.connect-banner button:hover { background: rgba(255,255,255,.3); }
+#canvas.connecting { cursor: crosshair; }
+#canvas.connecting g.tnode, #canvas.connecting g.gwnode, #canvas.connecting g.evnode { cursor: crosshair; }
+g .connsrc rect, g.gwnode.connsrc rect, g.evnode.connsrc circle { outline: none; }
+.connsrc rect.node, .connsrc rect.gw { stroke: var(--accent) !important; stroke-width: 3 !important; }
+.connsrc circle.ev { stroke: var(--accent) !important; stroke-width: 3 !important; }
+
+.conn-item { border-top: 1px solid var(--line); padding: 8px 0; }
+.conn-item:first-child { border-top: 0; }
+.conn-to { font-size: 12.5px; margin-bottom: 5px; }
+.conn-edit { display: flex; gap: 5px; align-items: center; }
+.conn-edit .cond-in { flex: 1; min-width: 0; font: inherit; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--ground); color: var(--ink); padding: 5px 7px; }
+.conn-edit .mini { flex: none; }

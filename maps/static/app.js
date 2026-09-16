@@ -383,6 +383,12 @@ function updateGeomGraph(m) {
 function wireGraph(m) {
   var svg = $("#canvas svg"); if (!svg) return;
   updateGeomGraph(m);
+  // click empty canvas: leave connect mode, else clear the selection
+  svg.addEventListener("pointerdown", function (e) {
+    if (e.target !== svg) return;
+    if (state.connect) { setConnect(false); return; }
+    if (state.task || state.gwsel || state.evsel) { state.task = null; state.gwsel = null; state.evsel = null; markSel(); renderProps(); }
+  });
   var drag = null;
   svg.querySelectorAll("g[data-node]").forEach(function (g) {
     var id = g.getAttribute("data-node");
@@ -443,12 +449,18 @@ function postEvent(body) { return fetch("/api/event", { method: "POST", headers:
 function reloadIf(res) { if (res && res.ok) load(); else if (res) alert("Rejected: " + res.error); }
 function setConnect(on) {
   state.connect = on; state.connectFrom = null;
-  var cn = document.getElementById("connect"); if (cn) cn.classList.toggle("active", on);
+  var cn = document.getElementById("connect");
+  if (cn) { cn.classList.toggle("active", on); cn.textContent = on ? "Done connecting" : "Connect"; }
   var c = $("#canvas"); if (c) c.classList.toggle("connecting", on);
+  var banner = document.getElementById("connect-banner"); if (banner) banner.hidden = !on;
   if (!on) { var s = $("#canvas .connsrc"); if (s) s.classList.remove("connsrc"); }
 }
+// Esc always leaves connect mode — no way to get stuck in a hidden mode
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && state.connect) setConnect(false); });
 var connBtn = document.getElementById("connect");
 if (connBtn) connBtn.addEventListener("click", function () { setConnect(!state.connect); });
+var connDone = document.getElementById("connect-done");
+if (connDone) connDone.addEventListener("click", function () { setConnect(false); });
 var ebBtn = document.getElementById("enable-branch");
 if (ebBtn) ebBtn.addEventListener("click", function () {
   var p = getProc(); if (!p) return;
@@ -652,28 +664,12 @@ function renderProps() {
   if (!p) return;
   if (state.evsel && p.explicit) {
     var ev = (p.events || []).find(function (e) { return e.id === state.evsel; });
-    if (ev) {
-      $("#props").innerHTML = evProps(ev);
-      $("#ev-remove").onclick = function () {
-        if (!confirm("Remove event " + ev.id + "? Its flows are removed too (all on the audit trail).")) return;
-        postEvent({ op: "remove", id: ev.id, actor: ACTOR, reason: "removed event via canvas" })
-          .then(function (res) { if (res.ok) { state.evsel = null; load(); } else alert("Rejected: " + res.error); });
-      };
-      return;
-    }
+    if (ev) { $("#props").innerHTML = evProps(ev); wireEvProps(ev); return; }
     state.evsel = null;
   }
   if (state.gwsel && p.explicit) {
     var gw = (p.gateways || []).find(function (g) { return g.id === state.gwsel; });
-    if (gw) {
-      $("#props").innerHTML = gwProps(gw);
-      $("#gw-remove").onclick = function () {
-        if (!confirm("Remove gateway " + gw.id + "? Its flows are removed too (all on the audit trail).")) return;
-        postGateway({ op: "remove", id: gw.id, actor: ACTOR, reason: "removed gateway via canvas" })
-          .then(function (res) { if (res.ok) { state.gwsel = null; load(); } else alert("Rejected: " + res.error); });
-      };
-      return;
-    }
+    if (gw) { $("#props").innerHTML = gwProps(gw); wireGwProps(gw); return; }
     state.gwsel = null;
   }
   if (!t) { $("#props").innerHTML = procProps(p); return; }
@@ -810,26 +806,117 @@ $("#new-proc").addEventListener("click", function () {
     .then(function (r) { return r.json(); })
     .then(function (res) { if (res.ok) { state.sel = res.result.id; state.task = null; state.view = "flow"; document.querySelectorAll(".views button").forEach(function (x) { x.classList.toggle("active", x.getAttribute("data-view") === "flow"); }); load(); } else alert("Rejected: " + res.error); });
 });
-function evProps(ev) {
-  var kindLbl = { start: "Start event", intermediate: "Intermediate event", end: "End event" }[ev.kind] || ev.kind;
-  var trigLbl = ev.trigger === "timer" ? "Timer" : ev.trigger === "message" ? "Message" : "Plain";
-  var detail = ev.trigger === "timer" ? (ev.timer || "(no schedule set)") : ev.trigger === "message" ? (ev.message_ref || "(no message named)") : "—";
-  return '<div class="p-head"><span class="p-id">' + esc(ev.id) + "</span></div>"
-    + '<div class="p-sub">' + esc(kindLbl.toLowerCase()) + "</div>"
-    + '<div class="p-sec"><div class="lbl">trigger</div><div class="p-row">' + esc(trigLbl) + "</div></div>"
-    + (ev.name ? '<div class="p-sec"><div class="lbl">name</div><div class="p-row">' + esc(ev.name) + "</div></div>" : "")
-    + '<div class="p-sec"><div class="lbl">' + (ev.trigger === "message" ? "message" : "schedule") + '</div><div class="p-row mono">' + esc(detail) + "</div></div>"
-    + '<div class="p-sec"><div class="p-row muted">Turn on <b>Connect</b> and click this event then a target (or a source then this event) to wire it into the flow. Events export to BPMN as timer/message events.</div></div>'
-    + '<div class="struct"><button id="ev-remove" class="danger">Remove event</button></div>';
+// label any node for the connections list
+function nodeLabel(id) {
+  if (id === "__start__") return "start";
+  if (id === "__end__") return "end";
+  var p = getProc(); if (!p) return id;
+  var t = p.tasks.find(function (x) { return x.id === id; }); if (t) return "t" + t.seq + " · " + t.name;
+  var g = (p.gateways || []).find(function (x) { return x.id === id; }); if (g) return "◇ " + (g.name || g.type);
+  var e = (p.events || []).find(function (x) { return x.id === id; }); if (e) return "○ " + (e.name || e.trigger);
+  return id;
 }
+// the outgoing connections from a node, as an editable list (condition + remove)
+function connList(nodeId) {
+  var flows = (getProc().flows || []).filter(function (f) { return f.from === nodeId; });
+  if (!flows.length) return '<div class="muted" style="font-size:12px">No outgoing connections yet. Use <b>Draw a connection</b> below.</div>';
+  return flows.map(function (f) {
+    return '<div class="conn-item" data-flow="' + esc(f.id) + '">'
+      + '<div class="conn-to">&rarr; ' + esc(trunc(nodeLabel(f.to), 26)) + "</div>"
+      + '<div class="conn-edit"><input class="cond-in" placeholder="condition (optional), e.g. amount &gt; 500" value="' + esc(f.condition || "") + '">'
+      + '<button class="mini cond-save" type="button">Set</button>'
+      + '<button class="mini danger cond-del" type="button">Remove</button></div></div>';
+  }).join("");
+}
+
+function evProps(ev) {
+  var kindLbl = { start: "Start event", intermediate: "Intermediate event", end: "End event" };
+  return '<div class="p-head"><span class="p-id">' + esc(ev.id) + "</span></div>"
+    + '<div class="p-sub">event</div>'
+    + '<div class="struct"><div class="lbl">edit event</div>'
+    + '<label>Name<input id="ev-name" type="text" value="' + esc(ev.name || "") + '" placeholder="e.g. 24h SLA"></label>'
+    + '<label>Kind<select id="ev-kind">' + ["start", "intermediate", "end"].map(function (k) { return '<option value="' + k + '"' + (ev.kind === k ? " selected" : "") + ">" + kindLbl[k] + "</option>"; }).join("") + "</select></label>"
+    + '<label>Trigger<select id="ev-trig">' + [["none", "Plain"], ["timer", "Timer"], ["message", "Message"]].map(function (k) { return '<option value="' + k[0] + '"' + (ev.trigger === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") + "</select></label>"
+    + '<label id="ev-timer-l"' + (ev.trigger === "timer" ? "" : " hidden") + '>Schedule <span class="hint">ISO-8601 / cron</span><input id="ev-timer" type="text" value="' + esc(ev.timer || "") + '" placeholder="P1D · PT24H · 0 9 * * 1"></label>'
+    + '<label id="ev-msg-l"' + (ev.trigger === "message" ? "" : " hidden") + '>Message<input id="ev-msg" type="text" value="' + esc(ev.message_ref || "") + '" placeholder="e.g. payment_received"></label>'
+    + '<div class="btnrow"><button id="ev-save">Save event</button><button id="ev-remove" class="danger">Remove event</button></div></div>'
+    + '<div class="p-sec"><div class="lbl">connections out</div>' + connList(ev.id) + '</div>'
+    + '<div class="struct"><button id="node-connect" class="ghost-btn">Draw a connection from here</button>'
+    + '<div class="p-row muted" style="margin-top:8px">Tip: <b>drag</b> the event to move it. Events are structural — they carry no role or guardrail.</div></div>';
+}
+
 function gwProps(gw) {
-  var label = gw.type === "exclusive" ? "Exclusive (decision · XOR)" : "Parallel (fork/join · AND)";
   return '<div class="p-head"><span class="p-id">' + esc(gw.id) + "</span></div>"
     + '<div class="p-sub">gateway</div>'
-    + '<div class="p-sec"><div class="lbl">type</div><div class="p-row">' + esc(label) + "</div></div>"
-    + (gw.name ? '<div class="p-sec"><div class="lbl">name</div><div class="p-row">' + esc(gw.name) + "</div></div>" : "")
-    + '<div class="p-sec"><div class="p-row muted">Turn on <b>Connect</b> and click this gateway then a target to route a branch out of it. On an exclusive gateway you can label each branch with a condition.</div></div>'
-    + '<div class="struct"><button id="gw-remove" class="danger">Remove gateway</button></div>';
+    + '<div class="struct"><div class="lbl">edit gateway</div>'
+    + '<label>Name<input id="gw-name" type="text" value="' + esc(gw.name || "") + '" placeholder="e.g. amount over 500?"></label>'
+    + '<label>Type<select id="gw-type">'
+    + '<option value="exclusive"' + (gw.type === "exclusive" ? " selected" : "") + ">Exclusive — decision (XOR)</option>"
+    + '<option value="parallel"' + (gw.type === "parallel" ? " selected" : "") + ">Parallel — fork/join (AND)</option>"
+    + "</select></label>"
+    + '<div class="btnrow"><button id="gw-save">Save gateway</button><button id="gw-remove" class="danger">Remove gateway</button></div></div>'
+    + '<div class="p-sec"><div class="lbl">branches out</div>' + connList(gw.id)
+    + (gw.type === "exclusive" ? '<div class="p-row muted" style="font-size:11.5px;margin-top:6px">On an exclusive gateway, label each branch with the condition that takes it.</div>' : "") + "</div>"
+    + '<div class="struct"><button id="node-connect" class="ghost-btn">Draw a connection from here</button>'
+    + '<div class="p-row muted" style="margin-top:8px">Tip: <b>drag</b> the diamond to move it. A gateway is structural — it carries no role; the steps it routes to do.</div></div>';
+}
+
+// shared wiring for the editable connections list (used by gw + ev panels)
+function wireConnList(container) {
+  container.querySelectorAll(".conn-item").forEach(function (row) {
+    var fid = row.getAttribute("data-flow");
+    var save = row.querySelector(".cond-save"), del = row.querySelector(".cond-del"), inp = row.querySelector(".cond-in");
+    if (save) save.onclick = function () {
+      postFlow({ op: "edit", id: fid, changes: { condition: inp.value.trim() }, actor: ACTOR, reason: "set branch condition via canvas" })
+        .then(function (res) { if (res.ok) load(); else alert("Rejected: " + res.error); });
+    };
+    if (del) del.onclick = function () {
+      if (!confirm("Remove this connection? (deprecated on the audit trail)")) return;
+      postFlow({ op: "remove", id: fid, actor: ACTOR, reason: "removed flow via canvas" }).then(reloadIf);
+    };
+  });
+}
+function startConnectFrom(nodeId) {
+  setConnect(true);
+  state.connectFrom = nodeId;
+  var el = $('#canvas [data-node="' + (window.CSS && CSS.escape ? CSS.escape(nodeId) : nodeId) + '"]');
+  if (el) el.classList.add("connsrc");
+}
+function wireGwProps(gw) {
+  var box = $("#props");
+  $("#gw-save").onclick = function () {
+    postGateway({ op: "edit", id: gw.id, changes: { name: $("#gw-name").value.trim(), type: $("#gw-type").value }, actor: ACTOR, reason: "edited gateway via canvas" })
+      .then(function (res) { if (res.ok) load(); else alert("Rejected: " + res.error); });
+  };
+  $("#gw-remove").onclick = function () {
+    if (!confirm("Remove gateway " + gw.id + "? Its connections are removed too (all on the audit trail).")) return;
+    postGateway({ op: "remove", id: gw.id, actor: ACTOR, reason: "removed gateway via canvas" })
+      .then(function (res) { if (res.ok) { state.gwsel = null; load(); } else alert("Rejected: " + res.error); });
+  };
+  $("#node-connect").onclick = function () { startConnectFrom(gw.id); };
+  wireConnList(box);
+}
+function wireEvProps(ev) {
+  var box = $("#props");
+  var trig = $("#ev-trig");
+  trig.onchange = function () {
+    $("#ev-timer-l").hidden = trig.value !== "timer";
+    $("#ev-msg-l").hidden = trig.value !== "message";
+  };
+  $("#ev-save").onclick = function () {
+    var changes = { name: $("#ev-name").value.trim(), kind: $("#ev-kind").value, trigger: trig.value,
+                    timer: trig.value === "timer" ? $("#ev-timer").value.trim() : null,
+                    message_ref: trig.value === "message" ? $("#ev-msg").value.trim() : null };
+    postEvent({ op: "edit", id: ev.id, changes: changes, actor: ACTOR, reason: "edited event via canvas" })
+      .then(function (res) { if (res.ok) load(); else alert("Rejected: " + res.error); });
+  };
+  $("#ev-remove").onclick = function () {
+    if (!confirm("Remove event " + ev.id + "? Its connections are removed too (all on the audit trail).")) return;
+    postEvent({ op: "remove", id: ev.id, actor: ACTOR, reason: "removed event via canvas" })
+      .then(function (res) { if (res.ok) { state.evsel = null; load(); } else alert("Rejected: " + res.error); });
+  };
+  $("#node-connect").onclick = function () { startConnectFrom(ev.id); };
+  wireConnList(box);
 }
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");
