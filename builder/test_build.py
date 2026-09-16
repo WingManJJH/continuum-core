@@ -49,12 +49,30 @@ def main():
     pb = build.plan_build(INSTRUCTIONS)
     plan = pb["plan"]
     check("reads the process name", plan["name"] == "Vendor onboarding")
-    check("counts steps / gateway / agent", plan["counts"]["steps"] == 4 and plan["counts"]["gateways"] == 1 and plan["counts"]["agent_steps"] == 1)
+    check("counts steps / gateway / agent", plan["counts"]["steps"] == 5 and plan["counts"]["gateways"] == 1 and plan["counts"]["agent_steps"] == 1)
     check("a decision line becomes a gateway", any(x["kind"] == "decision" for x in plan["preview"]))
     check("an automated step is flagged agent", any(x["agent"] for x in plan["preview"]))
     check("a performer role is deduced", any(x.get("role") for x in plan["preview"]))
     check("assumptions are surfaced, not hidden", len(plan["assumptions"]) >= 3 and any("guardrail" in a for a in plan["assumptions"]))
     check("source is the deterministic reader", plan["source"] == "rules")
+
+    # enhanced reader: bare title line, lowercase / single-word roles, drafted branch
+    basic = ("Invoice approval\n"
+             "the ap clerk receives the invoice\n"
+             "the system checks it against the PO\n"
+             "if the amount is over 500, the finance manager approves it\n"
+             "finance posts the payment\n"
+             "notify the vendor")
+    bp = build.plan_build(basic)
+    bplan = bp["plan"]
+    check("an unlabelled first line is used as the process name", bplan["name"] == "Invoice approval")
+    roles_found = {x["role"] for x in bplan["preview"] if x.get("role")}
+    check("lowercase + single-word performers are deduced",
+          "role.ap_clerk" in roles_found and "role.finance_manager" in roles_found and "role.finance" in roles_found)
+    check("an imperative step is NOT read as a role", all(not x.get("role") for x in bplan["preview"] if x["name"].startswith("Notify")))
+    drafted = [f for f in bp["parsed"]["flows"] if f.get("condition")]
+    check("a branch condition is drafted from an 'If …' line", any("over 500" in (f["condition"] or "") for f in drafted))
+    check("the drafted-branch assumption is surfaced", any("branch condition" in a for a in bplan["assumptions"]))
 
     # 2. apply -> a governed process through the audited write path
     before = os.path.getsize(cc.EDITS_LOG) if os.path.exists(cc.EDITS_LOG) else 0
@@ -65,7 +83,7 @@ def main():
     check("apply mints the process", res["code"] == "BI.1.1" and res["counts"]["gateways"] == 1)
     g = cc.Graph()
     m = next(x for x in mapdata.all_maps(g) if x["id"] == "BI.1.1")
-    check("steps + gateway + flows built", len(m["tasks"]) == 4 and len(m["gateways"]) == 1 and len(m["flows"]) == 6)
+    check("steps + gateway + flows built", len(m["tasks"]) == 5 and len(m["gateways"]) == 1 and len(m["flows"]) == 7)
     check("a deduced role was created + attached", g.get("HumanRole", "role.procurement_lead") is not None
           and any("role.procurement_lead" in t["roles"] for t in m["tasks"]))
     check("the automated step came in agent-bound", any(t["agents"] for t in m["tasks"]))

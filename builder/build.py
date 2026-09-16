@@ -36,10 +36,37 @@ import import_bpmn as _imp  # noqa: E402  — shared apply/plan
 MAX_STEPS = 60
 _AGENT_RE = re.compile(r"\b(automatical|automated|auto-|the system|system (?:will|then|automatically)|"
                        r"\bAI\b|\bbot\b|\bRPA\b|a script|scripted)\b", re.I)
-_DECISION_RE = re.compile(r"^(if|whether)\b|\?\s*$|"
+_DECISION_RE = re.compile(r"^(if|whether|when)\b|\?\s*$|"
                           r"\b(decide|determine|check|choose) (whether|if)\b|\bdecision\b|"
                           r"\beither\b.*\bor\b", re.I)
 _LIST_MARK = re.compile(r"^\s*(?:\d+[.)]|[-*•·])\s+")
+
+# a leading word that is a common action verb is NOT a performer (avoids reading
+# imperative "Process payments" / "Update records" as a role called "Process"/"Update")
+_VERB_STOP = {
+    "receive", "receives", "send", "sends", "check", "checks", "verify", "verifies",
+    "validate", "validates", "create", "creates", "update", "updates", "notify", "notifies",
+    "issue", "issues", "post", "posts", "escalate", "escalates", "route", "routes",
+    "record", "records", "submit", "submits", "process", "processes", "review", "reviews",
+    "approve", "approves", "confirm", "confirms", "close", "closes", "open", "opens",
+    "assign", "assigns", "prepare", "prepares", "generate", "generates", "calculate", "collect",
+    "gather", "ensure", "evaluate", "assess", "complete", "perform", "conduct", "handle",
+    "forward", "email", "call", "contact", "schedule", "initiate", "start", "begin", "finalize",
+    "sign", "file", "log", "enter", "add", "remove", "delete", "move", "transfer", "deposit",
+    "withdraw", "pay", "charge", "refund", "ship", "deliver", "order", "request", "obtain",
+    "retrieve", "fetch", "upload", "download", "import", "export", "print", "scan", "fill",
+    "determine", "flag", "match", "reconcile", "capture", "attach", "categorize", "classify",
+}
+# a leading noun that is a common object is NOT a performer
+_NOUN_STOP = {
+    "invoice", "invoices", "request", "requests", "order", "orders", "payment", "payments",
+    "document", "documents", "form", "forms", "data", "file", "files", "email", "emails",
+    "report", "reports", "amount", "vendor", "customer", "item", "items", "ticket", "case",
+    "record", "records", "application", "account", "accounts", "product", "products", "service",
+    "services", "message", "task", "step", "system", "information", "details", "status", "list",
+    "entry", "transaction", "transactions", "receipt", "receipts", "approval", "approvals",
+    "it", "this", "that", "they", "we", "he", "she", "there",
+}
 
 
 def _slug(name: str) -> str | None:
@@ -47,20 +74,30 @@ def _slug(name: str) -> str | None:
     return ("role." + s) if s else None
 
 
+def _actor_ok(actor: str) -> bool:
+    words = actor.lower().split()
+    if not words:
+        return False
+    return words[0] not in _VERB_STOP and words[-1] not in _NOUN_STOP and actor.lower() != "system"
+
+
 def _role_from_line(line: str):
     """Return (role_id, role_name, remaining_text) deduced from a step line, or
-    (None, None, line)."""
+    (None, None, line). Catches explicit labels, 'by …', and a leading actor
+    noun-phrase (Title-case OR lowercase, one word or several) before a verb."""
     m = re.match(r"^([A-Z][A-Za-z][A-Za-z /&]{1,30}?):\s*(.+)$", line)   # "AP Clerk: verify the invoice"
     if m and len(m.group(1).split()) <= 4:
         return _slug(m.group(1)), m.group(1).strip(), m.group(2).strip()
     m = re.search(r"\bby (?:the )?([A-Za-z][\w]*(?: [A-Za-z][\w]*){0,3})", line)  # "... by the AP clerk"
     if m:
         nm = m.group(1).strip()
-        if nm.lower() not in ("email", "hand", "phone", "default", "now", "then"):
+        if _actor_ok(nm) and nm.lower() not in ("email", "hand", "phone", "default", "now", "then"):
             return _slug(nm), nm.title(), line
-    m = re.match(r"^(?:The )?([A-Z][a-z]+(?: [A-Z][a-z]+)+)\s+([a-z]\w+)", line)  # "Finance Manager approves ..."
-    if m:
-        return _slug(m.group(1)), m.group(1).strip(), line
+    # leading actor + 3rd-person verb: "AP Clerk receives…", "the support agent reviews…", "Buyer creates…"
+    m = re.match(r"^(?:[Tt]he )?([A-Za-z][\w]*(?: [A-Za-z][\w]*){0,3}?)\s+([a-z]+s)\b", line)
+    if m and _actor_ok(m.group(1)):
+        actor = m.group(1).strip()
+        return _slug(actor), actor.title(), line
     return None, None, line
 
 
@@ -69,6 +106,17 @@ def _clean_name(text: str) -> str:
     if text and text[0].islower():
         text = text[0].upper() + text[1:]
     return text[:120] or "Step"
+
+
+def _questionize(cond: str) -> str:
+    c = re.sub(r"^(the|a|an)\s+", "", cond.strip().rstrip("?").strip(), flags=re.I)
+    c = (c[0].upper() + c[1:]) if c else "Decision"
+    return (c + "?")[:80]
+
+
+def _short_cond(cond: str) -> str | None:
+    c = re.sub(r"^(the|a|an)\s+", "", cond.strip().rstrip("?").strip(), flags=re.I)
+    return c[:120] or None
 
 
 def _items_from_text(text: str):
@@ -88,6 +136,16 @@ def _items_from_text(text: str):
             name = _clean_name(m.group(2))
             continue
         kept.append(ln)
+    # an unlabelled first line is the title when the steps below are a list, or
+    # when it's a short phrase that doesn't itself read like an instruction
+    if name == "Process from instructions" and len(kept) >= 2 and not _LIST_MARK.match(kept[0]):
+        f = kept[0]
+        listy_after = any(_LIST_MARK.match(x) for x in kept[1:])
+        short_title = (len(f.split()) <= 5 and _role_from_line(f)[0] is None
+                       and not _DECISION_RE.search(f) and f.split()[0].lower() not in _VERB_STOP)
+        if listy_after or short_title:
+            name = _clean_name(f)
+            kept = kept[1:]
     if name == "Process from instructions":
         assumptions.append("No process name was given — used \"Process from instructions\".")
 
@@ -100,11 +158,28 @@ def _items_from_text(text: str):
         ln = _LIST_MARK.sub("", ln).strip()
         if not ln:
             continue
+        # "If <condition>, <then-action>" / "When <condition> …" -> a decision
+        # gateway, and (if an action follows the comma) the branch it takes, with
+        # the condition drafted onto that branch's connection.
+        dm = re.match(r"^(if|when|whether)\b\s*(.*)$", ln, re.I)
+        if dm:
+            cond, sep, action = dm.group(2).partition(",")
+            items.append({"name": _questionize(cond), "kind": "gateway",
+                          "role": None, "role_name": None, "agent": False})
+            if sep and action.strip():
+                arole, aname, arest = _role_from_line(action.strip())
+                items.append({"name": _clean_name(arest if arole else action),
+                              "kind": "task", "role": arole, "role_name": aname,
+                              "agent": bool(_AGENT_RE.search(action)),
+                              "branch_condition": _short_cond(cond)})
+            continue
         role_id, role_name, rest = _role_from_line(ln)
-        agent = bool(_AGENT_RE.search(ln))
-        kind = "gateway" if _DECISION_RE.search(rest) else "task"
-        items.append({"name": _clean_name(rest), "kind": kind,
-                      "role": role_id, "role_name": role_name, "agent": agent})
+        if _DECISION_RE.search(rest):     # e.g. "Amount over 100?" — a decision with no If
+            items.append({"name": _clean_name(rest), "kind": "gateway",
+                          "role": None, "role_name": None, "agent": False})
+        else:
+            items.append({"name": _clean_name(rest), "kind": "task",
+                          "role": role_id, "role_name": role_name, "agent": bool(_AGENT_RE.search(ln))})
     if not items:
         raise ValueError("no steps found — give one instruction per line, or a numbered list")
     return name, items, assumptions, warnings
@@ -113,10 +188,13 @@ def _items_from_text(text: str):
 def _assemble(name: str, items: list, assumptions: list, warnings: list, source: str) -> dict:
     tasks, gateways, flows, roles = [], [], [], {}
     chain = ["__S__"]
-    no_perf, agents, decisions = [], [], []
+    cond_by_node = {}
+    no_perf, agents, decisions, branches = [], [], [], []
     for i, it in enumerate(items):
         nid = "n%d" % i
         chain.append(nid)
+        if it.get("branch_condition"):
+            cond_by_node[nid] = it["branch_condition"]
         if it.get("role") and it.get("role_name"):
             roles[it["role"]] = it["role_name"]
         if it["kind"] == "gateway":
@@ -126,12 +204,15 @@ def _assemble(name: str, items: list, assumptions: list, warnings: list, source:
             tasks.append({"bpmn_id": nid, "name": it["name"], "agent": it["agent"],
                           "role": it.get("role"), "x": i})
             if not it.get("role"):
-                no_perf.append("step %d" % (len([t for t in tasks])))
+                no_perf.append(nid)
             if it["agent"]:
                 agents.append(it["name"])
     chain.append("__E__")
     for j in range(len(chain) - 1):
-        flows.append({"bpmn_id": "f%d" % j, "source": chain[j], "target": chain[j + 1], "condition": None})
+        cond = cond_by_node.get(chain[j + 1])
+        if cond:
+            branches.append(cond)
+        flows.append({"bpmn_id": "f%d" % j, "source": chain[j], "target": chain[j + 1], "condition": cond})
 
     if no_perf:
         assumptions.append("No performer was stated for %d step(s) — left to the process owner; "
@@ -141,7 +222,10 @@ def _assemble(name: str, items: list, assumptions: list, warnings: list, source:
                            + ("…" if len(agents) > 6 else "") + ". They inherit the process guardrail.")
     if decisions:
         assumptions.append("Modeled %d decision(s) as gateways: " % len(decisions)
-                           + ", ".join(decisions[:6]) + ". Add each branch's condition in the canvas.")
+                           + ", ".join(decisions[:6]) + ". Wire the remaining branch(es) in the canvas.")
+    if branches:
+        assumptions.append("Drafted %d branch condition(s) from the instructions (e.g. \"%s\") — "
+                           "refine them into expressions in the canvas." % (len(branches), branches[0]))
     if roles:
         assumptions.append("Deduced role(s): " + ", ".join(sorted(set(roles.values())))
                            + " (created if new).")
