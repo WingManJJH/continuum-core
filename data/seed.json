@@ -286,7 +286,8 @@
       "guardrail_ref": "gr.CO.3.2.7",
       "maturity_score": 3,
       "version": 4,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "CO"
     },
     {
       "id": "FN.9.3.1",
@@ -314,7 +315,8 @@
       "guardrail_ref": "gr.FN.9.3.1",
       "maturity_score": 3,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "FN"
     },
     {
       "id": "SC.4.3.6",
@@ -339,7 +341,8 @@
       "guardrail_ref": "gr.SC.4.3.6",
       "maturity_score": 2,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "SC"
     },
     {
       "id": "MS.3.5.2",
@@ -364,7 +367,8 @@
       "guardrail_ref": "gr.MS.3.5.2",
       "maturity_score": 2,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "MS"
     },
     {
       "id": "IT.8.4.2",
@@ -392,7 +396,8 @@
       "guardrail_ref": "gr.IT.8.4.2",
       "maturity_score": 3,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "IT"
     },
     {
       "id": "PD.2.4.1",
@@ -417,7 +422,8 @@
       "guardrail_ref": "gr.PD.2.4.1",
       "maturity_score": 3,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "PD"
     },
     {
       "id": "HR.7.2.5",
@@ -442,7 +448,8 @@
       "guardrail_ref": "gr.HR.7.2.5",
       "maturity_score": 2,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "HR"
     },
     {
       "id": "SV.1.2.3",
@@ -467,7 +474,8 @@
       "guardrail_ref": "gr.SV.1.2.3",
       "maturity_score": 4,
       "version": 1,
-      "status": "active"
+      "status": "active",
+      "parent_ref": "SV"
     }
   ],
   "Task": [
@@ -1752,6 +1760,104 @@
       "control": "Admin grants are human-only (task-level override); standard grants escalate above sensitivity 0.7.",
       "control_type": "preventive",
       "guardrail_ref": "gr.IT.8.4.2.ADMIN",
+      "version": 1,
+      "status": "active"
+    }
+  ],
+  "ProcessGroup": [
+    {
+      "id": "CO",
+      "name": "Customer Operations",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Customer Operations \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "FN",
+      "name": "Finance",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Finance \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "HR",
+      "name": "Human Resources",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Human Resources \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "IT",
+      "name": "Information Technology",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Information Technology \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "MS",
+      "name": "Marketing & Sales",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Marketing & Sales \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "PD",
+      "name": "Product Development",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Product Development \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SC",
+      "name": "Supply Chain",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Supply Chain \u2014 top-level process category (APQC L1).",
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "SV",
+      "name": "Strategy",
+      "level": 1,
+      "parent_ref": null,
+      "owner_role": null,
+      "objective_refs": [],
+      "description": "Strategy \u2014 top-level process category (APQC L1).",
+      "custom": {},
       "version": 1,
       "status": "active"
     }

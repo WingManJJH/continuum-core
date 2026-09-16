@@ -33,6 +33,7 @@ function load() {
     var d = res[0];
     state.procs = d.processes;
     state.landscape = null;  // model changed — refetch the house next time it's opened
+    state.architecture = null;  // and the hierarchy
     if (!state.sel && state.procs.length) state.sel = state.procs[0].id;
     renderNav();
     renderTitle();
@@ -73,11 +74,19 @@ function toggleProcTools(hide) {
 }
 function renderCenter() {
   var landB = document.getElementById("landscape-btn"); if (landB) landB.classList.toggle("active", state.view === "landscape");
-  toggleProcTools(state.view === "landscape");
+  var archB = document.getElementById("arch-btn"); if (archB) archB.classList.toggle("active", state.view === "architecture");
+  toggleProcTools(state.view === "landscape" || state.view === "architecture");
   if (state.view === "landscape") {
     renderCrumbs();
     $("#canvas").innerHTML = state.landscape ? renderLandscape(state.landscape) : '<div class="muted" style="padding:24px">loading…</div>';
     wireLandscape();
+    return;
+  }
+  if (state.view === "architecture") {
+    renderCrumbs();
+    $("#canvas").innerHTML = (state.architecture && typeof renderArchitecture === "function")
+      ? renderArchitecture(state.architecture) : '<div class="muted" style="padding:24px">loading…</div>';
+    if (typeof wireArchitecture === "function") wireArchitecture();
     return;
   }
   var p = getProc(); if (!p) return;
@@ -672,7 +681,11 @@ function renderProps() {
     if (gw) { $("#props").innerHTML = gwProps(gw); wireGwProps(gw); return; }
     state.gwsel = null;
   }
-  if (!t) { $("#props").innerHTML = procProps(p); return; }
+  if (!t) {
+    $("#props").innerHTML = procProps(p);
+    var mb = $("#pmeta-open"); if (mb && typeof openMasterData === "function") mb.onclick = function () { openMasterData("process", p.id); };
+    return;
+  }
   $("#props").innerHTML = taskProps(p, t);
   var form = $("#gr-form");
   if (form) {
@@ -927,7 +940,11 @@ function procProps(p) {
     + '<div class="p-sec"><div class="lbl">guardrail</div><div class="p-row"><span class="pill gr">' + esc(p.guardrail || "none") + "</span></div></div>"
     + '<div class="p-sec"><div class="lbl">KPIs</div><div class="p-row">' + (kpis || '<span class="muted">none</span>') + "</div></div>"
     + '<div class="p-sec"><div class="lbl">risk &amp; control</div><div class="p-row">' + (risks || '<span class="muted">none</span>') + "</div></div>"
-    + '<div class="p-sec"><div class="p-row muted">Click a step in the flowchart to edit its guardrail.</div></div>';
+    + '<div class="p-sec"><div class="lbl">hierarchy</div><div class="p-row">parent <b>' + esc(p.parent_ref || "—") + "</b>"
+    + ((p.objective_refs && p.objective_refs.length) ? " · objectives " + p.objective_refs.map(function (o) { return '<span class="pill">' + esc(o.replace(/^obj\./, "")) + "</span>"; }).join("") : "") + "</div>"
+    + (p.custom && Object.keys(p.custom).length ? '<div class="p-row">' + Object.keys(p.custom).map(function (k) { return '<span class="mdchip">' + esc(k) + ": " + esc(String(p.custom[k])) + "</span>"; }).join("") : "") + "</div>"
+    + '<div class="struct"><button id="pmeta-open" class="ghost-btn">Master data &amp; hierarchy…</button>'
+    + '<div class="p-row muted" style="margin-top:8px">Click a step in the flowchart to edit its guardrail.</div></div>';
 }
 function taskProps(p, t) {
   var g = t.guardrail_full;

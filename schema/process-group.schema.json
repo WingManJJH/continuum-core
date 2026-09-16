@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/process-group",
+  "title": "Process Group",
+  "description": "A non-executable node in the process hierarchy (Core Model §02, §05) — an APQC Level-1 category or a Level-2/3 group that leaf Processes roll up to. Gives the L1–L5 architecture real names, owners, objective links, and user-defined master data, so a management team can navigate the whole business by level. LOCKED addition.",
+  "type": "object",
+  "required": ["id", "name", "level", "status", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}(\\.[0-9]+)*$",
+      "description": "Hierarchy id: a 2-letter domain (L1, e.g. CO) or a dotted path (L2/L3, e.g. CO.3)."
+    },
+    "name": {"type": "string", "maxLength": 160},
+    "level": {"type": "integer", "minimum": 1, "maximum": 5, "description": "Depth in the process hierarchy (1 = top-level category)."},
+    "parent_ref": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{2}(\\.[0-9]+)*$",
+      "description": "The group one level up (null for an L1 category)."
+    },
+    "owner_role": {"type": ["string", "null"], "pattern": "^role\\.[a-z0-9_.]+$", "description": "Accountable owner of this level."},
+    "objective_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^obj\\.[a-z0-9_.]+$"},
+      "description": "Strategic objectives this level supports (X-matrix alignment can attach at any level 1–5)."
+    },
+    "description": {"type": "string", "maxLength": 600},
+    "custom": {
+      "type": "object",
+      "description": "User-defined master-data metadata (free-form key/value) for this domain / group.",
+      "additionalProperties": {"type": ["string", "number", "boolean", "null"]}
+    },
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
+  }
+}

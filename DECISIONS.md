@@ -6,6 +6,30 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Phase 1: process hierarchy (L1–L5) + master-data metadata
+
+### D39 — Governed process hierarchy + custom master data on domains & processes
+**Context:** processes lived flat (grouped only by a derived 2-letter domain in Landscape); there was no
+governed multi-level parent hierarchy and no way to attach organization-specific metadata.
+**Decision & build:** a new locked entity **`ProcessGroup`** — an L1 category or L2–L5 group with
+`{id, name, level (1–5), parent_ref, owner_role, objective_refs, description, custom{}}` — registered
+additively (continuum_core tuple + token_budget map + `schema/process-group.schema.json`). **`Process`**
+gained optional `parent_ref`, `objective_refs`, and `custom{}` (free-form key/value master data, a
+controlled `additionalProperties` island in the otherwise-locked schema). Seeded 8 L1 domain groups and
+parented every process by its 2-letter code. Governance write path: `store.add_group` / `edit_group` /
+`remove_group` (children-guarded) and a new **`store.edit_process`** (name / owner / parent / objective
+links / custom / maturity) — all versioned + hash-chained. `mapdata.architecture(g)` returns the nested
+L1→…→L5 tree with per-process cards + orphan detection + a flat group list for the panels; served at
+`GET /api/architecture`; edits via `POST /api/group` and `POST /api/process/edit`. UI: an **Architecture**
+view (navigable hierarchy tree, click a process to open it) and a **Master data** panel (a modal per group
+*and* per process — owner, objective links, and an add/remove **custom-fields** editor). `governance/
+test_group.py` (14) + `maps/test_architecture.py` (7). Full suite **440**. Verified live: browsed the
+8-domain tree, added custom fields (`iso_clause`, `criticality`) + an objective link + owner to a domain,
+saved (versioned/audited), reparented a process. This is the backbone Phase 2 (OKR / X-matrix / strategy
+alignment) hangs on.
+
+---
+
 ## 2026-09-16 — Smarter deterministic builder (richer no-key drafts)
 
 ### D38 — Catch lowercase / single-word roles, an unlabelled title, and draft branch conditions

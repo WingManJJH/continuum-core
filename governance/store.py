@@ -44,6 +44,8 @@ EDITABLE_TASK_FIELDS = [
     "kpi_refs", "guardrail_ref", "subprocess_ref",
 ]
 EDITABLE_ROLE_FIELDS = ["name", "raci", "skills"]
+EDITABLE_GROUP_FIELDS = ["name", "level", "parent_ref", "owner_role", "objective_refs", "description", "custom"]
+EDITABLE_PROCESS_FIELDS = ["name", "owner_role", "parent_ref", "objective_refs", "custom", "maturity_score"]
 
 
 class EditError(ValueError):
@@ -72,6 +74,8 @@ class GovernanceStore:
             self._event_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(SCHEMA_DIR, "human-role.schema.json")) as f:
             self._role_validator = Draft202012Validator(json.load(f))
+        with open(os.path.join(SCHEMA_DIR, "process-group.schema.json")) as f:
+            self._group_validator = Draft202012Validator(json.load(f))
         with open(os.path.join(HERE, "..", "guardrail-template", "default-guardrail-policy.json")) as f:
             self._default_gr = json.load(f)
 
@@ -476,6 +480,103 @@ class GovernanceStore:
         new["status"] = "deprecated"
         new["version"] = cur["version"] + 1
         cc.append_edit_event("HumanRole", role_id, "deprecate", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    # --- process hierarchy (L1–L5) + master-data metadata --------------------
+    def add_group(self, group_id: str, name: str, level: int, actor: str, reason: str,
+                  parent_ref: str | None = None, owner_role: str | None = None,
+                  objective_refs: list | None = None, description: str = "") -> dict:
+        """Author a process-hierarchy node (an L1 category or L2–L5 group). Versioned."""
+        self._require(reason, actor)
+        if not re.match(r"^[A-Z]{2}(\.[0-9]+)*$", group_id or ""):
+            raise EditError("a group id looks like CO or CO.3 (2-letter domain + dotted path)")
+        if not name or not name.strip():
+            raise EditError("a group name is required")
+        g = self.graph()
+        if g.get("ProcessGroup", group_id) is not None:
+            raise EditError(f"group {group_id} already exists")
+        if parent_ref and g.get("ProcessGroup", parent_ref) is None:
+            raise EditError(f"unknown parent group {parent_ref}")
+        grp = {"id": group_id, "name": name.strip(), "level": int(level),
+               "parent_ref": parent_ref or None, "owner_role": owner_role or None,
+               "objective_refs": objective_refs or [], "description": (description or "").strip(),
+               "custom": {}, "version": 1, "status": "active"}
+        errs = sorted(self._group_validator.iter_errors(grp), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("ProcessGroup", group_id, "create", None, 1,
+                             {"kind": "human", "id": actor}, grp, reason.strip())
+        return grp
+
+    def edit_group(self, group_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Edit a hierarchy node — name / level / parent / owner / objectives / description
+        / custom master-data. Versioned. The id is immutable."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("ProcessGroup", group_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired group {group_id}")
+        unknown = set(changes) - set(EDITABLE_GROUP_FIELDS)
+        if unknown:
+            raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        if changes.get("parent_ref"):
+            if changes["parent_ref"] == group_id:
+                raise EditError("a group can't be its own parent")
+            if g.get("ProcessGroup", changes["parent_ref"]) is None:
+                raise EditError(f"unknown parent group {changes['parent_ref']}")
+        new = copy.deepcopy(cur)
+        for k, v in changes.items():
+            new[k] = v
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._group_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(e.message for e in errs[:2]))
+        cc.append_edit_event("ProcessGroup", group_id, "update", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def remove_group(self, group_id: str, actor: str, reason: str) -> dict:
+        """Retire a hierarchy node — refused while a process or group still hangs under it."""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("ProcessGroup", group_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or already-retired group {group_id}")
+        kids = [p["id"] for p in g.all("Process") if p["status"] == "active" and p.get("parent_ref") == group_id]
+        kids += [x["id"] for x in g.all("ProcessGroup") if x["status"] == "active" and x.get("parent_ref") == group_id]
+        if kids:
+            raise EditError(f"group {group_id} still has {len(kids)} child(ren) (e.g. {kids[0]}); reparent them first")
+        new = copy.deepcopy(cur)
+        new["status"] = "deprecated"
+        new["version"] = cur["version"] + 1
+        cc.append_edit_event("ProcessGroup", group_id, "deprecate", cur["version"], new["version"],
+                             {"kind": "human", "id": actor}, new, reason.strip())
+        return new
+
+    def edit_process(self, process_id: str, changes: dict, actor: str, reason: str) -> dict:
+        """Edit a process header — name / owner / parent / objective links / custom
+        master-data / maturity. Versioned. (Steps and guardrails have their own paths.)"""
+        self._require(reason, actor)
+        g = self.graph()
+        cur = g.get("Process", process_id)
+        if cur is None or cur["status"] != "active":
+            raise EditError(f"unknown or retired process {process_id}")
+        unknown = set(changes) - set(EDITABLE_PROCESS_FIELDS)
+        if unknown:
+            raise EditError(f"these fields are not editable here: {sorted(unknown)}")
+        if changes.get("parent_ref") and g.get("ProcessGroup", changes["parent_ref"]) is None:
+            raise EditError(f"unknown parent group {changes['parent_ref']}")
+        if changes.get("owner_role") and g.get("HumanRole", changes["owner_role"]) is None:
+            raise EditError(f"unknown owner role {changes['owner_role']}")
+        new = copy.deepcopy(cur)
+        for k, v in changes.items():
+            new[k] = v
+        new["version"] = cur["version"] + 1
+        errs = sorted(self._process_validator.iter_errors(new), key=lambda e: list(e.path))
+        if errs:
+            raise EditError("; ".join(f"{list(e.path) or '(root)'}: {e.message}" for e in errs[:2]))
+        cc.append_edit_event("Process", process_id, "update", cur["version"], new["version"],
                              {"kind": "human", "id": actor}, new, reason.strip())
         return new
 

@@ -37,6 +37,7 @@
     <section class="pane center">
       <div class="viewbar">
         <button id="landscape-btn" class="add-btn ghost-btn" type="button" title="See the whole organization's process landscape">Landscape</button>
+        <button id="arch-btn" class="add-btn ghost-btn" type="button" title="Navigate the L1–L5 process hierarchy (management architecture view)">Architecture</button>
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
         <button id="import-btn" class="add-btn ghost-btn" type="button" title="Import a BPMN 2.0 or Visio (.vsdx) diagram as a new governed process">Import</button>
@@ -136,6 +137,16 @@
     </div>
   </div>
 
+  <!-- Master data: hierarchy + custom metadata for a domain/group or a process -->
+  <div id="md-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2 id="md-title">Master data</h2><button id="md-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Master data for this <span id="md-kind">node</span> — its place in the hierarchy, strategic-objective links, and any <b>custom fields</b> your organization tracks. Every change is versioned and audited.</p>
+      <div id="md-body"></div>
+      <div id="md-msg"></div>
+    </div>
+  </div>
+
   <!-- Documentation panel -->
   <div id="docs-modal" class="docs-modal" hidden>
     <div class="docs-shell">
@@ -170,6 +181,7 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="architecture.js"></script>
   <script src="docs.js"></script>
 </body>
 </html>

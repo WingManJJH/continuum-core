@@ -61,6 +61,21 @@
       "maximum": 5,
       "description": "ISO 9004 self-assessment (1–5), tracked over versions."
     },
+    "parent_ref": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{2}(\\.[0-9]+)*$",
+      "description": "Parent in the L1–L5 process hierarchy — a ProcessGroup id (e.g. CO or CO.3)."
+    },
+    "objective_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^obj\\.[a-z0-9_.]+$"},
+      "description": "Strategic objectives this process supports (X-matrix / strategy alignment)."
+    },
+    "custom": {
+      "type": "object",
+      "description": "User-defined master-data metadata (free-form key/value). Not read by agents.",
+      "additionalProperties": {"type": ["string", "number", "boolean", "null"]}
+    },
     "version": {"type": "integer", "minimum": 1, "description": "Every change is a new version, never an overwrite (ISO 9001 §7.5)."},
     "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
   },

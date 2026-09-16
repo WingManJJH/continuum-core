@@ -399,3 +399,30 @@ g .connsrc rect, g.gwnode.connsrc rect, g.evnode.connsrc circle { outline: none;
 .bstep-gw, .bstep-ai { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-left: 4px; }
 .bstep-gw { background: var(--warn-bg); color: var(--warn); }
 .bstep-ai { background: var(--accent); color: var(--accent-ink); }
+
+/* ==== Architecture (L1–L5 hierarchy) + master data (D39) ==== */
+.arch { padding: 6px 4px 40px; }
+.archhead { font-size: 13px; color: var(--muted); margin: 4px 4px 14px; }
+.agroup { border-left: 2px solid var(--line); margin: 6px 0 6px 4px; padding-left: 12px; }
+.aghead { display: flex; align-items: center; gap: 9px; padding: 6px 0; flex-wrap: wrap; }
+.aglvl { font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 5px; padding: 1px 6px; }
+.aglvl.warn { background: var(--warn); }
+.agname { font-weight: 600; font-size: 15px; }
+.agid { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.agowner, .agobj { font-size: 11.5px; color: var(--muted); }
+.agmd { margin-left: auto; }
+.agdesc { font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
+.agbody { padding-left: 4px; }
+.apcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 9px; margin: 6px 0 10px; }
+.apcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); cursor: pointer; }
+.apcard:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+.apcid { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.apcname { font-weight: 600; font-size: 13.5px; margin: 2px 0; }
+.apcmeta { font-size: 11.5px; color: var(--muted); }
+.mdchip { display: inline-block; font-size: 11px; font-family: var(--mono); border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px; margin: 3px 4px 0 0; color: var(--muted); }
+.kvrow { display: flex; gap: 6px; margin: 5px 0; }
+.kvrow .kv-k, .kvrow .kv-v { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); color: var(--ink); padding: 5px 8px; }
+.kvrow .kv-k { max-width: 40%; font-family: var(--mono); }
+#md-body label { display: block; margin: 9px 0; font-size: 12.5px; }
+#md-body label input, #md-body label select { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; margin-top: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); padding: 7px 9px; }
+#md-body .hint { color: var(--muted); font-weight: 400; }
