@@ -559,3 +559,42 @@ g .connsrc rect, g.gwnode.connsrc rect, g.evnode.connsrc circle { outline: none;
 .nq.center .xcross { min-height: 210px; min-width: 180px; }
 .agrid { display: grid; }
 .agc { width: 16px; height: 16px; }
+
+/* ── Phase 3: live indicator + Present / board mode ─────────────────── */
+.live-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--line); vertical-align: middle; transition: background .25s; }
+.live-dot.on { background: #2fbf71; box-shadow: 0 0 0 0 rgba(47,191,113,.55);
+  animation: livePulse 2s infinite; }
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(47,191,113,.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(47,191,113,0); }
+  100% { box-shadow: 0 0 0 0 rgba(47,191,113,0); }
+}
+
+.present-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 4000;
+  display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 18px;
+  background: #0f1b24; color: #eaf1f5; box-shadow: 0 2px 14px rgba(0,0,0,.35); }
+.present-bar .pb-brand { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+.present-bar .pb-brand span { font-weight: 400; opacity: .6; }
+.present-bar .pb-views { display: flex; gap: 8px; }
+.present-bar .pb-views button, .present-bar .pb-exit {
+  background: rgba(255,255,255,.08); color: #eaf1f5; border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer;
+  min-height: 40px; }
+.present-bar .pb-views button:hover, .present-bar .pb-exit:hover { background: rgba(255,255,255,.16); }
+.present-bar .pb-views button.active { background: #2f8fbf; border-color: #2f8fbf; }
+.present-bar .pb-proc { background: rgba(255,255,255,.08); color: #eaf1f5;
+  border: 1px solid rgba(255,255,255,.16); border-radius: 9px; padding: 9px 12px;
+  font-size: 15px; min-height: 40px; max-width: 260px; }
+.present-bar .pb-spacer { flex: 1; }
+.present-bar .pb-live { display: flex; align-items: center; gap: 7px; font-size: 13px;
+  text-transform: uppercase; letter-spacing: .6px; opacity: .85; }
+.present-bar .pb-exit { background: rgba(240,106,79,.22); border-color: rgba(240,106,79,.5); }
+
+body.presenting header, body.presenting .pane.nav, body.presenting .pane.props,
+body.presenting .viewbar { display: none !important; }
+body.presenting .shell { grid-template-columns: 1fr; padding: 0; gap: 0;
+  height: calc(100vh - 56px); margin-top: 56px; }
+body.presenting .pane.center { border: 0; border-radius: 0; max-height: none; }
+body.presenting .canvas { font-size: 1.06rem; }
+body.presenting { overflow: hidden; }
