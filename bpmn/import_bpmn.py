@@ -161,9 +161,8 @@ def _proc_name(root) -> str | None:
     return p.get("name") if p is not None else None
 
 
-def plan_import(xml_text: str) -> dict:
-    """A dry-run: what would be created, plus warnings. Writes nothing."""
-    p = parse_bpmn(xml_text)
+def plan_from_parsed(p: dict) -> dict:
+    """A dry-run summary of any parsed graph (BPMN or Visio). Writes nothing."""
     return {
         "name": p["name"],
         "counts": {"steps": len(p["tasks"]), "agent_steps": sum(1 for t in p["tasks"] if t["agent"]),
@@ -171,6 +170,11 @@ def plan_import(xml_text: str) -> dict:
         "warnings": p["warnings"],
         "sample_steps": [t["name"] for t in p["tasks"][:6]],
     }
+
+
+def plan_import(xml_text: str) -> dict:
+    """A dry-run for a BPMN file: what would be created, plus warnings."""
+    return plan_from_parsed(parse_bpmn(xml_text))
 
 
 def _next_code(g: cc.Graph, prefix: str = "IM") -> str:
@@ -186,8 +190,17 @@ def apply_import(xml_text: str, code: str | None = None, owner: str | None = Non
                  store: gov.GovernanceStore | None = None) -> dict:
     """Create a new process from the BPMN, through the audited write path. Returns
     {process, code, counts, warnings}. Every node and flow is a hash-chained event."""
+    return apply_parsed(parse_bpmn(xml_text), code=code, owner=owner,
+                        actor=actor, reason=reason, store=store)
+
+
+def apply_parsed(parsed: dict, code: str | None = None, owner: str | None = None,
+                 actor: str = DEFAULT_OWNER, reason: str = "imported from a diagram",
+                 store: gov.GovernanceStore | None = None) -> dict:
+    """Create a new process from an already-parsed graph (BPMN or Visio), through
+    the audited write path. Shared by both importers so identity/id-remapping and
+    the create sequence are identical."""
     s = store or gov.GovernanceStore()
-    parsed = parse_bpmn(xml_text)
     g = cc.Graph()
     code = code or _next_code(g)
     owner = owner or DEFAULT_OWNER

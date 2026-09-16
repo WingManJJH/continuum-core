@@ -31,6 +31,7 @@ import store as gov  # noqa: E402  — the tested guardrail write path (one sour
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
+import visio_import as visio  # noqa: E402  — Visio .vsdx import
 
 STORE = gov.GovernanceStore()
 
@@ -158,10 +159,21 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as e:
                     return self._json_code({"ok": False, "error": str(e)}, 400)
             if u.path == "/api/import/bpmn":
-                # bring a BPMN 2.0 file into the model. op=plan is a write-free
-                # dry-run; op=apply creates a new process via the audited write path.
+                # bring a BPMN 2.0 XML file OR a Visio .vsdx into the model. op=plan
+                # is a write-free dry-run; op=apply creates a new process via the
+                # audited write path. format="vsdx" carries the file as base64.
                 try:
-                    if b.get("op") == "apply":
+                    apply = b.get("op") == "apply"
+                    if b.get("format") == "vsdx":
+                        import base64
+                        data = base64.b64decode(b.get("data_b64", ""))
+                        if apply:
+                            res = visio.apply_vsdx(data, code=(b.get("code") or None),
+                                                   owner=(b.get("owner") or None), actor=actor,
+                                                   reason=reason or "imported from Visio", store=STORE)
+                            return self._json({"ok": True, "result": res})
+                        return self._json({"ok": True, "plan": visio.plan_vsdx(data)})
+                    if apply:
                         res = bpmn_import.apply_import(b.get("xml", ""), code=(b.get("code") or None),
                                                        owner=(b.get("owner") or None), actor=actor,
                                                        reason=reason or "imported from BPMN 2.0", store=STORE)
