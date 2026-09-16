@@ -34,6 +34,7 @@ function load() {
     state.procs = d.processes;
     state.landscape = null;  // model changed — refetch the house next time it's opened
     state.architecture = null;  // and the hierarchy
+    state.strategy = null;  // and the strategy layer
     if (!state.sel && state.procs.length) state.sel = state.procs[0].id;
     renderNav();
     renderTitle();
@@ -75,7 +76,8 @@ function toggleProcTools(hide) {
 function renderCenter() {
   var landB = document.getElementById("landscape-btn"); if (landB) landB.classList.toggle("active", state.view === "landscape");
   var archB = document.getElementById("arch-btn"); if (archB) archB.classList.toggle("active", state.view === "architecture");
-  toggleProcTools(state.view === "landscape" || state.view === "architecture");
+  var stratB = document.getElementById("strategy-btn"); if (stratB) stratB.classList.toggle("active", state.view === "strategy");
+  toggleProcTools(state.view === "landscape" || state.view === "architecture" || state.view === "strategy");
   if (state.view === "landscape") {
     renderCrumbs();
     $("#canvas").innerHTML = state.landscape ? renderLandscape(state.landscape) : '<div class="muted" style="padding:24px">loading…</div>';
@@ -87,6 +89,13 @@ function renderCenter() {
     $("#canvas").innerHTML = (state.architecture && typeof renderArchitecture === "function")
       ? renderArchitecture(state.architecture) : '<div class="muted" style="padding:24px">loading…</div>';
     if (typeof wireArchitecture === "function") wireArchitecture();
+    return;
+  }
+  if (state.view === "strategy") {
+    renderCrumbs();
+    $("#canvas").innerHTML = (state.strategy && typeof renderStrategy === "function")
+      ? renderStrategy(state.strategy, state.stratTab || "okr") : '<div class="muted" style="padding:24px">loading…</div>';
+    if (typeof wireStrategy === "function") wireStrategy();
     return;
   }
   var p = getProc(); if (!p) return;

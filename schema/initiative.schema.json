@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/initiative",
+  "title": "Initiative",
+  "description": "An improvement priority / project in the X-matrix (Hoshin) \u2014 the 'how' that advances objectives, delivered through processes. LOCKED addition.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^init\\.[a-z0-9_.]+$"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "objective_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^obj\\.[a-z0-9_.]+$"
+      }
+    },
+    "process_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+$"
+      }
+    },
+    "owner_role": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^role\\.[a-z0-9_.]+$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}
