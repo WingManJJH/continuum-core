@@ -10,6 +10,7 @@
   <header>
     <div class="brand">Continuum <span>· Process Canvas</span></div>
     <div class="spacer"></div>
+    <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
     <button class="toggle" id="themeBtn" type="button">theme: auto</button>
@@ -148,6 +149,14 @@
     </div>
   </div>
 
+  <!-- Version history & compare -->
+  <div id="hist-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2 id="hist-title">Model history &amp; compare</h2><button id="hist-close" class="x" type="button">&times;</button></div>
+      <div id="hist-body"></div>
+    </div>
+  </div>
+
   <!-- Documentation panel -->
   <div id="docs-modal" class="docs-modal" hidden>
     <div class="docs-shell">
@@ -184,6 +193,7 @@
   <script src="app.js"></script>
   <script src="architecture.js"></script>
   <script src="strategy.js"></script>
+  <script src="history.js"></script>
   <script src="docs.js"></script>
 </body>
 </html>

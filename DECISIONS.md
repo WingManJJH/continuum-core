@@ -6,6 +6,25 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — Version history & compare (comparison between models)
+
+### D41 — Browse who/when/why and diff any two versions of any entity
+**Context:** every governed change was already versioned + hash-chained with actor + reason (full version
+control existed), but there was no *view* to browse the history or **compare models**.
+**Decision & build:** `audit/history.py` reconstructs from the change-control log (each event carries a full
+entity snapshot): `entity_history(type,id)` (the version timeline with a **field-level diff** at each step —
+old → new), `compare_versions(type,id,va,vb)` (order-independent diff of two versions), and `model_changes()`
+(the recent change stream + a per-type created/updated/deprecated summary + the chain-intact check). Served
+at `GET /api/changes` and `GET /api/history`. UI: a **History** button in the header → a modal showing the
+whole change stream (op badge, entity, version, who · when · why) and a per-type summary with an
+audit-chain badge; click any change to drill into that entity's **revision timeline with field diffs**, with
+a back button. Read-only — it never writes. `audit/test_history.py` (8). Full suite **464**. Verified live:
+edited a domain twice, opened History, saw the change stream and CO's `name: Customer Operations → Customer
+Ops` diff with the reason and actor. (This is the version-control/comparison half of the user's input;
+formal approval-gate workflow is the remaining piece — a candidate for Phase 3.)
+
+---
+
 ## 2026-09-16 — Phase 2: strategy layer — OKR, X-matrix, alignment, KPI hierarchy
 
 ### D40 — Enterprise MVV + Hoshin X-matrix wired to the process model & KPIs
