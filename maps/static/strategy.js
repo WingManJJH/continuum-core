@@ -63,42 +63,54 @@ function xCell(L, type, a, b) {
   return '<div class="agc ' + cls + '" data-ct="' + esc(type) + '" data-a="' + esc(a) + '" data-b="' + esc(b)
     + '" data-state="' + esc(state) + '" title="' + esc(strength || "none") + (manual ? " (manual — click to change)" : " (derived — click to pin)") + '"></div>';
 }
-function xGrid(rows, cols, type, abFn, L) {
+// intersection grid: fixed 16px cells at 22px pitch so it lines up with the axis cards
+var XCELL = 16, XGAP = 6, XAXIS = 210;   // cell px, gap px, vertical-card length px
+function xGrid(rows, cols, type, abFn, L, justify) {
   var cells = "";
   for (var r = 0; r < rows.length; r++) for (var c = 0; c < cols.length; c++) {
     var ab = abFn(rows[r], cols[c]);
     cells += xCell(L, type, ab[0], ab[1]);
   }
-  return '<div class="agrid" style="grid-template-columns:repeat(' + (cols.length || 1) + ',1fr)">' + cells + "</div>";
+  return '<div class="agrid" style="grid-template-columns:repeat(' + (cols.length || 1) + ',' + XCELL + 'px);'
+    + 'grid-template-rows:repeat(' + (rows.length || 1) + ',' + XCELL + 'px);gap:' + XGAP + 'px;'
+    + (justify === "end" ? "justify-content:flex-end;" : "") + '">' + cells + "</div>";
+}
+// a vertical (rotated) axis card — objectives / metrics / owners
+function vCard(id, label, cls, extra) {
+  return '<div class="vcard ' + cls + '" ' + (extra || "") + ' style="height:' + XAXIS + 'px"><span class="vtext">' + esc(label) + "</span></div>";
+}
+// a horizontal axis card — initiatives / goals
+function hCard(id, label, cls, extra) {
+  return '<div class="hcard ' + cls + '" ' + (extra || "") + "><span>" + esc(label) + "</span></div>";
 }
 function renderXMatrix(X) {
   var O = X.objectives, G = X.goals, I = X.initiatives, M = X.metrics, W = X.owners, L = X.links;
-  var initList = I.map(function (it) { return '<div class="nxitem nx-init">' + esc(it.name) + "</div>"; }).join("");
-  var objList = O.map(function (o) { return '<div class="nxitem nx-obj" data-obj="' + esc(o.id) + '">' + esc(o.name) + "</div>"; }).join("");
-  var metList = M.map(function (m) {
-    var cls = m.status === "on_target" ? "good" : m.status === "off_target" ? "crit" : "";
-    return '<div class="nxitem nx-met ' + cls + '" data-kpi="' + esc(m.id) + '">' + esc(m.name)
-      + '<span class="nxval">' + (m.value == null ? "—" : esc(String(m.value))) + "/" + esc(String(m.target)) + (m.status === "off_target" ? " ✗" : m.status === "on_target" ? " ✓" : "") + "</span></div>";
+  var objCards = O.map(function (o) { return vCard(o.id, o.name, "nx-obj rot", 'data-obj="' + esc(o.id) + '"'); }).join("");
+  var metCards = M.map(function (m) {
+    var st = m.status === "on_target" ? "good" : m.status === "off_target" ? "crit" : "";
+    var lbl = m.name + " · " + (m.value == null ? "—" : m.value) + "/" + m.target + (m.status === "off_target" ? " ✗" : m.status === "on_target" ? " ✓" : "");
+    return vCard(m.id, lbl, "nx-met " + st, 'data-kpi="' + esc(m.id) + '"');
   }).join("");
-  var ownList = W.map(function (o) { return '<div class="nxitem nx-own">' + esc(o.name) + "</div>"; }).join("");
-  var goalList = G.map(function (g) { return '<div class="nxitem nx-goal" data-obj="' + esc(g.id) + '">' + esc(g.name) + "</div>"; }).join("");
+  var ownCards = W.map(function (o) { return vCard(o.id, o.name, "nx-own rot", ""); }).join("");
+  var initCards = I.map(function (it) { return hCard(it.id, it.name, "nx-init", ""); }).join("");
+  var goalCards = G.map(function (g) { return hCard(g.id, g.name, "nx-goal", 'data-obj="' + esc(g.id) + '"'); }).join("");
 
-  var A = xGrid(I, O, "init_obj", function (it, o) { return [it.id, o.id]; }, L);       // init ↔ obj
-  var C = xGrid(I, M, "init_metric", function (it, m) { return [it.id, m.id]; }, L);    // init ↔ metric
-  var D = xGrid(I, W, "init_owner", function (it, w) { return [it.id, w.id]; }, L);     // init ↔ owner
-  var Icorner = xGrid(G, O, "obj_goal", function (g, o) { return [o.id, g.id]; }, L);   // obj ↔ goal
+  var A = xGrid(I, O, "init_obj", function (it, o) { return [it.id, o.id]; }, L);              // init(rows) × obj(cols)
+  var C = xGrid(I, M, "init_metric", function (it, m) { return [it.id, m.id]; }, L);           // init × metric
+  var D = xGrid(I, W, "init_owner", function (it, w) { return [it.id, w.id]; }, L);            // init × owner
+  var Icorner = xGrid(G, O, "obj_goal", function (g, o) { return [o.id, g.id]; }, L);          // goal(rows) × obj(cols)
 
   var grid = '<div class="nexus"><div class="nexus-grid">'
     + '<div class="nq tl"><span class="clab">A · init × objective</span>' + A + "</div>"
-    + '<div class="nq initiatives"><div class="qlab">▲ Change initiatives</div>' + initList + "</div>"
+    + '<div class="nq initiatives"><span class="alab">▲ Change initiatives</span><div class="haxis">' + initCards + "</div></div>"
     + '<div class="nq tr"><span class="clab">C · init × metric</span>' + C + "</div>"
     + '<div class="nq tr2"><span class="clab">D · init × owner</span>' + D + "</div>"
-    + '<div class="nq objectives"><div class="qlab vert">◄ Objectives</div><div class="qitems">' + objList + "</div></div>"
+    + '<div class="nq objectives"><span class="alab vleft">◄ Objectives</span><div class="vaxis">' + objCards + "</div></div>"
     + '<div class="nq center"><div class="xcross"><span>X</span></div></div>'
-    + '<div class="nq metrics"><div class="qlab vert">Metrics ►</div><div class="qitems">' + metList + "</div></div>"
-    + '<div class="nq owners"><div class="qlab vert">Owners</div><div class="qitems">' + ownList + "</div></div>"
+    + '<div class="nq metrics"><span class="alab vright">Metrics ►</span><div class="vaxis">' + metCards + "</div></div>"
+    + '<div class="nq owners"><span class="alab vright">Owners</span><div class="vaxis">' + ownCards + "</div></div>"
     + '<div class="nq bl"><span class="clab">I · objective × goal</span>' + Icorner + "</div>"
-    + '<div class="nq goals"><div class="qlab">▼ Organizational goals</div>' + goalList + "</div>"
+    + '<div class="nq goals"><span class="alab">▼ Organizational goals</span><div class="haxis">' + goalCards + "</div></div>"
     + "</div></div>";
 
   var key = '<div class="nxkey"><b>Correlation</b> <span class="agc primary"></span> primary '
