@@ -598,3 +598,32 @@ body.presenting .shell { grid-template-columns: 1fr; padding: 0; gap: 0;
 body.presenting .pane.center { border: 0; border-radius: 0; max-height: none; }
 body.presenting .canvas { font-size: 1.06rem; }
 body.presenting { overflow: hidden; }
+
+/* ── Phase 3: approval gate ─────────────────────────────────────────── */
+.appr-badge { display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px;
+  font-size: 11px; font-weight: 700; line-height: 16px; text-align: center;
+  color: #fff; background: #f06a4f; border-radius: 9px; }
+.appr-tabs { display: flex; gap: 6px; margin-left: 14px; }
+.appr-tabs button { background: transparent; border: 1px solid var(--line); color: var(--fg);
+  border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.appr-tabs button.active { background: var(--accent, #2f8fbf); color: #fff; border-color: transparent; }
+#appr-body { max-height: 62vh; overflow: auto; padding: 6px 2px; }
+.appr-card { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; margin: 9px 2px;
+  background: var(--surface); }
+.appr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.appr-op { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted, #7a8795);
+  background: rgba(127,127,127,.12); padding: 1px 7px; border-radius: 6px; }
+.appr-arg { margin: 6px 0 2px; font-size: 13px; }
+.appr-meta { font-size: 12px; color: var(--muted, #7a8795); margin-top: 3px; }
+.appr-dec { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--line); font-size: 13px; }
+.appr-actions { display: flex; gap: 8px; margin-top: 10px; }
+.appr-actions button { padding: 7px 15px; font-size: 13px; border-radius: 8px; cursor: pointer; }
+.appr-st { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  padding: 2px 8px; border-radius: 20px; }
+.appr-st.st-pending  { background: #fff3d6; color: #8a6100; }
+.appr-st.st-approved { background: #d8f3e3; color: #1b6b45; }
+.appr-st.st-rejected { background: #fadbd6; color: #9a3423; }
+.appr-st.st-withdrawn{ background: #e8ebee; color: #566572; }
+.pill.warn { background: #fff3d6; color: #8a6100; }
+label.ck { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; cursor: pointer; }
+label.ck input { width: auto; margin: 0; }

@@ -32,6 +32,7 @@ import history as hist  # noqa: E402  — version history & compare
 import layout  # noqa: E402  — decorative node positions (not a model edit)
 import portal  # noqa: E402  — read-only share links (operational, not a model edit)
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
+import approvals as approvals_mod  # noqa: E402  — approval-gate workflow (Phase 3)
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
@@ -40,6 +41,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "builder"))
 import build as builder  # noqa: E402  — build a process from instructions
 
 STORE = gov.GovernanceStore()
+QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
 
 STATIC = os.path.join(HERE, "static")
 CONTENT = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
@@ -92,6 +94,11 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/strategy":
             g = cc.Graph()
             return self._json({"strategy": strat.strategy(g), "xmatrix": strat.xmatrix(g)})
+        if u.path == "/api/approvals":
+            status = parse_qs(u.query).get("status", [None])[0] or None
+            return self._json({"approvals": QUEUE.list(status),
+                               "pending": QUEUE.pending_count(),
+                               "ops": sorted(approvals_mod.PROPOSABLE_OPS)})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
@@ -182,6 +189,26 @@ class Handler(BaseHTTPRequestHandler):
         actor = b.get("actor", "role.ops.support_lead")
         reason = b.get("reason", "")
         try:
+            if u.path == "/api/approvals":
+                # the approval gate — propose a change (does not touch the model),
+                # or approve (apply through the audited store) / reject / withdraw.
+                op = b.get("op")
+                if op == "propose":
+                    cr = QUEUE.propose(b.get("target_op", ""), b.get("args", {}) or {},
+                                       proposed_by=actor, reason=reason,
+                                       title=b.get("title", ""), target=b.get("target", ""))
+                elif op == "approve":
+                    cr = QUEUE.approve(b.get("id", ""), reviewer=b.get("reviewer", actor),
+                                       decision_reason=b.get("decision_reason", ""))
+                elif op == "reject":
+                    cr = QUEUE.reject(b.get("id", ""), reviewer=b.get("reviewer", actor),
+                                      decision_reason=b.get("decision_reason", ""))
+                elif op == "withdraw":
+                    cr = QUEUE.withdraw(b.get("id", ""), actor=actor,
+                                        decision_reason=b.get("decision_reason", ""))
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+                return self._json({"ok": True, "cr": cr, "pending": QUEUE.pending_count()})
             if u.path == "/api/layout":
                 # decorative node positions only — NOT a model edit, so it does not
                 # go through the governance store, the version chain, or the audit log.
@@ -353,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 return self.send_error(404)
             return self._json({"ok": True, "result": r})
-        except gov.EditError as e:
+        except (gov.EditError, approvals_mod.ApprovalError) as e:
             return self._json_code({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             return self._json_code({"ok": False, "error": repr(e)}, 500)
