@@ -1,7 +1,7 @@
 # Continuum Core — Phases 1–4
 
 [![tests](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml/badge.svg)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
-[![assertions](https://img.shields.io/badge/assertions-278%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
+[![assertions](https://img.shields.io/badge/assertions-289%20passing-2ea44f)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab)](https://github.com/WingManJJH/continuum-core/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -102,7 +102,8 @@ python3 governance/retention.py                    # retention plan (add --apply
 # Process canvas — interactive §03 Canvas View
 python3 maps/test_mapdata.py                       # 12 asserts: flow / agent step / escalation / override / editor payload
 python3 maps/test_layout.py                        # 10 asserts: free-form canvas layout layer (save/reset, decorative-only)
-python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart with branching (gateways + drawn flows) / swimlanes / RACI / checklist + drill-down + in-canvas guardrail editing
+python3 maps/test_landscape.py                     # 11 asserts: Phase D process landscape (domains + catalogs)
+python3 maps/app.py                                # http://localhost:8789 — 3-pane canvas: free-form draggable flowchart with branching / swimlanes / RACI / checklist + drill-down + an org-wide process-landscape repository + in-canvas guardrail editing
 
 # Advisor — analyze anything vs best practices & standards
 python3 advisor/test_advisor.py                    # 26 asserts: rules + LLM-augmentation across every subject

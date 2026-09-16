@@ -75,6 +75,62 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
     return out
 
 
+DOMAIN_NAMES = {
+    "CO": "Customer Operations", "FN": "Finance", "SC": "Supply Chain",
+    "MS": "Marketing & Sales", "IT": "Information Technology",
+    "PD": "Product Development", "HR": "Human Resources", "SV": "Strategy",
+}
+
+
+def landscape(g: cc.Graph | None = None) -> dict:
+    """The org's process house: every active process grouped by APQC domain, with
+    per-process stats, plus catalogs (roles / KPIs / risks) that thread across
+    processes. Phase D navigation — read-only, from the one graph."""
+    g = g or cc.Graph()
+    procs = sorted((p for p in g.all("Process") if p["status"] == "active"), key=lambda p: p["id"])
+    role_use: dict[str, set] = {}
+    kpi_use: dict[str, set] = {}
+    domains: dict[str, dict] = {}
+    for p in procs:
+        dom = p["id"][:2]
+        tasks = [t for t in g.all("Task") if t["process_ref"] == p["id"] and t["status"] == "active"]
+        agent_steps = sum(1 for t in tasks
+                          if any(str(w).startswith("agent.") for w in t.get("performed_by", [])))
+        gr = g.get("GuardrailPolicy", p.get("guardrail_ref"))
+        reviewed = bool(gr and gr.get("review", {}).get("reviewed_by"))
+        for t in tasks:
+            for w in t.get("performed_by", []):
+                if str(w).startswith("role."):
+                    role_use.setdefault(w, set()).add(p["id"])
+        for k in p.get("kpi_refs", []):
+            kpi_use.setdefault(k, set()).add(p["id"])
+        e = domains.setdefault(dom, {"code": dom, "name": DOMAIN_NAMES.get(dom, dom), "processes": []})
+        e["processes"].append({
+            "id": p["id"], "name": p["name"], "owner": p["owner_role"],
+            "steps": len(tasks), "agent_steps": agent_steps, "reviewed": reviewed,
+            "risks": len(p.get("risk_refs", [])), "kpis": len(p.get("kpi_refs", [])),
+        })
+
+    def _name(etype, eid):
+        e = g.get(etype, eid)
+        return e["name"] if e and e.get("name") else eid
+
+    roles = sorted(({"id": rid, "name": _name("HumanRole", rid), "count": len(ps),
+                     "processes": sorted(ps)} for rid, ps in role_use.items()),
+                   key=lambda x: (-x["count"], x["id"]))
+    kpis = sorted(({"id": kid, "name": _name("KPI", kid), "count": len(ps),
+                    "processes": sorted(ps)} for kid, ps in kpi_use.items()),
+                  key=lambda x: (-x["count"], x["id"]))
+    risks = sorted(({"id": rc["id"], "risk": rc.get("risk", ""), "process": rc.get("process_ref")}
+                    for rc in g.all("RiskControl") if rc.get("status") == "active"),
+                   key=lambda x: x["id"])
+    return {
+        "processes_total": len(procs),
+        "domains": [domains[d] for d in sorted(domains)],
+        "catalogs": {"roles": roles, "kpis": kpis, "risks": risks},
+    }
+
+
 if __name__ == "__main__":
     import json
     print(json.dumps(all_maps(), indent=2)[:1400])

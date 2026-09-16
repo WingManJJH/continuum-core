@@ -27,6 +27,7 @@ function subBadge(t) {
 function load() {
   return fetch("/api/maps").then(function (r) { return r.json(); }).then(function (d) {
     state.procs = d.processes;
+    state.landscape = null;  // model changed — refetch the house next time it's opened
     if (!state.sel && state.procs.length) state.sel = state.procs[0].id;
     renderNav();
     renderTitle();
@@ -62,7 +63,18 @@ document.querySelectorAll(".views button").forEach(function (b) {
   });
 });
 
+function toggleProcTools(hide) {
+  ["add-step", "tidy", "enable-branch", "connect"].forEach(function (id) { var b = document.getElementById(id); if (b) b.style.display = hide ? "none" : ""; });
+}
 function renderCenter() {
+  var landB = document.getElementById("landscape-btn"); if (landB) landB.classList.toggle("active", state.view === "landscape");
+  toggleProcTools(state.view === "landscape");
+  if (state.view === "landscape") {
+    renderCrumbs();
+    $("#canvas").innerHTML = state.landscape ? renderLandscape(state.landscape) : '<div class="muted" style="padding:24px">loading…</div>';
+    wireLandscape();
+    return;
+  }
   var p = getProc(); if (!p) return;
   renderCrumbs();
   if (state.view === "raci") $("#canvas").innerHTML = renderRaci(p);
@@ -502,6 +514,69 @@ function wireLanes(m) {
     g.addEventListener("dblclick", function () { var t = taskById(tid); if (t && t.subprocess) drillInto(t.subprocess); });
   });
 }
+
+// ================= Phase D: process landscape / repository =====================
+function openProcess(id) {
+  if (!state.procs.find(function (x) { return x.id === id; })) return;
+  state.sel = id; state.view = "flow"; state.nav = []; state.task = null; state.gwsel = null;
+  document.querySelectorAll(".views button").forEach(function (x) { x.classList.toggle("active", x.getAttribute("data-view") === "flow"); });
+  renderNav(); renderTitle(); renderCenter(); renderProps();
+}
+function pchips(ids) { return ids.map(function (pid) { return '<a class="pchip" data-open="' + esc(pid) + '">' + esc(pid) + "</a>"; }).join(""); }
+function renderLandscape(L) {
+  var house = L.domains.map(function (d) {
+    var cards = d.processes.map(function (p) {
+      var ai = p.agent_steps ? p.agent_steps + " AI &middot; " : "";
+      return '<div class="pcard" data-open="' + esc(p.id) + '">'
+        + '<div class="pcid">' + esc(p.id) + "</div>"
+        + '<div class="pcname">' + esc(p.name) + "</div>"
+        + '<div class="pcmeta">' + p.steps + " steps &middot; " + ai + "owner " + esc(shortRole(p.owner)) + "</div>"
+        + '<div class="pcbadges"><span class="gdot ' + (p.reviewed ? "good" : "warn") + '"></span>'
+        + (p.reviewed ? "reviewed guardrail" : "default guardrail")
+        + (p.risks ? ' &middot; <span class="rtag">' + p.risks + " risk</span>" : "")
+        + (p.kpis ? " &middot; " + p.kpis + " KPI" : "") + "</div></div>";
+    }).join("");
+    return '<section class="domain"><h3><span class="dcode">' + esc(d.code) + '</span> ' + esc(d.name)
+      + ' <span class="dcount">' + d.processes.length + "</span></h3>"
+      + '<div class="pcards">' + cards + "</div></section>";
+  }).join("");
+  var C = L.catalogs;
+  function catcol(title, rows) { return '<div class="catcol"><h4>' + title + "</h4>" + rows + "</div>"; }
+  var roleRows = C.roles.map(function (r) {
+    return '<div class="catrow"><div class="catmain"><span class="catname">' + esc(r.name) + '</span><span class="catcount">' + r.count + "</span></div>"
+      + '<div class="catprocs">' + pchips(r.processes) + "</div></div>";
+  }).join("");
+  var kpiRows = C.kpis.map(function (k) {
+    return '<div class="catrow"><div class="catmain"><span class="catname">' + esc(k.name) + '</span><span class="catcount">' + k.count + "</span></div>"
+      + '<div class="catprocs">' + pchips(k.processes) + "</div></div>";
+  }).join("");
+  var riskRows = C.risks.map(function (x) {
+    return '<div class="catrow"><div class="catmain"><span class="catname" title="' + esc(x.risk) + '">' + esc(x.id) + '</span></div>'
+      + '<div class="catprocs">' + pchips([x.process]) + "</div></div>";
+  }).join("");
+  return '<div class="landscape">'
+    + '<div class="lshead">Process landscape &mdash; <b>' + L.processes_total + "</b> processes across <b>" + L.domains.length + "</b> APQC domains. Click any process to open it.</div>"
+    + '<div class="house">' + house + "</div>"
+    + '<div class="catalogs"><div class="catshead">Catalogs &mdash; what threads across the org</div><div class="catgrid">'
+    + catcol("Roles (" + C.roles.length + ")", roleRows)
+    + catcol("KPIs (" + C.kpis.length + ")", kpiRows)
+    + catcol("Risks (" + C.risks.length + ")", riskRows)
+    + "</div></div></div>";
+}
+function wireLandscape() {
+  var c = $("#canvas"); if (!c) return;
+  c.querySelectorAll("[data-open]").forEach(function (el) {
+    el.addEventListener("click", function () { openProcess(el.getAttribute("data-open")); });
+  });
+}
+var lsBtn = document.getElementById("landscape-btn");
+if (lsBtn) lsBtn.addEventListener("click", function () {
+  state.view = "landscape";
+  document.querySelectorAll(".views button").forEach(function (x) { x.classList.remove("active"); });
+  renderCenter();
+  if (!state.landscape) fetch("/api/landscape").then(function (r) { return r.json(); })
+    .then(function (d) { state.landscape = d.landscape; if (state.view === "landscape") renderCenter(); });
+});
 
 // ---------- RACI view ----------
 function renderRaci(m) {
