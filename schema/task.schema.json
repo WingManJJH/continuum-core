@@ -34,6 +34,11 @@
       "pattern": "^gr\\.[A-Z0-9._]+$",
       "description": "Task-level override. null = inherit the owning process's guardrail_ref (§02: inherit down unless overridden explicitly)."
     },
+    "subprocess_ref": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{2}\\.[0-9.]+$",
+      "description": "Optional drill-down: this step expands into another process (its apqc_code). null = a leaf step. Phase C sub-process navigation on the canvas."
+    },
     "version": {"type": "integer", "minimum": 1},
     "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
   }

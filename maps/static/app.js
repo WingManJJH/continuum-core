@@ -11,6 +11,17 @@ var state = { procs: [], sel: null, task: null, view: "flow" };
 
 function getProc() { return state.procs.find(function (p) { return p.id === state.sel; }); }
 function getTask() { var p = getProc(); return p && state.task ? p.tasks.find(function (t) { return t.id === state.task; }) : null; }
+function taskById(id) { var p = getProc(); return p ? p.tasks.find(function (t) { return t.id === id; }) : null; }
+// update selection highlight IN PLACE (re-rendering would kill a pending dblclick)
+function markSel() {
+  var svg = $("#canvas svg"); if (!svg) return;
+  svg.querySelectorAll("g.tnode").forEach(function (g) { var r = g.querySelector("rect.node"); if (r) r.classList.toggle("selrect", g.getAttribute("data-task") === state.task); });
+  svg.querySelectorAll("g.gwnode").forEach(function (g) { var r = g.querySelector("rect.gw"); if (r) r.classList.toggle("selrect", g.getAttribute("data-node") === state.gwsel); });
+}
+// drill-down "SUB" badge (local node coords) — a step that expands into another process
+function subBadge(t) {
+  return t.subprocess ? '<rect class="subbadge" x="' + (NW - 32) + '" y="' + (NH - 17) + '" width="30" height="14" rx="3"/><text class="subbadge" x="' + (NW - 17) + '" y="' + (NH - 7) + '" text-anchor="middle">SUB</text>' : "";
+}
 
 // ---------- load ----------
 function load() {
@@ -33,7 +44,7 @@ function renderNav() {
 }
 $("#proc-list").addEventListener("click", function (e) {
   var li = e.target.closest("li[data-p]"); if (!li) return;
-  state.sel = li.getAttribute("data-p"); state.task = null;
+  state.sel = li.getAttribute("data-p"); state.task = null; state.gwsel = null; state.nav = [];
   renderNav(); renderTitle(); renderCenter(); renderProps();
 });
 
@@ -53,12 +64,42 @@ document.querySelectorAll(".views button").forEach(function (b) {
 
 function renderCenter() {
   var p = getProc(); if (!p) return;
+  renderCrumbs();
   if (state.view === "raci") $("#canvas").innerHTML = renderRaci(p);
   else if (state.view === "checklist") $("#canvas").innerHTML = renderChecklist(p);
+  else if (state.view === "lanes") { $("#canvas").innerHTML = renderLanes(p); wireLanes(p); }
   else if (p.explicit) { $("#canvas").innerHTML = renderGraph(p); wireGraph(p); }
   else { $("#canvas").innerHTML = renderLinear(p); if (p.tasks.length) wireFlow(p); }
   syncFlowBar(p);
 }
+// --- sub-process drill-down breadcrumb ---
+function renderCrumbs() {
+  var c = $("#crumbs"); if (!c) return;
+  if (!state.nav || !state.nav.length) { c.hidden = true; c.innerHTML = ""; return; }
+  c.hidden = false;
+  var trail = state.nav.concat([state.sel]);
+  c.innerHTML = trail.map(function (id, i) {
+    var pr = state.procs.find(function (x) { return x.id === id; });
+    var nm = pr ? pr.name : id;
+    return (i ? '<span class="csep">›</span>' : "") + (i < trail.length - 1
+      ? '<a class="crumb" data-i="' + i + '">' + esc(nm) + "</a>"
+      : '<span class="crumb cur">' + esc(nm) + "</span>");
+  }).join("");
+}
+function drillInto(pid) {
+  if (!state.procs.find(function (x) { return x.id === pid; })) return;
+  state.nav = (state.nav || []).concat([state.sel]);
+  state.sel = pid; state.task = null; state.gwsel = null;
+  renderNav(); renderTitle(); renderCenter(); renderProps();
+}
+$("#crumbs").addEventListener("click", function (e) {
+  var a = e.target.closest("a.crumb[data-i]"); if (!a) return;
+  var i = +a.getAttribute("data-i");
+  var trail = state.nav.concat([state.sel]);
+  state.nav = trail.slice(0, i);
+  state.sel = trail[i]; state.task = null; state.gwsel = null;
+  renderNav(); renderTitle(); renderCenter(); renderProps();
+});
 // show "Enable branching" only for a linear process with steps; "Connect" only in explicit mode
 function syncFlowBar(p) {
   var eb = document.getElementById("enable-branch"), cn = document.getElementById("connect");
@@ -130,7 +171,7 @@ function renderLinear(m) {
     var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
     lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
     var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
-    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>");
+    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t));
     if (t.agents.length && t.escalate_if) {  // escalation branch travels with the node
       var bx = NW / 2, by = NH + 26, pw = 172, pxx = bx - pw / 2;
       p.push('<line class="esc-line" x1="' + bx + '" y1="' + NH + '" x2="' + bx + '" y2="' + by + '" marker-end="url(#eh_' + uid + ')"/>');
@@ -204,8 +245,9 @@ function wireFlow(m) {
       g.classList.remove("dragging");
       var moved = drag.moved; drag = null;
       if (moved) saveLayout(m);
-      else { state.task = tid; renderCenter(); renderProps(); }
+      else { state.task = tid; state.gwsel = null; markSel(); renderProps(); }
     });
+    g.addEventListener("dblclick", function () { var t = taskById(tid); if (t && t.subprocess) drillInto(t.subprocess); });
   });
 }
 function saveLayout(m) {
@@ -263,7 +305,7 @@ function renderGraph(m) {
     var lines = wrap(t.name, 22), sy = lines.length === 2 ? 24 : 31;
     lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (sy + k * 14) + '">' + esc(ln) + "</text>"); });
     var who = t.agents.length ? ((t.roles[0] ? lastSeg(t.roles[0]) + " + agent" : "agent")) : (t.roles[0] ? lastSeg(t.roles[0]) : "");
-    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text></g>");
+    p.push('<text class="tperf" x="10" y="' + (NH - 9) + '">' + esc(trunc(who, 24)) + "</text>" + subBadge(t) + "</g>");
   });
   (m.gateways || []).forEach(function (gw) {
     var x = state.flowPos[gw.id].x, y = state.flowPos[gw.id].y, c = GW / 2;
@@ -333,6 +375,7 @@ function wireGraph(m) {
     });
     // in connect mode drag is disabled, so selection/connect comes via click
     g.addEventListener("click", function () { if (state.connect) nodeClick(m, id, g); });
+    g.addEventListener("dblclick", function () { var t = taskById(id); if (t && t.subprocess) drillInto(t.subprocess); });
   });
   svg.querySelectorAll("line.flow").forEach(function (ln) {
     ln.addEventListener("click", function () {
@@ -354,9 +397,9 @@ function nodeClick(m, id, g) {
     postFlow({ op: "add", process: m.id, from: from, to: to, condition: cond, actor: ACTOR, reason: "drew flow via canvas" }).then(reloadIf);
     return;
   }
-  if (id === "__start__" || id === "__end__") { state.task = null; state.gwsel = null; renderCenter(); renderProps(); return; }
-  if (state.gw && state.gw[id]) { state.gwsel = id; state.task = null; renderCenter(); renderProps(); return; }
-  state.task = id; state.gwsel = null; renderCenter(); renderProps();
+  if (id === "__start__" || id === "__end__") { state.task = null; state.gwsel = null; markSel(); renderProps(); return; }
+  if (state.gw && state.gw[id]) { state.gwsel = id; state.task = null; markSel(); renderProps(); return; }
+  state.task = id; state.gwsel = null; markSel(); renderProps();
 }
 function postFlow(body) { return fetch("/api/flow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
 function postGateway(body) { return fetch("/api/gateway", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
@@ -374,6 +417,91 @@ if (ebBtn) ebBtn.addEventListener("click", function () {
   var p = getProc(); if (!p) return;
   postFlow({ op: "enable", process: p.id, actor: ACTOR, reason: "enabled branching via canvas" }).then(reloadIf);
 });
+
+// ================= Phase C: swimlane view (steps grouped by performer) =========
+var LW = 168, LH = 110;  // lane label column width, lane row height
+function laneOf(t) { return t.roles[0] || (t.agents.length ? "__agent__" : "__none__"); }
+function laneLabel(id) { return id === "__agent__" ? "Automated (agent)" : id === "__none__" ? "Unassigned" : shortRole(id); }
+function laneOrder(m) {
+  var seen = {}, order = [];
+  m.tasks.forEach(function (t) { var l = laneOf(t); if (!seen[l]) { seen[l] = 1; order.push(l); } });
+  return order.length ? order : ["__none__"];
+}
+function renderLanes(m) {
+  if (!m.tasks.length) return '<div class="muted" style="padding:24px">No steps yet — add one from the palette, then switch to Lanes.</div>';
+  var uid = m.id.replace(/[^A-Za-z0-9]/g, "_");
+  var lanes = laneOrder(m), li = {}; lanes.forEach(function (l, i) { li[l] = i; });
+  var CW = NW + GAP, padX = LW + 20, top = 8;
+  var W = padX + m.tasks.length * CW + 40, H = lanes.length * LH + top + 4;
+  state.lanes = { order: lanes, LH: LH, top: top };
+  var pos = {};
+  m.tasks.forEach(function (t, i) { var cy = top + li[laneOf(t)] * LH + LH / 2; pos[t.id] = { x: padX + i * CW, y: cy - NH / 2, cy: cy }; });
+  var p = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">'];
+  p.push('<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>');
+  lanes.forEach(function (l, i) {
+    p.push('<rect class="lane' + (i % 2 ? " alt" : "") + '" x="0" y="' + (top + i * LH) + '" width="' + W + '" height="' + (LH - 4) + '"/>');
+    p.push('<line class="lanediv" x1="' + LW + '" y1="' + (top + i * LH) + '" x2="' + LW + '" y2="' + (top + i * LH + LH - 4) + '"/>');
+    p.push('<text class="lanelbl" x="14" y="' + (top + i * LH + LH / 2) + '">' + esc(trunc(laneLabel(l), 20)) + "</text>");
+  });
+  var f0 = pos[m.tasks[0].id], fl = pos[m.tasks[m.tasks.length - 1].id];
+  var sx = padX - 44, sy = f0.cy, ex = fl.x + NW + 44, ey = fl.cy;
+  m.tasks.forEach(function (t, i) {
+    var to = { cx: pos[t.id].x + NW / 2, cy: pos[t.id].cy };
+    var from = i === 0 ? { cx: sx, cy: sy, circle: true } : { cx: pos[m.tasks[i - 1].id].x + NW / 2, cy: pos[m.tasks[i - 1].id].cy };
+    var p1 = from.circle ? circPt(from.cx, from.cy, R, to.cx, to.cy) : edgePt(from.cx, from.cy, NW / 2, NH / 2, to.cx, to.cy);
+    var p2 = edgePt(to.cx, to.cy, NW / 2, NH / 2, from.cx, from.cy);
+    p.push('<line class="conn" x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" marker-end="url(#ah_' + uid + ')"/>');
+  });
+  var le = edgePt(fl.x + NW / 2, fl.cy, NW / 2, NH / 2, ex, ey);
+  p.push('<line class="conn" x1="' + le.x + '" y1="' + le.y + '" x2="' + circPt(ex, ey, R, fl.x + NW / 2, fl.cy).x + '" y2="' + ey + '" marker-end="url(#ah_' + uid + ')"/>');
+  p.push('<circle class="tip" cx="' + sx + '" cy="' + sy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (sy + 3) + '" text-anchor="middle">start</text>');
+  p.push('<circle class="tip" cx="' + ex + '" cy="' + ey + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (ey + 3) + '" text-anchor="middle">end</text>');
+  m.tasks.forEach(function (t) {
+    var a = pos[t.id], ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
+    p.push('<g class="tnode lane-node" data-task="' + esc(t.id) + '" transform="translate(' + a.x + ',' + a.y + ')">');
+    p.push('<rect class="' + ncls + (t.id === state.task ? " selrect" : "") + '" x="0" y="0" width="' + NW + '" height="' + NH + '" rx="9"/>');
+    p.push('<text class="tseq" x="9" y="15">t' + t.seq + '</text>');
+    if (t.agents.length) p.push('<rect class="badge-bg" x="' + (NW - 26) + '" y="-7" width="24" height="15" rx="3.5"/><text class="badge" x="' + (NW - 14) + '" y="3.5" text-anchor="middle">AI</text>');
+    var lines = wrap(t.name, 22), yy = lines.length === 2 ? 26 : 33;
+    lines.forEach(function (ln, k) { p.push('<text class="tname" x="10" y="' + (yy + k * 14) + '">' + esc(ln) + "</text>"); });
+    p.push(subBadge(t) + "</g>");
+  });
+  p.push("</svg>");
+  return p.join("");
+}
+function wireLanes(m) {
+  var svg = $("#canvas svg"); if (!svg) return;
+  var drag = null;
+  svg.querySelectorAll("g.lane-node").forEach(function (g) {
+    var tid = g.getAttribute("data-task");
+    g.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      var tr = g.getAttribute("transform").match(/translate\(([-\d.]+),([-\d.]+)\)/);
+      drag = { sx: e.clientX, sy: e.clientY, ox: +tr[1], oy: +tr[2], moved: false };
+      g.setPointerCapture(e.pointerId); g.classList.add("dragging"); e.preventDefault();
+    });
+    g.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.moved = true;
+      g.setAttribute("transform", "translate(" + (drag.ox + dx) + "," + (drag.oy + dy) + ")");
+    });
+    g.addEventListener("pointerup", function (e) {
+      if (!drag) return;
+      try { g.releasePointerCapture(e.pointerId); } catch (err) {}
+      g.classList.remove("dragging");
+      var moved = drag.moved; drag = null;
+      if (!moved) { state.task = tid; state.gwsel = null; markSel(); renderProps(); return; }
+      var pt = svgPoint(e.clientX, e.clientY);
+      var idx = Math.max(0, Math.min(state.lanes.order.length - 1, Math.floor((pt.y - state.lanes.top) / state.lanes.LH)));
+      var target = state.lanes.order[idx], t = taskById(tid);
+      if (target === laneOf(t) || target.indexOf("__") === 0) { renderCenter(); return; }  // snap back
+      postTask({ op: "edit", id: tid, changes: { performed_by: [target].concat(t.agents) }, actor: ACTOR, reason: "reassigned performer via swimlane" })
+        .then(function (res) { if (res.ok) load(); else { alert("Rejected: " + res.error); renderCenter(); } });
+    });
+    g.addEventListener("dblclick", function () { var t = taskById(tid); if (t && t.subprocess) drillInto(t.subprocess); });
+  });
+}
 
 // ---------- RACI view ----------
 function renderRaci(m) {
@@ -449,6 +577,17 @@ function renderProps() {
   }
   if ($("#t-bind")) $("#t-bind").onclick = function () { bindAgent("bind"); };
   if ($("#t-unbind")) $("#t-unbind").onclick = function () { bindAgent("unbind"); };
+  if ($("#t-subp")) $("#t-subp").onchange = function () { setSubprocess(this.value); };
+}
+function procOptions(t) {
+  return state.procs.filter(function (pp) { return pp.id !== getProc().id; }).map(function (pp) {
+    return '<option value="' + esc(pp.id) + '"' + (t.subprocess === pp.id ? " selected" : "") + ">" + esc(pp.id) + " — " + esc(trunc(pp.name, 24)) + "</option>";
+  }).join("");
+}
+function setSubprocess(v) {
+  var t = getTask(); if (!t) return;
+  postTask({ op: "edit", id: t.id, changes: { subprocess_ref: v || null }, actor: ACTOR, reason: ($("#t-reason") && $("#t-reason").value.trim()) || (v ? "set drill-down" : "cleared drill-down") })
+    .then(function (res) { if (res.ok) load(); else structMsg("Rejected: " + res.error, "err"); });
 }
 
 function bindAgent(op) {
@@ -579,6 +718,8 @@ function taskProps(p, t) {
     + (t.agents.length
         ? '<button id="t-unbind" class="bindbtn unbind">Unbind agent (make human-only)</button>'
         : '<button id="t-bind" class="bindbtn">Make this step agent-run</button>')
+    + '<label>Drill-down to sub-process <span class="hint">this step expands into another process</span>'
+    + '<select id="t-subp"><option value="">(none &mdash; leaf step)</option>' + procOptions(t) + "</select></label>"
     + '<div id="t-msg" class="msg" hidden></div></div>';
   if (!g) return head + struct + '<div class="p-sec"><div class="p-row muted">No guardrail on this step (inherits the process default, if any).</div></div>';
   return head + struct

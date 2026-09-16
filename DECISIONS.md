@@ -6,6 +6,32 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-15 — Visual modeler Phase C: swimlanes + sub-process drill-down
+
+### D28 — Lanes view (grouped by performer) + drill-down navigation
+**Context:** Phase C of the in-house modeler — the two features that make it read like Mavim/GBTEC:
+*who* does each step (swimlanes) and navigating *depth* (a step that expands into another process).
+**Decision & build:**
+- **Swimlane view** (`Lanes`) — a **derived** view (no new schema): steps are grouped into horizontal
+  lanes by their primary performing role, laid out by sequence, with cross-lane sequence arrows, an
+  `Automated (agent)` lane, and start/end. **Drag a step into another lane to reassign its performer** —
+  which goes through the *existing, tested* `edit_task(performed_by)` write path (versioned + audited).
+  Verified live: dragged a step across lanes and its `performed_by` changed on the audit trail.
+- **Sub-process drill-down** — one additive, locked Task field **`subprocess_ref`** (a step expands into
+  another process). Editable via the tested task write path (validated: target process exists, not self);
+  `mapdata` exposes it. On the canvas a drill-down step shows a **SUB** badge, a **double-click** navigates
+  into the sub-process with a clickable **breadcrumb** trail, and a step's panel has a drill-down picker.
+  `governance/test_subprocess.py` — **8 asserts**. Verified live: set a drill-down, saw the badge,
+  double-clicked in, breadcrumbed back.
+- Fixed a real interaction bug found in testing: single-click select was re-rendering the SVG and killing
+  the pending `dblclick`; selection is now applied **in place** so drill-down navigation fires.
+
+Full suite **278**. **Phase D next:** the process-landscape / repository view (APQC domains -> groups ->
+processes) to navigate a whole org, plus catalogs. (Events — timer/message — and BPMN XML import/export
+still later.)
+
+---
+
 ## 2026-09-15 — Visual modeler Phase B: branching (gateways + drawn flows)
 
 ### D27 — Explicit process-flow graph on top of the linear task model

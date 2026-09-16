@@ -53,6 +53,7 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
                 "deny": gr.get("forbidden_actions", []) if gr else [],
                 "inputs": t.get("inputs", []), "outputs": t.get("outputs", []),
                 "data_scope": t.get("data_scope", []), "kpi_refs": t.get("kpi_refs", []),
+                "subprocess": t.get("subprocess_ref"),
                 "guardrail_full": gfull,
             })
         gateways = [{"id": x["id"], "type": x["type"], "name": x.get("name", "")}

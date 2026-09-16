@@ -41,7 +41,7 @@ EDITABLE_FIELDS = [
 ]
 EDITABLE_TASK_FIELDS = [
     "name", "seq", "performed_by", "inputs", "outputs", "data_scope",
-    "kpi_refs", "guardrail_ref",
+    "kpi_refs", "guardrail_ref", "subprocess_ref",
 ]
 
 
@@ -224,6 +224,13 @@ class GovernanceStore:
         unknown = set(changes) - set(EDITABLE_TASK_FIELDS)
         if unknown:
             raise EditError(f"these fields are not editable: {sorted(unknown)}")
+        if changes.get("subprocess_ref"):
+            sp = changes["subprocess_ref"]
+            if sp == cur["process_ref"]:
+                raise EditError("a step can't drill down into its own process")
+            tgt = g.get("Process", sp)
+            if tgt is None or tgt["status"] != "active":
+                raise EditError(f"unknown sub-process {sp}")
         new = copy.deepcopy(cur)
         for k, v in changes.items():
             new[k] = v
