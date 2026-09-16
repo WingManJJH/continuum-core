@@ -951,6 +951,49 @@ function refreshShareList() {
     window.open("/api/export/bpmn?process=" + encodeURIComponent(p.id), "_blank");
   });
 })();
+
+// ---------- Phase F: import BPMN ----------
+function postImport(body) { return fetch("/api/import/bpmn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+(function () {
+  var ib = $("#import-btn"); if (!ib) return;
+  var modal = $("#import-modal"), out = $("#import-out"), apply = $("#import-apply");
+  function open() { $("#import-xml").value = ""; out.innerHTML = ""; apply.disabled = true; modal.hidden = false; }
+  function close() { modal.hidden = true; }
+  ib.addEventListener("click", open);
+  $("#import-close").addEventListener("click", close);
+  modal.addEventListener("click", function (e) { if (e.target === modal) close(); });
+  $("#import-file").addEventListener("change", function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { $("#import-xml").value = rd.result; out.innerHTML = '<div class="muted">Loaded ' + esc(f.name) + " — press Preview.</div>"; apply.disabled = true; };
+    rd.readAsText(f);
+  });
+  $("#import-plan").addEventListener("click", function () {
+    var xml = $("#import-xml").value.trim();
+    if (!xml) { out.innerHTML = '<div class="msg err">Paste some BPMN XML or load a file first.</div>'; return; }
+    out.innerHTML = '<div class="muted">Reading…</div>';
+    postImport({ op: "plan", xml: xml }).then(function (res) {
+      if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; apply.disabled = true; return; }
+      var c = res.plan.counts;
+      var warns = res.plan.warnings.length ? '<div class="imp-warn"><b>' + res.plan.warnings.length + " note(s):</b><ul>"
+        + res.plan.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></div>" : "";
+      out.innerHTML = '<div class="imp-plan"><div class="imp-name">' + esc(res.plan.name) + "</div>"
+        + '<div class="imp-counts">' + c.steps + " steps (" + c.agent_steps + " agent) · " + c.gateways + " gateways · " + c.events + " events · " + c.flows + " flows</div>"
+        + warns + "</div>";
+      apply.disabled = false;
+    });
+  });
+  apply.addEventListener("click", function () {
+    var xml = $("#import-xml").value.trim(); if (!xml) return;
+    apply.disabled = true; out.innerHTML = '<div class="muted">Importing…</div>';
+    postImport({ op: "apply", xml: xml, actor: ACTOR, reason: "imported from BPMN 2.0 via canvas" }).then(function (res) {
+      if (!res.ok) { out.innerHTML = '<div class="msg err">' + esc(res.error) + "</div>"; return; }
+      var code = res.result.code;
+      out.innerHTML = '<div class="msg ok">Imported as <b>' + esc(code) + "</b> — opening it…</div>";
+      load().then(function () { close(); openProcess(code); });
+    });
+  });
+})();
 (function () {
   var sb = $("#share-btn"); if (!sb) return;
   sb.addEventListener("click", openShare);

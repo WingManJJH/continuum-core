@@ -37,6 +37,7 @@
         <button id="landscape-btn" class="add-btn ghost-btn" type="button" title="See the whole organization's process landscape">Landscape</button>
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
+        <button id="import-btn" class="add-btn ghost-btn" type="button" title="Import a BPMN 2.0 XML file as a new governed process">Import BPMN</button>
         <div id="proc-title" class="proc-title"></div>
         <button id="add-step" class="add-btn" type="button" title="Add a step to this process">+ Step</button>
         <button id="enable-branch" class="add-btn" type="button" hidden title="Turn the linear steps into an editable branching flow">Enable branching</button>
@@ -69,6 +70,24 @@
         <button id="share-land" class="add-btn ghost-btn" type="button">Publish whole landscape</button>
       </div>
       <div id="share-list" class="share-list"><div class="muted">Loading links…</div></div>
+    </div>
+  </div>
+
+  <!-- Import dialog: bring a BPMN 2.0 file in as a new governed process (Phase F) -->
+  <div id="import-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Import BPMN 2.0</h2><button id="import-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Bring a BPMN file (from Camunda, bpmn.io, Signavio…) in as a <b>new governed process</b>. Tasks, gateways, timer/message events, and flows are created through the audited write path; service tasks come in agent-bound. <b>Preview</b> first — nothing is written until you Import.</p>
+      <div class="import-row">
+        <label class="filebtn">Load .bpmn file…<input id="import-file" type="file" accept=".bpmn,.xml,application/xml,text/xml" hidden></label>
+        <span class="muted" style="font-size:12px">…or paste XML below.</span>
+      </div>
+      <textarea id="import-xml" class="import-xml" placeholder="&lt;bpmn:definitions&gt; … &lt;/bpmn:definitions&gt;" spellcheck="false"></textarea>
+      <div class="import-actions">
+        <button id="import-plan" class="add-btn" type="button">Preview</button>
+        <button id="import-apply" class="add-btn" type="button" disabled>Import as new process</button>
+      </div>
+      <div id="import-out" class="import-out"></div>
     </div>
   </div>
 
