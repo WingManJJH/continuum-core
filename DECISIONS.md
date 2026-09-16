@@ -6,6 +6,29 @@ something concrete. Newest first.
 
 ---
 
+## 2026-09-16 — In-app Documentation + Guided Tour
+
+### D36 — Documentation panel and an interactive, chaptered Guided Tour
+**Context:** the app had no in-app help; new users had nothing to orient them, and the capabilities
+(views, branching, roles, guardrails, landscape, share, BPMN/Visio) weren't documented in-product.
+**Decision & build:** two header buttons next to the theme selector, both in a new `maps/static/docs.js`
+(a classic script loaded after app.js, reusing its globals — it never makes a governed edit).
+**Documentation** opens a full-screen reference panel with a section TOC and a live filter, covering the
+whole app in 12 sections (overview, canvas & views, authoring, branching/gateways/events/Connect,
+drill-down, roles, guardrails & governance, landscape, share, BPMN/Visio interop, the other four apps,
+tips). **Guided Tour** is an interactive, non-blocking walkthrough that <b>drives the real app</b> — each
+step's `before` hook navigates (open a process, switch view, select a step, open the role drawer / a
+modal / the landscape) and the tour spotlights the relevant element (a dim backdrop with a cut-out) with a
+popover explaining it. **Chapters** (7: Welcome, Read a process, The four views, Roles, Guardrails &
+governance, Build & branch, The big picture; 19 steps) are listed in a jump menu so a user can launch from
+any point; Back/Next, arrow keys, Esc-to-exit, and a step counter round it out. The tour is
+**non-mutating** — it only navigates and opens panels, and resets UI state (close modals, exit Connect,
+clear selection) on exit, so it's safe to run against a live model repeatedly. UI-only (no backend/schema
+change) — the assertion suite is unchanged at **396**; verified live (docs 12 sections + filter; tour
+spotlight + popover drove the role drawer, chapter jump works, clean exit).
+
+---
+
 ## 2026-09-16 — Import: add Visio (.vsdx)
 
 ### D35 — Import a Visio flowchart as a new governed process
