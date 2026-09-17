@@ -12,7 +12,8 @@ function kpiStat(k) {
 }
 function kpiTree(k, depth) {
   var kids = (k.children || []).map(function (c) { return kpiTree(c, (depth || 0) + 1); }).join("");
-  return '<div class="kpirow" style="margin-left:' + ((depth || 0) * 16) + 'px">' + kpiStat(k) + "</div>" + kids;
+  return '<div class="kpirow" style="margin-left:' + ((depth || 0) * 16) + 'px">' + kpiStat(k)
+    + ' <button class="strat-edit" data-strat-edit="kpi" data-strat-id="' + esc(k.id) + '" title="Edit KPI">✎</button></div>' + kids;
 }
 
 function objCard(o) {
@@ -21,7 +22,8 @@ function objCard(o) {
   var dot = o.fulfilled ? '<span class="gdot good"></span>' : '<span class="gdot ' + (o.off_target_kpis.length ? "warn" : "muted") + '"></span>';
   return '<div class="ocard" data-obj="' + esc(o.id) + '">'
     + '<div class="ohead">' + dot + badge + '<span class="oname">' + esc(o.name) + "</span>"
-    + (o.owner ? '<span class="oowner">' + esc(shortRole(o.owner)) + "</span>" : "") + "</div>"
+    + (o.owner ? '<span class="oowner">' + esc(shortRole(o.owner)) + "</span>" : "")
+    + ' <button class="strat-edit" data-strat-edit="objective" data-strat-id="' + esc(o.id) + '" title="Edit objective">✎</button></div>'
     + (o.target && o.target.statement ? '<div class="otarget">' + esc(o.target.statement) + "</div>" : "")
     + '<div class="okr-kpis"><div class="lbl2">Key results</div>' + (o.kpis.length ? o.kpis.map(function (k) { return kpiTree(k, 0); }).join("") : '<span class="muted">no KPIs</span>') + "</div>"
     + '<div class="okr-procs"><div class="lbl2">Supporting processes</div>' + (procs || '<span class="muted">none — alignment gap</span>') + "</div></div>";
@@ -47,7 +49,8 @@ function renderOKR(S) {
 function entBanner(e) {
   if (!e) return "";
   var vals = (e.values || []).map(function (v) { return '<span class="val">' + esc(v) + "</span>"; }).join("");
-  return '<div class="entbanner"><div class="entname">' + esc(e.name) + "</div>"
+  return '<div class="entbanner"><div class="entname">' + esc(e.name)
+    + ' <button class="strat-edit" data-strat-edit="enterprise" title="Edit mission / vision / values">✎</button></div>'
     + (e.mission ? '<div class="entrow"><b>Mission</b> ' + esc(e.mission) + "</div>" : "")
     + (e.vision ? '<div class="entrow"><b>Vision</b> ' + esc(e.vision) + "</div>" : "")
     + (vals ? '<div class="entvals">' + vals + "</div>" : "") + "</div>";
@@ -176,15 +179,114 @@ function wireStrategy() {
   c.querySelectorAll("[data-open]").forEach(function (el) {
     el.addEventListener("click", function () { openProcess(el.getAttribute("data-open")); });
   });
+  // pencil → open the strategy entity editor (gated like every other edit)
+  c.querySelectorAll(".strat-edit").forEach(function (b) {
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      openStratEdit(b.getAttribute("data-strat-edit"), b.getAttribute("data-strat-id") || "");
+    });
+  });
   // click an objective anywhere -> highlight it + its processes across the view
   c.querySelectorAll("[data-obj]").forEach(function (el) {
     el.addEventListener("click", function (e) {
-      if (e.target.closest("[data-open]")) return;
+      if (e.target.closest("[data-open]") || e.target.closest(".strat-edit")) return;
       var id = el.getAttribute("data-obj");
       c.querySelectorAll("[data-obj]").forEach(function (x) { x.classList.toggle("objsel", x.getAttribute("data-obj") === id); });
     });
   });
 }
+
+// ---------- strategy entity editor (enterprise / objective / KPI) ----------
+function _findKpi(kpis, id) {
+  for (var i = 0; i < (kpis || []).length; i++) {
+    if (kpis[i].id === id) return kpis[i];
+    var f = _findKpi(kpis[i].children, id); if (f) return f;
+  }
+  return null;
+}
+function _stratEntity(kind, id) {
+  var S = state.strategy && state.strategy.strategy; if (!S) return null;
+  if (kind === "enterprise") return S.enterprise || {};
+  if (kind === "objective") return (S.objectives || []).find(function (o) { return o.id === id; }) || null;
+  if (kind === "kpi") {
+    for (var i = 0; i < (S.objectives || []).length; i++) {
+      var f = _findKpi(S.objectives[i].kpis, id); if (f) return f;
+    }
+  }
+  return null;
+}
+var STRAT_META = {
+  enterprise: { entity: "Enterprise", op: "edit_enterprise", label: "Enterprise" },
+  objective:  { entity: "StrategicObjective", op: "edit_objective", label: "Objective" },
+  kpi:        { entity: "KPI", op: "edit_kpi", label: "KPI" },
+};
+function openStratEdit(kind, id) {
+  var meta = STRAT_META[kind]; if (!meta) return;
+  var e = _stratEntity(kind, id);
+  if (!e) { alert("Could not find that item — try reloading the strategy view."); return; }
+  var modal = document.getElementById("strat-modal"), body = document.getElementById("strat-body");
+  document.getElementById("strat-title").textContent = "Edit " + meta.label + (id ? " · " + id : "");
+  var fields = "";
+  if (kind === "enterprise") {
+    fields = '<label>Mission<textarea id="se-mission" rows="2">' + esc(e.mission || "") + "</textarea></label>"
+      + '<label>Vision<textarea id="se-vision" rows="2">' + esc(e.vision || "") + "</textarea></label>"
+      + '<label>Values <span class="hint">comma-separated</span><input id="se-values" value="' + esc((e.values || []).join(", ")) + '"></label>';
+  } else if (kind === "objective") {
+    fields = '<label>Name<input id="se-name" value="' + esc(e.name || "") + '"></label>';
+  } else {  // kpi
+    fields = '<label>Name<input id="se-name" value="' + esc(e.name || "") + '"></label>'
+      + '<label>Target<input id="se-target" value="' + esc(e.target == null ? "" : String(e.target)) + '"></label>';
+  }
+  body.innerHTML = '<form id="strat-form">' + fields
+    + '<label>Reason for change <span class="hint">required · §7.5</span><input id="se-reason" placeholder="why?"></label>'
+    + (typeof gateControlHTML === "function" ? gateControlHTML(meta.entity) : "")
+    + '<div id="strat-msg" class="msg" hidden></div>'
+    + '<div class="actions"><button type="button" id="se-cancel" class="ghost">Cancel</button><button type="submit" class="save">Save new version</button></div></form>';
+  modal.hidden = false;
+  document.getElementById("se-cancel").onclick = function () { modal.hidden = true; };
+  document.getElementById("strat-form").onsubmit = function (ev) {
+    ev.preventDefault();
+    var changes = {};
+    if (kind === "enterprise") {
+      changes = { mission: document.getElementById("se-mission").value.trim(),
+                  vision: document.getElementById("se-vision").value.trim(),
+                  values: parseCsv(document.getElementById("se-values").value) };
+    } else if (kind === "objective") {
+      changes = { name: document.getElementById("se-name").value.trim() };
+    } else {
+      changes = { name: document.getElementById("se-name").value.trim() };
+      var tv = document.getElementById("se-target").value.trim();
+      if (tv !== "") changes.target = isNaN(Number(tv)) ? tv : Number(tv);
+    }
+    var reason = document.getElementById("se-reason").value.trim();
+    var msg = document.getElementById("strat-msg");
+    // build the gated proposal args to match each store method's signature
+    var args = kind === "enterprise" ? { changes: changes }
+             : kind === "objective" ? { obj_id: id, changes: changes }
+             : { kpi_id: id, changes: changes };
+    if (typeof routeThroughGate === "function" && routeThroughGate(
+        meta.entity, document.getElementById("strat-form"), meta.op, args,
+        meta.label + " change" + (id ? " · " + id : ""), reason, msg)) {
+      return;
+    }
+    // direct save
+    var endpoint = kind === "enterprise" ? "/api/enterprise" : kind === "objective" ? "/api/objective" : "/api/kpi";
+    var payload = kind === "enterprise" ? { changes: changes, actor: ACTOR, reason: reason }
+                : { id: id, changes: changes, actor: ACTOR, reason: reason };
+    fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); }).then(function (res) {
+        if (!res.ok) { msg.textContent = "Rejected: " + res.error; msg.className = "msg err"; msg.hidden = false; return; }
+        modal.hidden = true;
+        fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; if (state.view === "strategy") renderCenter(); });
+      });
+  };
+}
+(function () {
+  var cl = document.getElementById("strat-close");
+  if (cl) cl.addEventListener("click", function () { document.getElementById("strat-modal").hidden = true; });
+  var m = document.getElementById("strat-modal");
+  if (m) m.addEventListener("click", function (e) { if (e.target === m) m.hidden = true; });
+})();
 (function () {
   var sb = document.getElementById("strategy-btn");
   if (sb) sb.addEventListener("click", function () {
