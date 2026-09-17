@@ -661,3 +661,15 @@ label.ck input { width: auto; margin: 0; }
 #strat-body input, #strat-body textarea { width: 100%; margin-top: 4px; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg);
   font: inherit; box-sizing: border-box; }
+
+/* ── Phase 3: identity + assigned-to-me ─────────────────────────────── */
+#who-btn { font-weight: 600; }
+.appr-mine-tag { font-size: 11px; font-weight: 700; color: #1b6b45; background: #d8f3e3;
+  padding: 2px 8px; border-radius: 20px; }
+.appr-mine { margin-left: 2px; }
+#who-body label { display: block; margin: 10px 0; font-size: 13px; }
+#who-body input[type=text], #who-body input:not([type]), #who-body select {
+  width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; box-sizing: border-box; }
+#who-body label.ck { display: flex; align-items: center; gap: 8px; }
+#who-body label.ck input { width: auto; margin: 0; }

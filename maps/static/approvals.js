@@ -3,8 +3,9 @@
 // of saved directly; it waits here until a reviewer approves (applies it through
 // the audited store) or rejects it. Classic script after app.js; reuses esc/$.
 
-var APPR_PROPOSER = (typeof ACTOR !== "undefined" && ACTOR) ? ACTOR : "role.ops.support_lead";
-var APPR_REVIEWER = "role.qms.iso_advisor";  // separation of duties by default
+// Who is acting comes from the per-user identity (app.js ACTOR, reassigned live
+// when the user changes identity). These read it at call time, never cached.
+function apprActor() { return (typeof ACTOR !== "undefined" && ACTOR) ? ACTOR : "role.ops.support_lead"; }
 
 function _apShort(r) { return String(r || "").replace(/^role\./, "").replace(/^agent\./, ""); }
 function _apTs(ts) { try { return new Date(ts).toLocaleString(); } catch (e) { return ts || ""; } }
@@ -15,8 +16,8 @@ function proposeChange(targetOp, args, title, reason, assignee) {
   return fetch("/api/approvals", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ op: "propose", target_op: targetOp, args: args,
-      title: title, actor: APPR_PROPOSER, reason: reason,
-      assignee: assignee || APPR_REVIEWER }),   // default reviewer owns it
+      title: title, actor: apprActor(), reason: reason,
+      assignee: assignee || "" }),   // unassigned by default; route it in the queue
   }).then(function (r) { return r.json(); }).then(function (res) {
     refreshApprovalsBadge();
     return res;
@@ -77,15 +78,21 @@ function routeThroughGate(entity, containerEl, targetOp, args, title, reason, ms
   return true;
 }
 
-var _lastPending = null;
+var _lastPending = null, _lastMine = 0, _titleBase = null;
+function _setTitleBadge(n) {
+  if (_titleBase == null) _titleBase = document.title;
+  document.title = (n > 0 ? "(" + n + ") " : "") + _titleBase;
+}
 function refreshApprovalsBadge() {
   var badge = document.getElementById("appr-badge");
   if (!badge) return Promise.resolve(0);
   return fetch("/api/approvals?status=pending").then(function (r) { return r.json(); }).then(function (d) {
-    var n = d.pending || 0;
+    var list = d.approvals || [], n = d.pending || 0;
     badge.textContent = n;
     badge.hidden = n === 0;
     _lastPending = n;
+    _lastMine = list.filter(function (c) { return c.assignee === apprActor(); }).length;
+    _setTitleBadge(n);
     return n;
   }).catch(function () { return 0; });
 }
@@ -102,9 +109,15 @@ function apprToast(msg) {
   apprToast._t = setTimeout(function () { t.classList.remove("show"); }, 6000);
 }
 function onApprovalsChanged() {
-  var prev = _lastPending;
+  var prev = _lastPending, prevMine = _lastMine;
   refreshApprovalsBadge().then(function (n) {
-    if (prev != null && n > prev) apprToast(n === 1 ? "A change is awaiting review." : n + " changes are awaiting review.");
+    if (prev != null && n > prev) {
+      var mineUp = _lastMine > prevMine;
+      var msg = mineUp ? (_lastMine === 1 ? "A change is assigned to you." : _lastMine + " changes are assigned to you.")
+                       : (n === 1 ? "A change is awaiting review." : n + " changes are awaiting review.");
+      apprToast(msg);
+      if (typeof notifyDesktop === "function") notifyDesktop("Continuum · Approvals", msg);
+    }
   });
   var modal = document.getElementById("appr-modal");
   if (modal && !modal.hidden && _apprFilter !== "policy") loadApprovals();
@@ -129,9 +142,10 @@ function _apDecision(cr) {
 
 function renderApprovals(list, filter) {
   if (!list.length) {
-    return '<div class="muted" style="padding:12px">' +
-      (filter === "pending" ? "No changes are waiting for review." : "No change requests yet.") +
-      " Changes can be submitted from the guardrail, role, and master-data editors (“Submit for approval”).</div>";
+    var m = filter === "mine" ? "Nothing is assigned to you right now."
+          : filter === "pending" ? "No changes are waiting for review." : "No change requests yet.";
+    return '<div class="muted" style="padding:12px">' + m +
+      " Changes can be submitted from the guardrail, role, master-data, and strategy editors (“Submit for approval”).</div>";
   }
   return list.map(function (cr) {
     var badge = '<span class="appr-st st-' + esc(cr.status) + '">' + esc(cr.status) + "</span>";
@@ -153,8 +167,11 @@ function renderApprovals(list, filter) {
       var opts = '<option value="">— unassigned —</option>' + roleList.map(function (r) {
         return '<option value="' + esc(r.id) + '"' + (r.id === cr.assignee ? " selected" : "") + ">" + esc(r.name) + "</option>";
       }).join("");
+      var mine = cr.assignee === apprActor();
       assignRow = '<div class="appr-assign"><span class="muted">Assigned to</span>'
-        + '<select class="appr-assignee" data-id="' + esc(cr.id) + '">' + opts + "</select></div>";
+        + '<select class="appr-assignee" data-id="' + esc(cr.id) + '">' + opts + "</select>"
+        + (mine ? '<span class="appr-mine-tag">you</span>'
+                : '<button class="mini appr-mine" data-id="' + esc(cr.id) + '">Assign to me</button>') + "</div>";
       actions = '<div class="appr-actions">'
         + '<button class="save appr-approve" data-id="' + esc(cr.id) + '">Approve</button>'
         + '<button class="ghost appr-reject" data-id="' + esc(cr.id) + '">Reject</button>'
@@ -185,13 +202,16 @@ function openApprovals() {
 }
 function loadApprovals() {
   var body = document.getElementById("appr-body");
-  var qs = _apprFilter === "pending" ? "?status=pending" : "";
+  // "mine" = pending requests assigned to my identity; others use the server filter
+  var qs = (_apprFilter === "pending" || _apprFilter === "mine") ? "?status=pending" : "";
   Promise.all([
     fetch("/api/approvals" + qs).then(function (r) { return r.json(); }),
     loadApprRoles(),
   ]).then(function (parts) {
     var d = parts[0];
-    body.innerHTML = renderApprovals(d.approvals || [], _apprFilter);
+    var list = d.approvals || [];
+    if (_apprFilter === "mine") list = list.filter(function (c) { return c.assignee === apprActor(); });
+    body.innerHTML = renderApprovals(list, _apprFilter);
     body.querySelectorAll(".appr-approve").forEach(function (b) {
       b.addEventListener("click", function () { decide("approve", b.getAttribute("data-id")); });
     });
@@ -204,23 +224,27 @@ function loadApprovals() {
     body.querySelectorAll(".appr-assignee").forEach(function (sel) {
       sel.addEventListener("change", function () { reassign(sel.getAttribute("data-id"), sel.value); });
     });
+    body.querySelectorAll(".appr-mine").forEach(function (b) {
+      b.addEventListener("click", function () { reassign(b.getAttribute("data-id"), apprActor(), true); });
+    });
     refreshApprovalsBadge();
   });
 }
-function reassign(id, assignee) {
+function reassign(id, assignee, reload) {
   fetch("/api/approvals", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ op: "assign", id: id, assignee: assignee, actor: APPR_REVIEWER, reason: "reassigned via queue" }),
+    body: JSON.stringify({ op: "assign", id: id, assignee: assignee, actor: apprActor(), reason: "reassigned via queue" }),
   }).then(function (r) { return r.json(); }).then(function (res) {
-    if (!res.ok) alert("Could not reassign: " + res.error);
+    if (!res.ok) { alert("Could not reassign: " + res.error); return; }
+    if (reload) loadApprovals();
   });
 }
 function decide(op, id) {
-  var payload = { op: op, id: id, actor: APPR_PROPOSER };
-  if (op === "approve") { payload.reviewer = APPR_REVIEWER; payload.decision_reason = "approved via canvas"; }
+  var payload = { op: op, id: id, actor: apprActor() };
+  if (op === "approve") { payload.reviewer = apprActor(); payload.decision_reason = "approved via canvas"; }
   if (op === "reject") {
     var rr = prompt("Reason for rejecting this change?"); if (!rr) return;
-    payload.reviewer = APPR_REVIEWER; payload.decision_reason = rr;
+    payload.reviewer = apprActor(); payload.decision_reason = rr;
   }
   if (op === "withdraw") {
     if (!confirm("Withdraw this change request?")) return;
@@ -262,7 +286,7 @@ function renderPolicy() {
 function setPolicy(entity, mode) {
   fetch("/api/approval-policy", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ entity: entity, mode: mode, actor: APPR_REVIEWER, reason: "set approval policy for " + entity }),
+    body: JSON.stringify({ entity: entity, mode: mode, actor: apprActor(), reason: "set approval policy for " + entity }),
   }).then(function (r) { return r.json(); }).then(function (res) {
     var m = document.getElementById("pol-msg");
     if (res.ok) { if (gatePolicy) gatePolicy[entity] = mode; if (m) { m.textContent = entity + " → " + mode + ". Saved."; m.className = "msg ok"; m.hidden = false; } }

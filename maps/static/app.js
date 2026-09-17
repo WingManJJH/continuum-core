@@ -728,8 +728,29 @@ function bindAgent(op) {
     .then(function (res) { if (res.ok) load(); else structMsg("Rejected: " + res.error, "err"); });
 }
 
+// ---------- who is acting (per-user identity) ----------
+// A person signs in as themselves by picking the role they act as; it is stored
+// per-browser and drives every governed action's actor + the "assigned to me"
+// view. The governed model is role-based (a role, never a named person), so the
+// role is what's recorded; the display name is a local convenience.
+var IDENTITY = (function () {
+  try { var v = JSON.parse(localStorage.getItem("cc-identity") || "null"); if (v && v.role) return v; } catch (e) {}
+  return { name: "", role: "role.ops.support_lead" };
+})();
+var ACTOR = IDENTITY.role;   // reassigned live when the identity changes
+function setIdentity(name, role) {
+  IDENTITY = { name: (name || "").trim(), role: role || "role.ops.support_lead" };
+  ACTOR = IDENTITY.role;
+  try { localStorage.setItem("cc-identity", JSON.stringify(IDENTITY)); } catch (e) {}
+  renderIdentityChip();
+  if (typeof refreshApprovalsBadge === "function") refreshApprovalsBadge();
+}
+function identityLabel() { return IDENTITY.name ? IDENTITY.name + " · " + shortRole(IDENTITY.role) : shortRole(IDENTITY.role); }
+function renderIdentityChip() {
+  var el = document.getElementById("who-btn"); if (el) el.textContent = "You: " + identityLabel();
+}
+
 // ---------- structural edits (Task write path) ----------
-var ACTOR = "role.ops.support_lead";
 function postTask(body) {
   return fetch("/api/task", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); });
 }
@@ -1038,6 +1059,55 @@ function saveGuardrail(e) {
   function apply(x) { if (x === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", x); btn.textContent = "theme: " + x; try { localStorage.setItem("cc-canvas-theme", x); } catch (e) {} }
   apply(cur);
   btn.addEventListener("click", function () { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); });
+})();
+
+// ---------- per-user identity + desktop notifications ----------
+function notifyEnabled() { try { return localStorage.getItem("cc-notify") === "1"; } catch (e) { return false; } }
+function notifyDesktop(title, body) {
+  if (!notifyEnabled() || !("Notification" in window) || Notification.permission !== "granted") return;
+  if (!document.hidden) return;  // the in-app toast already covers the visible case
+  try { new Notification(title, { body: body, tag: "cc-approvals" }); } catch (e) {}
+}
+(function () {
+  var openBtn = document.getElementById("who-btn"); if (!openBtn) return;
+  var modal = document.getElementById("who-modal");
+  renderIdentityChip();
+  function fillRoles() {
+    var sel = document.getElementById("who-role");
+    fetch("/api/roles").then(function (r) { return r.json(); }).then(function (d) {
+      var roles = (d.roles || []).map(function (r) { return { id: r.id, name: r.name }; });
+      // make sure common governance roles + the current identity are selectable
+      ["role.ops.support_lead", "role.qms.iso_advisor", IDENTITY.role].forEach(function (id) {
+        if (id && !roles.some(function (r) { return r.id === id; })) roles.unshift({ id: id, name: shortRole(id) });
+      });
+      sel.innerHTML = roles.map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === IDENTITY.role ? " selected" : "") + ">" + esc(r.name) + " (" + esc(r.id) + ")</option>";
+      }).join("");
+    });
+  }
+  openBtn.addEventListener("click", function () {
+    document.getElementById("who-name").value = IDENTITY.name || "";
+    var ck = document.getElementById("who-notify");
+    ck.checked = notifyEnabled() && ("Notification" in window) && Notification.permission === "granted";
+    fillRoles();
+    modal.hidden = false;
+  });
+  document.getElementById("who-close").addEventListener("click", function () { modal.hidden = true; });
+  modal.addEventListener("click", function (e) { if (e.target === modal) modal.hidden = true; });
+  document.getElementById("who-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var ck = document.getElementById("who-notify"), msg = document.getElementById("who-msg");
+    function finish() {
+      setIdentity(document.getElementById("who-name").value, document.getElementById("who-role").value);
+      if (typeof onApprovalsChanged === "function") { /* refresh assigned-to-me */ }
+      msg.textContent = "Saved — you are acting as " + shortRole(IDENTITY.role) + "."; msg.className = "msg ok"; msg.hidden = false;
+      setTimeout(function () { modal.hidden = true; }, 700);
+    }
+    try { localStorage.setItem("cc-notify", ck.checked ? "1" : "0"); } catch (err) {}
+    if (ck.checked && ("Notification" in window) && Notification.permission !== "granted") {
+      Notification.requestPermission().then(function () { finish(); });
+    } else { finish(); }
+  });
 })();
 
 // ---------- Phase E: publish / share ----------

@@ -16,6 +16,7 @@
     <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
+    <button class="toggle" id="who-btn" type="button">You: support_lead</button>
     <button class="toggle" id="themeBtn" type="button">theme: auto</button>
   </header>
 
@@ -175,12 +176,30 @@
         <h2>Approval queue</h2>
         <nav class="appr-tabs">
           <button data-af="pending" class="active" type="button">Pending</button>
+          <button data-af="mine" type="button">Assigned to me</button>
           <button data-af="all" type="button">All</button>
           <button data-af="policy" type="button">Policy</button>
         </nav>
         <button id="appr-close" class="x" type="button">&times;</button>
       </div>
       <div id="appr-body"></div>
+    </div>
+  </div>
+
+  <!-- Who am I — per-user identity -->
+  <div id="who-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Your identity</h2><button id="who-close" class="x" type="button">&times;</button></div>
+      <div id="who-body">
+        <p class="modal-sub">Pick the role you act as. It's stored in this browser and recorded as the actor on every change you make, and it drives your “assigned to me” view. The model is role-based — a role, never a named person — so the role is what's recorded; the name is a local convenience.</p>
+        <form id="who-form">
+          <label>Your name <span class="hint">optional, shown only to you</span><input id="who-name" placeholder="e.g. Jeffrey"></label>
+          <label>Acting as role<select id="who-role"></select></label>
+          <label class="ck"><input type="checkbox" id="who-notify"> Desktop notifications for new approvals awaiting me</label>
+          <div id="who-msg" class="msg" hidden></div>
+          <div class="actions"><button type="submit" class="save">Save</button></div>
+        </form>
+      </div>
     </div>
   </div>
 

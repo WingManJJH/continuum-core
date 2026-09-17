@@ -52,7 +52,8 @@ var DOCS = [
     + "<ul><li><b>Separation of duties</b> is recorded: if the reviewer is also the proposer the decision is allowed but flagged <b>self-approved</b> on the trail.</li>"
     + "<li>If the model moved on and a queued change no longer applies cleanly, Approve surfaces the reason and leaves the request pending.</li>"
     + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li>"
-    + "<li>A request can be <b>assigned</b> to a reviewer (a role), and the queue is <b>live</b> — a new request pops a toast and updates the badge in every open window without a reload.</li></ul>"
+    + "<li>A request can be <b>assigned</b> to a reviewer, and the queue is <b>live</b> — a new request pops a toast and updates the badge in every open window without a reload.</li>"
+    + "<li><b>You</b> (top of the screen) is your identity: pick the role you act as — it's stored in this browser, recorded as the actor on your changes, and drives the <b>Assigned to me</b> tab (with an “Assign to me” button on each request). Opt in there to <b>desktop notifications</b> when work is assigned to you, and the browser-tab title shows a pending count.</li></ul>"
     + "<p><b>Policy — which changes need review.</b> The <b>Policy</b> tab in the Approvals window sets a mode per kind of change: <b>required</b> (a direct edit is refused — it must be submitted), <b>optional</b> (the editor offers the “Submit for approval” choice), or <b>off</b> (commits directly). The gate toggle appears on the guardrail, role, master-data (process / hierarchy), and strategy (enterprise, objective, KPI) editors; setting a kind to <i>required</i> forces every one of its edits through review. Changing the policy is itself governed (who / when / why).</p>" },
 
   { id: "board", title: "Live board (Present mode)", html:
@@ -188,6 +189,8 @@ var TOUR = [
     { sel: function () { return document.querySelector('.appr-tabs [data-af="policy"]'); },
       before: function () { tourReset(); document.getElementById("approvals-btn").click(); var t = document.querySelector('.appr-tabs [data-af="policy"]'); if (t) t.click(); },
       title: "Set what needs review", body: "The <b>Policy</b> tab decides which <i>kinds</i> of change need approval: <b>required</b> (must be submitted), <b>optional</b> (the editor offers the choice), or <b>off</b>. Set guardrails to <i>required</i> and every guardrail edit routes through review automatically." },
+    { sel: "#who-btn", before: function () { tourReset(); },
+      title: "Who you are", body: "Pick the role you act as — it's recorded as the actor on your changes and powers the <b>Assigned to me</b> view. Opt in to <b>desktop notifications</b> so new work reaches you even when this tab is in the background." },
     { sel: function () { return document.querySelector(".strat-edit"); },
       before: function () { tourReset(); state.stratTab = "okr"; document.getElementById("strategy-btn").click(); },
       title: "Edit strategy in place", body: "Objectives, KPIs, and the enterprise mission / vision / values are editable right on the OKR board — the <b>✎</b> pencil opens a governed edit, and the same approval policy applies as everywhere else." },
