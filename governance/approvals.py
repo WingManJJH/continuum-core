@@ -102,9 +102,13 @@ class ApprovalQueue:
                     "title": ev.get("title", ""), "target": ev.get("target", ""),
                     "proposed_by": ev["proposed_by"], "reason": ev["reason"],
                     "proposed_at": ev["ts"], "status": "pending",
-                    "decision": None,
+                    "assignee": ev.get("assignee", ""), "decision": None,
                 }
-            elif cid in crs:  # decide / withdraw
+            elif cid not in crs:
+                continue
+            elif ev["kind"] == "assign":  # reassign a pending request
+                crs[cid]["assignee"] = ev.get("assignee", "")
+            else:  # decide / withdraw
                 cr = crs[cid]
                 cr["status"] = ev["status"]
                 cr["decision"] = {
@@ -140,7 +144,7 @@ class ApprovalQueue:
 
     # --- writes ------------------------------------------------------------
     def propose(self, op: str, args: dict, proposed_by: str, reason: str,
-                title: str = "", target: str = "") -> dict:
+                title: str = "", target: str = "", assignee: str = "") -> dict:
         """Queue a change without touching the model. Validates the op and the
         SHAPE of the args against the real method signature, so a bad request is
         refused up front — but full schema/referential checks run at apply time."""
@@ -150,6 +154,8 @@ class ApprovalQueue:
             raise ApprovalError("proposer must be a role (e.g. role.ops.support_lead)")
         if not isinstance(args, dict):
             raise ApprovalError("args must be an object")
+        if assignee and not assignee.startswith("role."):
+            raise ApprovalError("assignee must be a role")
         params, domain = self._domain_params(op)
         bad = set(args) - set(domain)
         if bad:
@@ -161,8 +167,23 @@ class ApprovalQueue:
         cr_id = "cr_" + cc._ulidish()
         self._append({
             "kind": "propose", "cr_id": cr_id, "op": op, "args": args,
-            "title": title or op, "target": target,
+            "title": title or op, "target": target, "assignee": assignee,
             "proposed_by": proposed_by, "reason": reason.strip(),
+        })
+        return self.get(cr_id)
+
+    def assign(self, cr_id: str, assignee: str, actor: str, reason: str = "") -> dict:
+        """Route a pending request to a reviewer (a role). '' clears the assignee."""
+        cr = self.get(cr_id)
+        if cr["status"] != "pending":
+            raise ApprovalError(f"request is already {cr['status']}")
+        if assignee and not assignee.startswith("role."):
+            raise ApprovalError("assignee must be a role")
+        if not actor or not actor.startswith("role."):
+            raise ApprovalError("actor must be a role")
+        self._append({
+            "kind": "assign", "cr_id": cr_id, "assignee": assignee,
+            "by": actor, "decision_reason": reason.strip(),
         })
         return self.get(cr_id)
 

@@ -148,6 +148,27 @@ def main():
         chain = cc.verify_log(q.log_path)
         check("proposals log chain intact", chain["ok"] is True)
 
+        # --- assignee: set at propose, reassign, validation ---------------
+        cra = q.propose("edit_guardrail",
+                        {"gr_id": gr_id, "changes": {"audit_requirement": "full_capture"}},
+                        proposed_by="role.ops.support_lead", reason="assign test",
+                        assignee="role.qms.iso_advisor")
+        check("propose records assignee", cra["assignee"] == "role.qms.iso_advisor")
+        moved = q.assign(cra["id"], "role.ops.support_lead", actor="role.qms.iso_advisor")
+        check("assign reroutes a pending request", moved["assignee"] == "role.ops.support_lead")
+        check("assign leaves it pending", moved["status"] == "pending")
+        try:
+            q.assign(cra["id"], "not_a_role", "role.qms.iso_advisor")
+            check("assign rejects a non-role assignee", False)
+        except ap.ApprovalError:
+            check("assign rejects a non-role assignee", True)
+        q.reject(cra["id"], "role.qms.iso_advisor", "cleanup")
+        try:
+            q.assign(cra["id"], "role.ops.support_lead", "role.qms.iso_advisor")
+            check("assign requires pending", False)
+        except ap.ApprovalError:
+            check("assign requires pending", True)
+
         # --- a non-guardrail op flows through the same gate ---------------
         proc = store.graph().all("Process")[0]
         task = [t for t in store.graph().all("Task")

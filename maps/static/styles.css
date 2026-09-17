@@ -639,3 +639,16 @@ label.ck input { width: auto; margin: 0; }
 .pol-label { font-size: 14px; }
 .pol-mode { min-width: 130px; padding: 7px 10px; font-size: 13px; border-radius: 8px;
   border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+
+/* ── Phase 3: approvals assignee + live toast ───────────────────────── */
+.appr-assign { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; }
+.appr-assignee { padding: 5px 9px; font-size: 12.5px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.appr-toast { position: fixed; right: 18px; bottom: 18px; z-index: 5000;
+  background: #0f1b24; color: #eaf1f5; border-radius: 11px; padding: 13px 16px;
+  box-shadow: 0 8px 26px rgba(0,0,0,.4); font-size: 14px; max-width: 340px;
+  opacity: 0; transform: translateY(12px); pointer-events: none;
+  transition: opacity .25s, transform .25s; }
+.appr-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.appr-toast button { margin-left: 10px; background: #2f8fbf; color: #fff; border: 0;
+  border-radius: 8px; padding: 6px 13px; font-size: 13px; font-weight: 600; cursor: pointer; }
