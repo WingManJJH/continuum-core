@@ -652,3 +652,12 @@ label.ck input { width: auto; margin: 0; }
 .appr-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 .appr-toast button { margin-left: 10px; background: #2f8fbf; color: #fff; border: 0;
   border-radius: 8px; padding: 6px 13px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* ── Phase 3: strategy inline editors ───────────────────────────────── */
+.strat-edit { background: transparent; border: 0; cursor: pointer; font-size: 12px;
+  opacity: .45; padding: 0 4px; color: inherit; line-height: 1; vertical-align: middle; }
+.strat-edit:hover { opacity: 1; }
+#strat-body label { display: block; margin: 9px 0; font-size: 13px; }
+#strat-body input, #strat-body textarea { width: 100%; margin-top: 4px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg);
+  font: inherit; box-sizing: border-box; }
