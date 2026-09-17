@@ -67,7 +67,8 @@ var DOCS = [
     + "<p>The pulsing green <b>live dot</b> means the board updates in <b>real time</b>: whenever anyone commits a governed change — from any window — every open board and canvas refreshes within about a second and a half. No reload. Approve a change on one screen and watch it appear on the wall.</p>" },
 
   { id: "landscape", title: "Landscape (the repository)", html:
-    "<p><b>Landscape</b> (toolbar) is the whole organization at a glance: every process grouped by <b>APQC domain</b>, each card showing steps, agent steps, and whether its guardrail is reviewed or still default. Below are <b>catalogs</b> — roles, KPIs, and risks — each listing the processes that reference it. Click any card or catalog item to open it.</p>" },
+    "<p><b>Landscape</b> (toolbar) is the whole organization at a glance: every process grouped by <b>APQC domain</b>, each card showing steps, agent steps, and whether its guardrail is reviewed or still default. Below are <b>catalogs</b> — roles, KPIs, and risks — each listing the processes that reference it. Click any card or catalog item to open it.</p>"
+    + "<p>At the top, the <b>Value stream</b> draws the whole end-to-end chain: every process laid out left-to-right by where it sits in the flow, with arrows for each end&rarr;start hand-off. <b>◆ origination</b> processes (nothing feeds them) start the stream and <b>terminal</b> ones end it; click any node to open it. Build the chain by linking a process's red end to the next process (see <i>Start &amp; end conditions</i>).</p>" },
 
   { id: "share", title: "Share (read-only portal)", html:
     "<p><b>Share</b> (toolbar) mints an unguessable, revocable link to a process — or the whole landscape. Whoever holds it sees a clean, <b>read-only</b> viewer (Flowchart, Lanes, RACI, Checklist, guardrail details) at <code>/portal?token=…</code> — no editing. The view is always live, you can time-box or revoke a link any time, and it reports whether the model changed since you shared it.</p>"
@@ -210,7 +211,7 @@ var TOUR = [
   ]},
   { title: "The big picture", steps: [
     { sel: "#canvas", before: function () { tourOpenModalBtn("landscape-btn"); }, title: "Landscape",
-      body: "The whole organization by APQC domain, plus catalogs of roles, KPIs, and risks that thread across processes. Click anything to open it." },
+      body: "The whole organization by APQC domain, plus catalogs of roles, KPIs, and risks that thread across processes. At the top, the <b>Value stream</b> draws every end→start hand-off as one end-to-end chain. Click anything to open it." },
     { sel: function () { return openModalCard(); }, before: function () { tourOpenModalBtn("share-btn"); },
       title: "Share read-only", body: "Publish an unguessable, revocable link so anyone can <b>view</b> a process — flow, lanes, RACI, checklist — with no editing." },
     { sel: function () { return openModalCard(); }, before: function () { tourOpenModalBtn("import-btn"); },

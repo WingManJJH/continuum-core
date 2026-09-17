@@ -44,6 +44,10 @@ def main():
     check("KPIs catalog present + labeled", len(cats["kpis"]) >= 1 and all(k.get("name") for k in cats["kpis"]))
     check("risks catalog lists RiskControls with their process", len(cats["risks"]) == 3 and all(x["process"] for x in cats["risks"]))
 
+    ch = L["chain"]
+    check("landscape carries a value-stream chain", "nodes" in ch and "links" in ch and "stages" in ch)
+    check("seed has no hand-offs yet (all standalone)", ch["links"] == [] and ch["nodes"] == [] and ch["standalone"] == L["processes_total"])
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 
