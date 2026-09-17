@@ -601,6 +601,43 @@ function openProcess(id) {
   renderNav(); renderTitle(); renderCenter(); renderProps();
 }
 function pchips(ids) { return ids.map(function (pid) { return '<a class="pchip" data-open="' + esc(pid) + '">' + esc(pid) + "</a>"; }).join(""); }
+// value-stream chain — processes laid out in stages (longest path from an
+// origination), left→right, with end→start hand-off arrows. Clickable.
+function chainSvg(chain) {
+  if (!chain || !chain.nodes.length) {
+    return '<div class="vs-empty muted">No hand-offs defined yet. Open a process, click its <b style="color:#f0533a">red end</b>, and set where it hands off next — the value stream builds itself here.</div>';
+  }
+  var byStage = {};
+  chain.nodes.forEach(function (n) { (byStage[n.stage] = byStage[n.stage] || []).push(n); });
+  var COLW = 194, NW = 152, NH = 46, ROWH = 66, PADX = 14, PADY = 14, pos = {}, maxRows = 0;
+  Object.keys(byStage).forEach(function (st) {
+    byStage[st].forEach(function (n, i) { pos[n.id] = { x: PADX + (+st) * COLW, y: PADY + i * ROWH }; });
+    maxRows = Math.max(maxRows, byStage[st].length);
+  });
+  var W = PADX * 2 + Math.max(1, chain.stages) * COLW, H = PADY * 2 + Math.max(1, maxRows) * ROWH;
+  var s = ['<svg class="vs-svg" viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '">'];
+  s.push('<defs><marker id="vsah" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>');
+  chain.links.forEach(function (l) {
+    var a = pos[l.from], b = pos[l.to]; if (!a || !b) return;
+    var x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2, mx = (x1 + x2) / 2;
+    s.push('<path class="vs-link" d="M' + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2 + '" marker-end="url(#vsah)"/>');
+  });
+  chain.nodes.forEach(function (n) {
+    var p = pos[n.id], cls = "vs-node" + (n.origination ? " orig" : "") + (n.terminal ? " term" : "");
+    s.push('<g class="vs-g" data-open="' + esc(n.id) + '" transform="translate(' + p.x + "," + p.y + ')">');
+    s.push('<rect class="' + cls + '" width="' + NW + '" height="' + NH + '" rx="8"/>');
+    if (n.origination) s.push('<text class="vs-flag orig" x="7" y="' + (NH - 6) + '">◆ origination</text>');
+    else if (n.terminal) s.push('<text class="vs-flag term" x="7" y="' + (NH - 6) + '">terminal</text>');
+    s.push('<text class="vs-id" x="8" y="16">' + esc(n.id) + "</text>");
+    s.push('<text class="vs-name" x="8" y="31">' + esc(trunc(n.name, 21)) + "</text>");
+    s.push("</g>");
+  });
+  s.push("</svg>");
+  var note = chain.standalone
+    ? '<div class="muted" style="font-size:12px;margin-top:6px">' + chain.standalone + " process(es) aren’t chained yet — they don’t hand off or receive a hand-off.</div>"
+    : "";
+  return '<div class="vs-scroll">' + s.join("") + "</div>" + note;
+}
 function renderLandscape(L) {
   var house = L.domains.map(function (d) {
     var cards = d.processes.map(function (p) {
@@ -634,6 +671,9 @@ function renderLandscape(L) {
   }).join("");
   return '<div class="landscape">'
     + '<div class="lshead">Process landscape &mdash; <b>' + L.processes_total + "</b> processes across <b>" + L.domains.length + "</b> APQC domains. Click any process to open it.</div>"
+    + '<div class="vs-sec"><div class="catshead">Value stream &mdash; how work flows end&rarr;start across processes'
+    + '<span class="vs-legend"><span class="vs-key orig"></span> origination <span class="vs-key term"></span> terminal</span></div>'
+    + chainSvg(L.chain) + "</div>"
     + '<div class="house">' + house + "</div>"
     + '<div class="catalogs"><div class="catshead">Catalogs &mdash; what threads across the org</div><div class="catgrid">'
     + catcol("Roles (" + C.roles.length + ")", roleRows)

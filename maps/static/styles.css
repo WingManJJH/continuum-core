@@ -691,3 +691,25 @@ text.tip-anno.orig { fill: #2fbf71; font-weight: 600; }
 .term-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .term-dot.start { background: #2fbf71; }
 .term-dot.end { background: #f0533a; }
+
+/* ── Landscape: value-stream chain ──────────────────────────────────── */
+.vs-sec { margin: 14px 0 18px; }
+.vs-sec .catshead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vs-legend { font-size: 11.5px; font-weight: 400; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.vs-key { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: middle; }
+.vs-key.orig { background: #dff5e6; border: 2px solid #2fbf71; }
+.vs-key.term { background: #fce4e0; border: 2px solid #f0533a; }
+.vs-scroll { overflow-x: auto; padding: 8px 2px; }
+.vs-svg { max-width: none; }
+.vs-node { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; }
+.vs-node.orig { stroke: #2fbf71; stroke-width: 2; }
+.vs-node.term { stroke: #f0533a; stroke-width: 2; }
+.vs-g { cursor: pointer; }
+.vs-g:hover .vs-node { fill: var(--surface-2); }
+.vs-id { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; fill: var(--fg); }
+.vs-name { font-size: 10.5px; fill: var(--muted); }
+.vs-flag { font-size: 8px; font-weight: 700; }
+.vs-flag.orig { fill: #2fbf71; }
+.vs-flag.term { fill: #f0533a; }
+.vs-link { fill: none; stroke: var(--muted); stroke-width: 1.6; opacity: .8; }
+.vs-empty { padding: 14px; border: 1px dashed var(--line); border-radius: 10px; font-size: 13px; }

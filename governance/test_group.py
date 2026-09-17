@@ -76,6 +76,12 @@ def main():
     check("downstream process derives its inbound origin", any(i["from_process"] == "CO.3.2.7" for i in maps["FN.9.3.1"]["inbound"]))
     check("linked-to process is no longer an origination", maps["FN.9.3.1"]["origination"] is False)
     check("source process exposes its next hand-off", any(n["id"] == "FN.9.3.1" for n in maps["CO.3.2.7"]["next"]))
+    s.edit_process("FN.9.3.1", {"next_process_refs": ["MS.3.5.2"]}, A, "chain onward")
+    lc = mapdata.landscape(s.graph())["chain"]
+    check("landscape chain stages the value stream", {n["id"]: n["stage"] for n in lc["nodes"]} == {"CO.3.2.7": 0, "FN.9.3.1": 1, "MS.3.5.2": 2})
+    check("landscape chain flags origination + terminal",
+          next(n for n in lc["nodes"] if n["id"] == "CO.3.2.7")["origination"] is True
+          and next(n for n in lc["nodes"] if n["id"] == "MS.3.5.2")["terminal"] is True)
 
     check("audit chain intact after hierarchy edits", cc.verify_log(cc.EDITS_LOG)["ok"] is True)
 

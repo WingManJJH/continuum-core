@@ -227,6 +227,46 @@ def landscape(g: cc.Graph | None = None) -> dict:
         e = g.get(etype, eid)
         return e["name"] if e and e.get("name") else eid
 
+    # value-stream chain: process end → next process's start (Process-level +
+    # explicit end-event hand-offs), laid out in stages by longest path from an
+    # origination so the Landscape can draw the whole stream left-to-right.
+    pname = {p["id"]: p["name"] for p in procs}
+    nxt = {p["id"]: [] for p in procs}
+    for p in procs:
+        for n in p.get("next_process_refs", []) or []:
+            if n in pname and n not in nxt[p["id"]]:
+                nxt[p["id"]].append(n)
+    for ev in g.all("Event"):
+        if ev["status"] == "active" and ev["kind"] == "end" and ev.get("next_process_ref"):
+            src, dst = ev["process_ref"], ev["next_process_ref"]
+            if src in nxt and dst in pname and dst not in nxt[src]:
+                nxt[src].append(dst)
+    links = [{"from": a, "to": b} for a in nxt for b in nxt[a]]
+    indeg = {p["id"]: 0 for p in procs}
+    for a in nxt:
+        for b in nxt[a]:
+            indeg[b] += 1
+    linked = {a for a in nxt if nxt[a]} | {b for a in nxt for b in nxt[a]}
+    # longest-path stage (cycle-safe: cap iterations at node count)
+    stage = {pid: 0 for pid in linked}
+    for _ in range(len(linked) + 1):
+        changed = False
+        for a in nxt:
+            for b in nxt[a]:
+                if a in stage and stage[b] < stage[a] + 1:
+                    stage[b] = stage[a] + 1
+                    changed = True
+        if not changed:
+            break
+    chain_nodes = sorted(
+        ({"id": pid, "name": pname[pid], "domain": pid[:2], "stage": stage.get(pid, 0),
+          "origination": indeg.get(pid, 0) == 0, "terminal": not nxt.get(pid)}
+         for pid in linked),
+        key=lambda x: (x["stage"], x["id"]))
+    chain = {"nodes": chain_nodes, "links": links,
+             "stages": (max(stage.values()) + 1) if stage else 0,
+             "standalone": len(procs) - len(linked)}
+
     roles = sorted(({"id": rid, "name": _name("HumanRole", rid), "count": len(ps),
                      "processes": sorted(ps)} for rid, ps in role_use.items()),
                    key=lambda x: (-x["count"], x["id"]))
@@ -240,6 +280,7 @@ def landscape(g: cc.Graph | None = None) -> dict:
         "processes_total": len(procs),
         "domains": [domains[d] for d in sorted(domains)],
         "catalogs": {"roles": roles, "kpis": kpis, "risks": risks},
+        "chain": chain,
     }
 
 
