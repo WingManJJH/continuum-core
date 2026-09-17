@@ -45,6 +45,19 @@ STORE = gov.GovernanceStore()
 QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
 POLICY = policy_mod.ApprovalPolicy()        # which entity types must be gated
 
+# Active model persists across restarts (data/active_model.txt); the whole stack
+# folds whichever model is active (default / an imported BPC model / SYSPRO / …).
+_ACTIVE_FILE = os.path.join(cc.DATA_ROOT, "active_model.txt")
+def _restore_active_model():
+    try:
+        with open(_ACTIVE_FILE) as f:
+            slug = f.read().strip()
+        if slug and os.path.isdir(cc.model_base(slug)):
+            cc.set_active_model(slug)
+    except OSError:
+        pass
+_restore_active_model()
+
 STATIC = os.path.join(HERE, "static")
 CONTENT = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
 
@@ -113,6 +126,8 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/approval-policy":
             return self._json({"entities": POLICY.entities(), "modes": list(policy_mod.MODES),
                                "op_entity": policy_mod.OP_ENTITY})
+        if u.path == "/api/models":
+            return self._json({"models": cc.list_models(), "active": cc.ACTIVE_MODEL})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
@@ -243,6 +258,19 @@ class Handler(BaseHTTPRequestHandler):
                 pol = POLICY.set(b.get("entity", ""), b.get("mode", ""), actor,
                                  reason or "changed approval policy")
                 return self._json({"ok": True, "entities": POLICY.entities()})
+            if u.path == "/api/models":
+                # switch the active model (default / an imported model). Whole stack
+                # then folds that model; the choice persists across restarts.
+                slug = b.get("slug", "default")
+                if slug != "default" and not os.path.isdir(cc.model_base(slug)):
+                    return self._json_code({"ok": False, "error": f"unknown model {slug}"}, 400)
+                cc.set_active_model(slug)
+                try:
+                    with open(_ACTIVE_FILE, "w") as f:
+                        f.write(cc.ACTIVE_MODEL)
+                except OSError:
+                    pass
+                return self._json({"ok": True, "active": cc.ACTIVE_MODEL, "models": cc.list_models()})
             if u.path == "/api/layout":
                 # decorative node positions only — NOT a model edit, so it does not
                 # go through the governance store, the version chain, or the audit log.

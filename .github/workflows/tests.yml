@@ -67,6 +67,7 @@ jobs:
           python bpmn/test_import.py
           python bpmn/test_visio.py
           python builder/test_build.py
+          python builder/test_bpc_import.py
           python advisor/test_advisor.py
           python ask/test_agent.py
           python test_run.py

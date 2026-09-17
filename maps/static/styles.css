@@ -713,3 +713,8 @@ text.tip-anno.orig { fill: #2fbf71; font-weight: 600; }
 .vs-flag.term { fill: #f0533a; }
 .vs-link { fill: none; stroke: var(--muted); stroke-width: 1.6; opacity: .8; }
 .vs-empty { padding: 14px; border: 1px dashed var(--line); border-radius: 10px; font-size: 13px; }
+
+/* ── multi-model switcher ───────────────────────────────────────────── */
+.model-select { font-family: var(--mono); font-size: 12px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 8px; margin-left: 12px; max-width: 230px; }

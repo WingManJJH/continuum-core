@@ -52,6 +52,10 @@ var DOCS = [
     "<p>Each step's AI <b>guardrail</b> is editable right in its properties panel — allowed and forbidden actions, the data scope, and the <b>escalate-if</b> condition that hands off to a human. Saving bumps a version, records who/why, and is <b>instantly live for agents</b> on their next call. No deploy.</p>"
     + "<p>Everything is governed the same way: a guardrail edit, a new step, a drawn flow, a renamed role — each is a <b>versioned, hash-chained event</b> on an append-only audit trail (ISO 9001 §7.5). Nothing is overwritten or silently deleted; retired items are kept, deprecated. That chain is tamper-evident.</p>" },
 
+  { id: "models", title: "Models (switching process models)", html:
+    "<p>The <b>model selector</b> (top-left, next to the title) chooses which <b>process model</b> the whole app folds — its own hierarchy, processes, governance, and audit trail. The <b>Default model</b> ships with the app; alternate models (e.g. an imported <b>Microsoft Business Process Catalog</b>, or a SYSPRO / Sunrise edition) live side by side and are fully isolated — switching is instant and your choice sticks across restarts.</p>"
+    + "<p>Each model is a self-contained workspace: edits, versions, approvals, and the change log belong to the model you're in, so importing or editing one never touches another. (Imported models are generated locally from their source — they aren't part of the shared app.)</p>" },
+
   { id: "approvals", title: "Approvals (the review gate)", html:
     "<p>Some changes shouldn't go live the moment one person clicks Save. When you edit a guardrail you can tick <b>“Submit for approval instead of saving directly.”</b> That queues the change as a <b>Change Request</b> — it does <i>not</i> touch the live model — and it waits in the <b>Approvals</b> queue (top of the screen; the badge shows how many are pending).</p>"
     + "<p>A reviewer opens the queue and <b>Approves</b> it — which applies the change through the exact same audited, versioned, hash-chained path a direct edit uses — or <b>Rejects</b> it with a reason (no model change). The proposer can <b>Withdraw</b> a request they no longer want.</p>"
@@ -147,6 +151,8 @@ function openModalCard() { var m = document.querySelector(".modal:not([hidden]) 
 
 var TOUR = [
   { title: "Welcome", steps: [
+    { sel: "#model-select", before: function () { tourReset(); }, title: "Pick your model",
+      body: "This selector chooses which <b>process model</b> you're working in — the Default model, or an imported one like the <b>Microsoft Business Process Catalog</b>, SYSPRO, or Sunrise. Each is a fully isolated workspace; switching is instant." },
     { sel: ".brand", before: function () { tourOpen("CO.3.2.7"); }, title: "Welcome to Continuum",
       body: "This is the Process Canvas — an easy visual modeler on top of a <b>governed</b> process model. In a few minutes you'll see the whole thing, end to end. Use <b>Next</b>, or jump around with <b>Chapters</b>." },
     { sel: "#proc-list", title: "Your processes",
