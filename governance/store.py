@@ -45,7 +45,7 @@ EDITABLE_TASK_FIELDS = [
 ]
 EDITABLE_ROLE_FIELDS = ["name", "raci", "skills"]
 EDITABLE_GROUP_FIELDS = ["name", "level", "parent_ref", "owner_role", "objective_refs", "description", "custom"]
-EDITABLE_PROCESS_FIELDS = ["name", "owner_role", "parent_ref", "objective_refs", "custom", "maturity_score"]
+EDITABLE_PROCESS_FIELDS = ["name", "owner_role", "parent_ref", "objective_refs", "custom", "maturity_score", "next_process_refs"]
 
 
 class EditError(ValueError):
@@ -573,6 +573,16 @@ class GovernanceStore:
             raise EditError(f"unknown parent group {changes['parent_ref']}")
         if changes.get("owner_role") and g.get("HumanRole", changes["owner_role"]) is None:
             raise EditError(f"unknown owner role {changes['owner_role']}")
+        if "next_process_refs" in changes:
+            refs = changes["next_process_refs"] or []
+            if not isinstance(refs, list):
+                raise EditError("next_process_refs must be a list of process codes")
+            for nxt in refs:
+                if nxt == process_id:
+                    raise EditError("a process can't hand off to itself")
+                tgt = g.get("Process", nxt)
+                if tgt is None or tgt["status"] != "active":
+                    raise EditError(f"unknown next process {nxt}")
         new = copy.deepcopy(cur)
         for k, v in changes.items():
             new[k] = v
@@ -853,18 +863,29 @@ class GovernanceStore:
         cur = g.get("Event", event_id)
         if cur is None or cur["status"] != "active":
             raise EditError(f"unknown or retired event {event_id}")
-        unknown = set(changes) - {"name", "kind", "trigger", "timer", "message_ref"}
+        unknown = set(changes) - {"name", "kind", "trigger", "timer", "message_ref", "next_process_ref"}
         if unknown:
             raise EditError(f"these fields are not editable: {sorted(unknown)}")
         if "kind" in changes and changes["kind"] not in ("start", "intermediate", "end"):
             raise EditError("event kind must be 'start', 'intermediate', or 'end'")
         if "trigger" in changes and changes["trigger"] not in ("none", "timer", "message"):
             raise EditError("event trigger must be 'none', 'timer', or 'message'")
+        # next_process_ref chains this end event to the next process's start
+        if changes.get("next_process_ref"):
+            nxt = changes["next_process_ref"]
+            eff_kind = changes.get("kind", cur["kind"])
+            if eff_kind != "end":
+                raise EditError("only an end event can link to a next process")
+            if nxt == cur["process_ref"]:
+                raise EditError("an end event can't link back to its own process")
+            tgt = g.get("Process", nxt)
+            if tgt is None or tgt["status"] != "active":
+                raise EditError(f"unknown next process {nxt}")
         new = copy.deepcopy(cur)
         for k in ("name", "kind", "trigger"):
             if k in changes:
                 new[k] = str(changes[k]).strip() if k == "name" else changes[k]
-        for k in ("timer", "message_ref"):
+        for k in ("timer", "message_ref", "next_process_ref"):
             if k in changes:
                 v = changes[k]
                 new[k] = (str(v).strip() or None) if v else None

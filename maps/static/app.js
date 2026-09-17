@@ -156,10 +156,10 @@ function renderEmptyFlow(m) {
   var sx = PAD + R, ex = sx + 200, W = ex + R + PAD, H = LANE + NH + 18;
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">'
     + '<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>'
-    + '<circle class="tip" cx="' + sx + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (cy + 3) + '" text-anchor="middle">start</text>'
+    + '<circle class="tip start" cx="' + sx + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (cy + 3) + '" text-anchor="middle">start</text>'
     + '<line class="conn" x1="' + (sx + R) + '" y1="' + cy + '" x2="' + (ex - R) + '" y2="' + cy + '" marker-end="url(#ah_' + uid + ')"/>'
     + '<text class="hintmsg" x="' + ((sx + ex) / 2) + '" y="' + (cy - 12) + '" text-anchor="middle">drag a step here</text>'
-    + '<circle class="tip" cx="' + ex + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (cy + 3) + '" text-anchor="middle">end</text></svg>';
+    + '<circle class="tip end" cx="' + ex + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (cy + 3) + '" text-anchor="middle">end</text></svg>';
 }
 // resolve each task's position: saved layout, else an auto left-to-right flow
 function nodePos(m) {
@@ -182,6 +182,21 @@ function edgePt(cx, cy, hw, hh, tx, ty) {
 }
 function circPt(cx, cy, r, tx, ty) { var dx = tx - cx, dy = ty - cy, d = Math.hypot(dx, dy) || 1; return { x: cx + dx * r / d, y: cy + dy * r / d }; }
 
+// start / end terminal annotations: a start with no upstream is an origination,
+// otherwise it shows who hands off to it; an end shows the next process(es).
+function startAnnoSvg(m) {
+  var y = R + 15;
+  if (m.origination) return '<text class="tip-anno orig" y="' + y + '" text-anchor="middle">◆ origination</text>';
+  var codes = (m.inbound || []).map(function (i) { return i.from_process; });
+  if (!codes.length) return "";
+  return '<text class="tip-anno" y="' + y + '" text-anchor="middle">← ' + esc(trunc(codes.join(", "), 26)) + "</text>";
+}
+function endAnnoSvg(m) {
+  var y = R + 15;
+  var codes = (m.next || []).map(function (n) { return n.id; });
+  if (!codes.length) return "";
+  return '<text class="tip-anno" y="' + y + '" text-anchor="middle">→ ' + esc(trunc(codes.join(", "), 26)) + "</text>";
+}
 function renderLinear(m) {
   var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), tasks = m.tasks;
   if (!tasks.length) return renderEmptyFlow(m);
@@ -194,8 +209,8 @@ function renderLinear(m) {
   for (var i = 0; i < chain.length - 1; i++) {
     p.push('<line class="conn" data-a="' + esc(chain[i]) + '" data-b="' + esc(chain[i + 1]) + '" marker-end="url(#ah_' + uid + ')"/>');
   }
-  p.push('<g id="tip-start"><circle class="tip" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">start</text></g>');
-  p.push('<g id="tip-end"><circle class="tip" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">end</text></g>');
+  p.push('<g id="tip-start" class="tip-node" data-node="__start__"><circle class="tip start" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">start</text>' + startAnnoSvg(m) + "</g>");
+  p.push('<g id="tip-end" class="tip-node" data-node="__end__"><circle class="tip end" r="' + R + '"/><text class="tip" y="3" text-anchor="middle">end</text>' + endAnnoSvg(m) + "</g>");
   tasks.forEach(function (t) {
     var ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
     p.push('<g class="tnode' + (t.id === state.task ? " sel" : "") + '" data-task="' + esc(t.id) + '" transform="translate(' + pos[t.id].x + ',' + pos[t.id].y + ')">');
@@ -285,6 +300,13 @@ function wireFlow(m) {
     });
     g.addEventListener("dblclick", function () { var t = taskById(tid); if (t && t.subprocess) drillInto(t.subprocess); });
   });
+  // start / end terminals: click to see the process's inbound / hand-off links
+  svg.querySelectorAll(".tip-node[data-node]").forEach(function (g) {
+    g.addEventListener("click", function () {
+      state.terminal = g.getAttribute("data-node"); state.task = null; state.gwsel = null; state.evsel = null;
+      markSel(); renderProps();
+    });
+  });
 }
 function saveLayout(m) {
   getProc().layout = JSON.parse(JSON.stringify(state.flowPos));  // keep across re-renders
@@ -334,8 +356,8 @@ function renderGraph(m) {
       p.push('<g class="flabel" data-flow="' + esc(f.id) + '"><rect rx="4"/><text>' + esc(trunc(f.condition, 22)) + "</text></g>");
     }
   });
-  p.push('<g class="tip-node" data-node="__start__"><circle class="tip" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">start</text></g>');
-  p.push('<g class="tip-node" data-node="__end__"><circle class="tip" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">end</text></g>');
+  p.push('<g class="tip-node" data-node="__start__"><circle class="tip start" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">start</text>' + (m.origination ? '<text class="tip-anno orig" x="' + R + '" y="' + (2 * R + 14) + '" text-anchor="middle">◆ origination</text>' : (m.inbound && m.inbound.length ? '<text class="tip-anno" x="' + R + '" y="' + (2 * R + 14) + '" text-anchor="middle">← ' + esc(trunc(m.inbound.map(function (i) { return i.from_process; }).join(", "), 22)) + "</text>" : "")) + "</g>");
+  p.push('<g class="tip-node" data-node="__end__"><circle class="tip end" cx="' + R + '" cy="' + R + '" r="' + R + '"/><text class="tip" x="' + R + '" y="' + (R + 3) + '" text-anchor="middle">end</text>' + (m.next && m.next.length ? '<text class="tip-anno" x="' + R + '" y="' + (2 * R + 14) + '" text-anchor="middle">→ ' + esc(trunc(m.next.map(function (n) { return n.id; }).join(", "), 22)) + "</text>" : "") + "</g>");
   m.tasks.forEach(function (t) {
     var x = state.flowPos[t.id].x, y = state.flowPos[t.id].y;
     var ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
@@ -456,10 +478,10 @@ function nodeClick(m, id, g) {
     postFlow({ op: "add", process: m.id, from: from, to: to, condition: cond, actor: ACTOR, reason: "drew flow via canvas" }).then(reloadIf);
     return;
   }
-  if (id === "__start__" || id === "__end__") { state.task = null; state.gwsel = null; state.evsel = null; markSel(); renderProps(); return; }
-  if (state.ev && state.ev[id]) { state.evsel = id; state.task = null; state.gwsel = null; markSel(); renderProps(); return; }
-  if (state.gw && state.gw[id]) { state.gwsel = id; state.task = null; state.evsel = null; markSel(); renderProps(); return; }
-  state.task = id; state.gwsel = null; state.evsel = null; markSel(); renderProps();
+  if (id === "__start__" || id === "__end__") { state.terminal = id; state.task = null; state.gwsel = null; state.evsel = null; markSel(); renderProps(); return; }
+  if (state.ev && state.ev[id]) { state.evsel = id; state.task = null; state.gwsel = null; state.terminal = null; markSel(); renderProps(); return; }
+  if (state.gw && state.gw[id]) { state.gwsel = id; state.task = null; state.evsel = null; state.terminal = null; markSel(); renderProps(); return; }
+  state.task = id; state.gwsel = null; state.evsel = null; state.terminal = null; markSel(); renderProps();
 }
 function postFlow(body) { return fetch("/api/flow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
 function postGateway(body) { return fetch("/api/gateway", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
@@ -522,8 +544,8 @@ function renderLanes(m) {
   });
   var le = edgePt(fl.x + NW / 2, fl.cy, NW / 2, NH / 2, ex, ey);
   p.push('<line class="conn" x1="' + le.x + '" y1="' + le.y + '" x2="' + circPt(ex, ey, R, fl.x + NW / 2, fl.cy).x + '" y2="' + ey + '" marker-end="url(#ah_' + uid + ')"/>');
-  p.push('<circle class="tip" cx="' + sx + '" cy="' + sy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (sy + 3) + '" text-anchor="middle">start</text>');
-  p.push('<circle class="tip" cx="' + ex + '" cy="' + ey + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (ey + 3) + '" text-anchor="middle">end</text>');
+  p.push('<circle class="tip start" cx="' + sx + '" cy="' + sy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (sy + 3) + '" text-anchor="middle">start</text>');
+  p.push('<circle class="tip end" cx="' + ex + '" cy="' + ey + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (ey + 3) + '" text-anchor="middle">end</text>');
   m.tasks.forEach(function (t) {
     var a = pos[t.id], ncls = "node" + (t.agents.length ? " agent" : "") + (t.override ? " override" : "");
     p.push('<g class="tnode lane-node" data-task="' + esc(t.id) + '" transform="translate(' + a.x + ',' + a.y + ')">');
@@ -680,6 +702,14 @@ $("#canvas").addEventListener("change", function (e) {
 function renderProps() {
   var p = getProc(), t = getTask();
   if (!p) return;
+  if (state.terminal) {
+    $("#props").innerHTML = terminalProps(p, state.terminal);
+    $("#props").querySelectorAll("[data-open]").forEach(function (el) {
+      el.addEventListener("click", function () { state.terminal = null; openProcess(el.getAttribute("data-open")); });
+    });
+    var eb = $("#term-edit"); if (eb && typeof openMasterData === "function") eb.onclick = function () { openMasterData("process", p.id); };
+    return;
+  }
   if (state.evsel && p.explicit) {
     var ev = (p.events || []).find(function (e) { return e.id === state.evsel; });
     if (ev) { $("#props").innerHTML = evProps(ev); wireEvProps(ev); return; }
@@ -960,6 +990,25 @@ function wireEvProps(ev) {
   };
   $("#node-connect").onclick = function () { startConnectFrom(ev.id); };
   wireConnList(box);
+}
+function _plink(id, name) { return '<a class="pchip" data-open="' + esc(id) + '">' + esc(id) + (name ? ' <span class="muted">' + esc(trunc(name, 22)) + "</span>" : "") + "</a>"; }
+function terminalProps(p, which) {
+  if (which === "__end__") {
+    var nx = p.next || [];
+    var body = nx.length
+      ? '<div class="p-row">This process hands off to the next stage:</div><div class="p-row">' + nx.map(function (n) { return _plink(n.id, n.name); }).join(" ") + "</div>"
+      : '<div class="p-row muted">Terminal — this end doesn\'t hand off to another process yet.</div>';
+    return '<div class="p-sec"><div class="lbl"><span class="term-dot end"></span>End condition</div>' + body
+      + '<div class="p-row" style="margin-top:8px"><button id="term-edit" class="add-btn ghost-btn" type="button">Edit hand-offs</button></div>'
+      + '<div class="p-row muted" style="margin-top:8px">The end links to the next process\'s start, chaining processes into an end-to-end value stream.</div></div>';
+  }
+  // start
+  var inb = p.inbound || [];
+  var body2 = p.origination
+    ? '<div class="p-row"><span class="pill" style="background:#dff5e6;color:#1b6b45">◆ origination</span> This is a top-level start — nothing upstream hands off to it.</div>'
+    : '<div class="p-row">This process starts after these upstream processes finish:</div><div class="p-row">' + inb.map(function (i) { return _plink(i.from_process, i.from_process_name); }).join(" ") + "</div>";
+  return '<div class="p-sec"><div class="lbl"><span class="term-dot start"></span>Start condition</div>' + body2
+    + '<div class="p-row muted" style="margin-top:8px">Inbound links are derived from other processes\' end hand-offs. Set a hand-off on an upstream process\'s <b>end</b>.</div></div>';
 }
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");

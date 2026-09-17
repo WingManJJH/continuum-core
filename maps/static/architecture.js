@@ -119,6 +119,7 @@ function openMasterData(kind, id) {
     body.innerHTML =
       '<label>Parent (hierarchy)<select id="md-parent">' + opts + "</select></label>"
       + '<label>Objectives <span class="hint">comma · obj.*</span><input id="md-obj" value="' + esc((p.objective_refs || []).join(", ")) + '"></label>'
+      + '<label>Hands off to <span class="hint">next process code(s), comma · e.g. FN.9.3.1</span><input id="md-next" value="' + esc((p.next || []).map(function (n) { return n.id; }).join(", ")) + '"></label>'
       + '<div class="p-sec">' + _customEditor(p.custom) + "</div>"
       + (typeof gateControlHTML === "function" ? '<div class="p-sec">' + gateControlHTML("Process") + "</div>" : "")
       + '<div class="import-actions"><button id="md-save" class="add-btn" type="button">Save</button></div>';
@@ -126,6 +127,7 @@ function openMasterData(kind, id) {
     document.getElementById("md-save").onclick = function () {
       var changes = { parent_ref: document.getElementById("md-parent").value || null,
                       objective_refs: parseCsv(document.getElementById("md-obj").value),
+                      next_process_refs: parseCsv(document.getElementById("md-next").value),
                       custom: _collectKv() };
       if (typeof routeThroughGate === "function" && routeThroughGate(
           "Process", body, "edit_process", { process_id: id, changes: changes },

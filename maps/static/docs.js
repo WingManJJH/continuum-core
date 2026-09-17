@@ -20,6 +20,12 @@ var DOCS = [
     + "<li><b>RACI</b> — a Responsible / Accountable / Consulted chart, derived from the model (not hand-maintained).</li>"
     + "<li><b>Checklist</b> — a printable run sheet; tick items as you go.</li></ul>" },
 
+  { id: "startend", title: "Start & end conditions (the value stream)", html:
+    "<p>Every flow has a <b>start</b> (always <span style='color:#2fbf71'><b>green</b></span>) and an <b>end</b> (always <span style='color:#f0533a'><b>red</b></span>). These aren't just terminals — they chain processes into an <b>end-to-end value stream</b>.</p>"
+    + "<ul><li>Click a process's <b>end</b> to set which process(es) it <b>hands off to</b> — its end links to the next process's start. (You can also set it under a process's <b>master data</b> → “Hands off to”.)</li>"
+    + "<li>The <b>end</b> then shows <code>→ NEXT</code> and the <b>start</b> of the next process shows <code>← PRIOR</code> — click either to jump along the chain.</li>"
+    + "<li>A start that nothing hands off to is marked <b>◆ origination</b> — the top of the value stream. Most starts have an inbound hand-off; a few originate the work.</li></ul>" },
+
   { id: "authoring", title: "Authoring a process", html:
     "<p>Build visually — every structural change is validated, versioned, and audited (no engineering ticket).</p>"
     + "<ul><li><b>Add a step</b> — click <b>+ Step</b>, or drag a <b>+ Step</b> / <b>+ Approval step</b> tile from the palette onto the flow to insert it at that point.</li>"
@@ -152,6 +158,9 @@ var TOUR = [
       title: "The flowchart", body: "A process reads left to right: <code>start → steps → end</code>. The step with an <b>AI</b> badge is run by an agent; if its guardrail escalates, a branch to a human travels with it." },
     { sel: "#props", before: function () { tourOpen("CO.3.2.7"); state.task = "CO.3.2.7.t3"; if (typeof renderCenter === "function") renderCenter(); if (typeof renderProps === "function") renderProps(); },
       title: "A step's details", body: "Selecting a step shows who performs it, its data and KPIs, and its <b>guardrail</b> — right here, editable." },
+    { sel: function () { return document.querySelector('#canvas .tip-node[data-node="__end__"]') || document.querySelector("#canvas circle.tip.end"); },
+      before: function () { tourOpen("CO.3.2.7"); tourView("flow"); },
+      title: "Start & end conditions", body: "The <b>green start</b> and <b>red end</b> chain processes together: click an <b>end</b> to link it to the next process's start. A start nothing feeds is an <b>◆ origination</b>; the rest show where the work comes from and goes next." },
   ]},
   { title: "The four views", steps: [
     { sel: ".views", before: function () { tourOpen("CO.3.2.7"); tourView("lanes"); }, title: "Lanes (swimlanes)",

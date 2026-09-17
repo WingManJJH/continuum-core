@@ -52,6 +52,11 @@ def main():
     check("task carries data refs for the properties panel",
           t3["inputs"] == ["customer.kyc_doc"] and t3["kpi_refs"])
 
+    # process chain fields (end → next process's start); seed has no hand-offs
+    check("processes expose chain fields", all("next" in m and "inbound" in m and "origination" in m for m in maps))
+    check("seed processes are all origination (no hand-offs yet)",
+          all(m["origination"] and m["next"] == [] and m["inbound"] == [] for m in maps))
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
 

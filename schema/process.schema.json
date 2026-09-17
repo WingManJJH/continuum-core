@@ -71,6 +71,11 @@
       "items": {"type": "string", "pattern": "^obj\\.[a-z0-9_.]+$"},
       "description": "Strategic objectives this process supports (X-matrix / strategy alignment)."
     },
+    "next_process_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[A-Z]{2}\\.[0-9.]+$"},
+      "description": "Downstream processes this one hands off to — its end links to each of their starts, chaining processes into an end-to-end value stream. A process no one hands off to is an origination (top-level) start."
+    },
     "custom": {
       "type": "object",
       "description": "User-defined master-data metadata (free-form key/value). Not read by agents.",

@@ -65,6 +65,18 @@ def main():
     check("edit_process rejects a non-editable field", rejects(lambda: s.edit_process("CO.3.2.7", {"guardrail_ref": "x"}, A, "y"), "not editable"))
     check("edit_process rejects an unknown parent", rejects(lambda: s.edit_process("CO.3.2.7", {"parent_ref": "ZZ"}, A, "y"), "unknown parent"))
 
+    # 5. process chaining — end links to the next process's start (value stream)
+    s.edit_process("CO.3.2.7", {"next_process_refs": ["FN.9.3.1"]}, A, "hand off to expenses")
+    check("edit_process sets next_process_refs", s.graph().get("Process", "CO.3.2.7")["next_process_refs"] == ["FN.9.3.1"])
+    check("chain rejects a self-link", rejects(lambda: s.edit_process("CO.3.2.7", {"next_process_refs": ["CO.3.2.7"]}, A, "y"), "itself"))
+    check("chain rejects an unknown next process", rejects(lambda: s.edit_process("CO.3.2.7", {"next_process_refs": ["ZZ.9.9"]}, A, "y"), "unknown next"))
+    sys.path.insert(0, os.path.join(HERE, "..", "maps"))
+    import mapdata  # noqa: E402
+    maps = {m["id"]: m for m in mapdata.all_maps(s.graph())}
+    check("downstream process derives its inbound origin", any(i["from_process"] == "CO.3.2.7" for i in maps["FN.9.3.1"]["inbound"]))
+    check("linked-to process is no longer an origination", maps["FN.9.3.1"]["origination"] is False)
+    check("source process exposes its next hand-off", any(n["id"] == "FN.9.3.1" for n in maps["CO.3.2.7"]["next"]))
+
     check("audit chain intact after hierarchy edits", cc.verify_log(cc.EDITS_LOG)["ok"] is True)
 
     cc.reset_log(cc.EDITS_LOG)
