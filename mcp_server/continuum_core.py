@@ -22,11 +22,60 @@ from datetime import datetime, timezone
 from typing import Any
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.normpath(os.path.join(HERE, "..", "data", "seed.json"))
-EVENTS_LOG = os.path.join(os.path.dirname(DATA), "events.log.jsonl")   # agent actions (§04/§06)
-EDITS_LOG = os.path.join(os.path.dirname(DATA), "edits.log.jsonl")     # change control (Phase 2 governance edits, ISO 9001 §7.5)
-HEADS_FILE = os.path.join(os.path.dirname(DATA), "audit_heads.json")   # per-log chain head + count (truncation/rollback detection)
+DATA_ROOT = os.path.normpath(os.path.join(HERE, "..", "data"))         # data/ (default model lives here)
+MODELS_DIR = os.path.join(DATA_ROOT, "models")                        # data/models/<slug>/ (alternate models)
+ACTIVE_MODEL = "default"                                               # which model the stack is folding right now
+
+# The active model's file paths. These are reassigned by set_active_model(); the
+# functions below resolve their path arguments to the LIVE value of these globals
+# (default arg = None), so switching a model repoints the whole stack in-process —
+# and, as a bonus, this is what lets tests point at a temp dir cleanly.
+DATA = os.path.join(DATA_ROOT, "seed.json")
+EVENTS_LOG = os.path.join(DATA_ROOT, "events.log.jsonl")              # agent actions (§04/§06)
+EDITS_LOG = os.path.join(DATA_ROOT, "edits.log.jsonl")               # change control (Phase 2 governance edits, ISO 9001 §7.5)
+HEADS_FILE = os.path.join(DATA_ROOT, "audit_heads.json")             # per-log chain head + count (truncation/rollback detection)
 GENESIS_HASH = "0" * 64                                                # prev_hash of the first event in a log
+
+
+def model_base(slug: str) -> str:
+    """The directory holding a model's seed + logs. 'default' is data/ itself."""
+    return DATA_ROOT if slug in (None, "", "default") else os.path.join(MODELS_DIR, slug)
+
+
+def set_active_model(slug: str) -> str:
+    """Repoint the whole stack at model `slug` (a directory of seed + logs). Every
+    read (Graph fold) and write (append_*_event) then targets that model. Returns
+    the resolved slug. 'default' is the original data/ model."""
+    global ACTIVE_MODEL, DATA, EVENTS_LOG, EDITS_LOG, HEADS_FILE
+    base = model_base(slug)
+    ACTIVE_MODEL = slug or "default"
+    DATA = os.path.join(base, "seed.json")
+    EVENTS_LOG = os.path.join(base, "events.log.jsonl")
+    EDITS_LOG = os.path.join(base, "edits.log.jsonl")
+    HEADS_FILE = os.path.join(base, "audit_heads.json")
+    return ACTIVE_MODEL
+
+
+def list_models() -> list[dict]:
+    """Registered models: the built-in default plus every data/models/<slug>/ that
+    has a model.json. Each entry: {slug, name, description, source, active}."""
+    out = [{"slug": "default", "name": "Default model", "source": "seed",
+            "description": "The original governed model (data/seed.json).",
+            "active": ACTIVE_MODEL == "default"}]
+    if os.path.isdir(MODELS_DIR):
+        for slug in sorted(os.listdir(MODELS_DIR)):
+            meta_path = os.path.join(MODELS_DIR, slug, "model.json")
+            if not os.path.isfile(meta_path):
+                continue
+            try:
+                with open(meta_path) as f:
+                    m = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                m = {}
+            out.append({"slug": slug, "name": m.get("name", slug),
+                        "description": m.get("description", ""), "source": m.get("source", ""),
+                        "active": ACTIVE_MODEL == slug})
+    return out
 
 REASON_CODES = {
     "allowed",
@@ -41,7 +90,9 @@ REASON_CODES = {
 class Graph:
     """In-memory fold of the seed graph, indexed by id per entity type."""
 
-    def __init__(self, path: str = DATA, apply_edits: bool = True):
+    def __init__(self, path: str | None = None, apply_edits: bool = True):
+        if path is None:
+            path = DATA          # resolve live, so set_active_model() takes effect
         with open(path) as f:
             raw = json.load(f)
         self.model_sig: str = raw.get("model_sig", "dev")
@@ -61,7 +112,9 @@ class Graph:
         if apply_edits:
             self.apply_edit_log()
 
-    def apply_edit_log(self, log_path: str = EDITS_LOG) -> None:
+    def apply_edit_log(self, log_path: str | None = None) -> None:
+        if log_path is None:
+            log_path = EDITS_LOG
         if not os.path.exists(log_path):
             return
         with open(log_path) as f:
@@ -361,8 +414,10 @@ def verify_log(log_path: str) -> dict:
     return result
 
 
-def verify_audit(logs: tuple[str, ...] = (EDITS_LOG, EVENTS_LOG)) -> dict:
+def verify_audit(logs: tuple[str, ...] | None = None) -> dict:
     """Verify every audit log. overall.ok is True only if all chains are intact."""
+    if logs is None:
+        logs = (EDITS_LOG, EVENTS_LOG)
     results = [verify_log(p) for p in logs]
     return {"ok": all(r["ok"] for r in results), "logs": results}
 
@@ -395,10 +450,12 @@ def log_action(g: Graph, task_id: str, action: str, outcome: str,
 def append_edit_event(entity_type: str, entity_id: str, op: str,
                       from_version: int | None, to_version: int,
                       actor: dict, payload: dict, reason: str,
-                      log_path: str = EDITS_LOG) -> dict:
+                      log_path: str | None = None) -> dict:
     """Append an immutable, hash-chained change-control event (ISO 9001 §7.5).
     This is the write path Phase-2 governance edits go through — a new version,
     never an overwrite. Returns the event. Stdlib-only so the core stays light."""
+    if log_path is None:
+        log_path = EDITS_LOG     # resolve live (respects the active model)
     return _append_event(log_path, {
         "event_id": "evt_" + _ulidish(),
         "ts": datetime.now(timezone.utc).isoformat(),

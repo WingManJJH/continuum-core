@@ -1150,6 +1150,31 @@ function saveGuardrail(e) {
   btn.addEventListener("click", function () { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); });
 })();
 
+// ---------- model switcher (default / imported BPC / SYSPRO / …) ----------
+(function () {
+  var sel = document.getElementById("model-select"); if (!sel) return;
+  function fill(models, active) {
+    sel.innerHTML = models.map(function (m) {
+      return '<option value="' + esc(m.slug) + '"' + (m.slug === active ? " selected" : "") + ">" + esc(m.name) + "</option>";
+    }).join("");
+  }
+  fetch("/api/models").then(function (r) { return r.json(); }).then(function (d) { fill(d.models || [], d.active); })
+    .catch(function () { sel.hidden = true; });
+  sel.addEventListener("change", function () {
+    var slug = sel.value;
+    fetch("/api/models", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: slug, actor: ACTOR, reason: "switch active model" }) })
+      .then(function (r) { return r.json(); }).then(function (res) {
+        if (!res.ok) { alert("Could not switch model: " + res.error); return; }
+        // a different model = a different world: drop caches and reload from the top
+        state.landscape = null; state.architecture = null; state.strategy = null;
+        state.sel = null; state.task = null; state.nav = []; state.view = "landscape";
+        fill(res.models || [], res.active);
+        load().then(function () { renderCenter(); });
+      });
+  });
+})();
+
 // ---------- per-user identity + desktop notifications ----------
 function notifyEnabled() { try { return localStorage.getItem("cc-notify") === "1"; } catch (e) { return false; } }
 function notifyDesktop(title, body) {
