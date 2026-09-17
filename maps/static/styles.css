@@ -604,7 +604,7 @@ body.presenting { overflow: hidden; }
   font-size: 11px; font-weight: 700; line-height: 16px; text-align: center;
   color: #fff; background: #f06a4f; border-radius: 9px; }
 .appr-tabs { display: flex; gap: 6px; margin-left: 14px; }
-.appr-tabs button { background: transparent; border: 1px solid var(--line); color: var(--fg);
+.appr-tabs button { background: transparent; border: 1px solid var(--line); color: var(--ink);
   border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
 .appr-tabs button.active { background: var(--accent, #2f8fbf); color: #fff; border-color: transparent; }
 #appr-body { max-height: 62vh; overflow: auto; padding: 6px 2px; }
@@ -638,12 +638,12 @@ label.ck input { width: auto; margin: 0; }
   padding: 9px 4px; border-bottom: 1px solid var(--line); }
 .pol-label { font-size: 14px; }
 .pol-mode { min-width: 130px; padding: 7px 10px; font-size: 13px; border-radius: 8px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 
 /* ── Phase 3: approvals assignee + live toast ───────────────────────── */
 .appr-assign { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; }
 .appr-assignee { padding: 5px 9px; font-size: 12.5px; border-radius: 7px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .appr-toast { position: fixed; right: 18px; bottom: 18px; z-index: 5000;
   background: #0f1b24; color: #eaf1f5; border-radius: 11px; padding: 13px 16px;
   box-shadow: 0 8px 26px rgba(0,0,0,.4); font-size: 14px; max-width: 340px;
@@ -659,7 +659,7 @@ label.ck input { width: auto; margin: 0; }
 .strat-edit:hover { opacity: 1; }
 #strat-body label { display: block; margin: 9px 0; font-size: 13px; }
 #strat-body input, #strat-body textarea { width: 100%; margin-top: 4px; padding: 8px 10px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
   font: inherit; box-sizing: border-box; }
 
 /* ── Phase 3: identity + assigned-to-me ─────────────────────────────── */
@@ -670,7 +670,7 @@ label.ck input { width: auto; margin: 0; }
 #who-body label { display: block; margin: 10px 0; font-size: 13px; }
 #who-body input[type=text], #who-body input:not([type]), #who-body select {
   width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line);
-  border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; box-sizing: border-box; }
+  border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; box-sizing: border-box; }
 #who-body label.ck { display: flex; align-items: center; gap: 8px; }
 #who-body label.ck input { width: auto; margin: 0; }
 
@@ -678,7 +678,7 @@ label.ck input { width: auto; margin: 0; }
 .strat-edit.sx { font-size: 10px; opacity: .55; padding: 0 2px; }
 .strat-edit.sx:hover { opacity: 1; }
 .nx-addinit { width: 20px; height: 20px; line-height: 1; border: 1px dashed var(--line);
-  background: transparent; color: var(--fg); border-radius: 6px; cursor: pointer; opacity: .7;
+  background: transparent; color: var(--ink); border-radius: 6px; cursor: pointer; opacity: .7;
   font-size: 14px; margin: 2px; }
 .nx-addinit:hover { opacity: 1; border-style: solid; }
 
@@ -706,7 +706,7 @@ text.tip-anno.orig { fill: #2fbf71; font-weight: 600; }
 .vs-node.term { stroke: #f0533a; stroke-width: 2; }
 .vs-g { cursor: pointer; }
 .vs-g:hover .vs-node { fill: var(--surface-2); }
-.vs-id { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; fill: var(--fg); }
+.vs-id { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; fill: var(--ink); }
 .vs-name { font-size: 10.5px; fill: var(--muted); }
 .vs-flag { font-size: 8px; font-weight: 700; }
 .vs-flag.orig { fill: #2fbf71; }
