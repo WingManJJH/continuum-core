@@ -737,3 +737,16 @@ h3.dhead .caret { font-size: 11px; color: var(--muted); width: 12px; display: in
 .aghead.toggle { cursor: pointer; user-select: none; }
 .agcaret { display: inline-block; width: 12px; font-size: 11px; color: var(--muted); }
 .agroup.collapsed > .aghead { opacity: .95; }
+
+/* ── process overview (catalog entry with no steps) ─────────────────── */
+.proc-overview { max-width: 640px; margin: 8px 6px 18px; padding: 16px 18px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+.proc-overview .ov-lbl { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; }
+.ov-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.ov-chip { font-size: 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 20px; padding: 3px 11px; color: var(--ink); }
+.ov-chip b { color: var(--muted); font-weight: 600; margin-right: 3px; }
+.ov-desc { font-size: 14px; line-height: 1.55; color: var(--ink); margin: 4px 0 12px; }
+.ov-learn { display: inline-block; font-size: 13px; font-weight: 600; color: var(--accent, #2f8fbf); text-decoration: none; }
+.ov-learn:hover { text-decoration: underline; }

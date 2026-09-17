@@ -192,15 +192,35 @@ function wrap(name, max) {
   if (lines.length > 2) lines = [lines[0], trunc(lines.slice(1).join(" "), max)];
   return lines.slice(0, 2);
 }
+// Context panel for a process that has no modeled steps — turns an empty
+// flowchart into something useful (its description, source system, links).
+function processOverview(m) {
+  var c = m.custom || {};
+  if (!Object.keys(c).length) return "";
+  function chip(l, v) { return '<span class="ov-chip"><b>' + esc(l) + "</b> " + esc(String(v)) + "</span>"; }
+  var chips = "";
+  if (c.product) chips += chip("product", c.product);
+  if (c.module) chips += chip("module", c.module);
+  if (c.bpc_seq) chips += chip("seq", c.bpc_seq);
+  if (c.source) chips += chip("source", c.source);
+  var learn = c.learn_url ? '<a class="ov-learn" href="' + esc(c.learn_url) + '" target="_blank" rel="noopener">Open in Microsoft Learn &#8599;</a>' : "";
+  var desc = c.description ? '<p class="ov-desc">' + esc(c.description) + "</p>" : "";
+  if (!chips && !desc && !learn) return "";
+  return '<div class="proc-overview"><div class="ov-lbl">Catalog entry &mdash; no steps modeled yet</div>'
+    + (chips ? '<div class="ov-chips">' + chips + "</div>" : "") + desc + learn + "</div>";
+}
 function renderEmptyFlow(m) {
   var uid = m.id.replace(/[^A-Za-z0-9]/g, "_"), cy = LANE + NH / 2;
+  var ov = processOverview(m);
   var sx = PAD + R, ex = sx + 200, W = ex + R + PAD, H = LANE + NH + 18;
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">'
+  var hint = ov ? "add steps to model it" : "drag a step here";
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">'
     + '<defs><marker id="ah_' + uid + '" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" class="arrow"/></marker></defs>'
     + '<circle class="tip start" cx="' + sx + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + sx + '" y="' + (cy + 3) + '" text-anchor="middle">start</text>'
     + '<line class="conn" x1="' + (sx + R) + '" y1="' + cy + '" x2="' + (ex - R) + '" y2="' + cy + '" marker-end="url(#ah_' + uid + ')"/>'
-    + '<text class="hintmsg" x="' + ((sx + ex) / 2) + '" y="' + (cy - 12) + '" text-anchor="middle">drag a step here</text>'
+    + '<text class="hintmsg" x="' + ((sx + ex) / 2) + '" y="' + (cy - 12) + '" text-anchor="middle">' + hint + "</text>"
     + '<circle class="tip end" cx="' + ex + '" cy="' + cy + '" r="' + R + '"/><text class="tip" x="' + ex + '" y="' + (cy + 3) + '" text-anchor="middle">end</text></svg>';
+  return ov + svg;
 }
 // resolve each task's position: saved layout, else an auto left-to-right flow
 function nodePos(m) {
