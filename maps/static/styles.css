@@ -673,3 +673,11 @@ label.ck input { width: auto; margin: 0; }
   border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; box-sizing: border-box; }
 #who-body label.ck { display: flex; align-items: center; gap: 8px; }
 #who-body label.ck input { width: auto; margin: 0; }
+
+/* ── Phase 3: X-matrix inline edit pencils + add-initiative ─────────── */
+.strat-edit.sx { font-size: 10px; opacity: .55; padding: 0 2px; }
+.strat-edit.sx:hover { opacity: 1; }
+.nx-addinit { width: 20px; height: 20px; line-height: 1; border: 1px dashed var(--line);
+  background: transparent; color: var(--fg); border-radius: 6px; cursor: pointer; opacity: .7;
+  font-size: 14px; margin: 2px; }
+.nx-addinit:hover { opacity: 1; border-style: solid; }
