@@ -16,18 +16,27 @@ function renderArchitecture(A) {
       + (p.objective_refs && p.objective_refs.length ? " · <b>" + p.objective_refs.length + " objective</b>" : "")
       + (p.custom && Object.keys(p.custom).length ? " · " + Object.keys(p.custom).length + " field" : "") + "</div></div>";
   }
+  var big = A.process_total > 60;                 // collapse the tree by default past this
+  var exp = state.archExpanded || {};
   function node(n) {
-    var kids = (n.children || []).map(node).join("");
-    var procs = (n.processes || []).map(proc).join("");
-    return '<div class="agroup" data-lvl="' + n.level + '">'
-      + '<div class="aghead"><span class="aglvl">L' + n.level + "</span>"
+    var hasKids = (n.children && n.children.length) || (n.processes && n.processes.length);
+    var open = !big || exp[n.id];
+    var caret = (big && hasKids) ? '<span class="agcaret">' + (open ? "▾" : "▸") + "</span>" : '<span class="agcaret"></span>';
+    var head = '<div class="aghead' + (big && hasKids ? " toggle" : "") + '" data-grp="' + esc(n.id) + '">'
+      + caret + '<span class="aglvl">L' + n.level + "</span>"
       + '<span class="agname">' + esc(n.name) + "</span>"
       + '<span class="agid">' + esc(n.id) + "</span>"
       + (n.owner_role ? '<span class="agowner">owner ' + esc(shortRole(n.owner_role)) + "</span>" : "")
       + (n.objective_refs && n.objective_refs.length ? '<span class="agobj">' + n.objective_refs.length + " objective</span>" : "")
-      + '<button class="mini agmd" type="button" data-group="' + esc(n.id) + '">Master data</button></div>'
-      + (n.description ? '<div class="agdesc">' + esc(n.description) + "</div>" : "")
-      + '<div class="agbody">' + kids + (procs ? '<div class="apcards">' + procs + "</div>" : "") + "</div></div>";
+      + '<button class="mini agmd" type="button" data-group="' + esc(n.id) + '">Master data</button></div>';
+    var body = "";
+    if (open) {
+      var kids = (n.children || []).map(node).join("");
+      var procs = (n.processes || []).map(proc).join("");
+      body = (n.description ? '<div class="agdesc">' + esc(n.description) + "</div>" : "")
+        + '<div class="agbody">' + kids + (procs ? '<div class="apcards">' + procs + "</div>" : "") + "</div>";
+    }
+    return '<div class="agroup' + (open ? "" : " collapsed") + '" data-lvl="' + n.level + '">' + head + body + "</div>";
   }
   var roots = (A.roots || []).map(node).join("");
   var orphans = A.orphans && A.orphans.length
@@ -44,6 +53,15 @@ function wireArchitecture() {
   });
   c.querySelectorAll(".agmd").forEach(function (b) {
     b.addEventListener("click", function (e) { e.stopPropagation(); openMasterData("group", b.getAttribute("data-group")); });
+  });
+  c.querySelectorAll(".aghead.toggle").forEach(function (h) {
+    h.addEventListener("click", function (e) {
+      if (e.target.closest(".agmd")) return;
+      var id = h.getAttribute("data-grp");
+      state.archExpanded = state.archExpanded || {};
+      state.archExpanded[id] = !state.archExpanded[id];
+      renderCenter();
+    });
   });
 }
 

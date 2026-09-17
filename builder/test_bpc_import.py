@@ -66,6 +66,20 @@ def main():
     gv = Draft202012Validator(json.load(open(os.path.join(SD, "process-group.schema.json"))))
     check("every process is schema-valid", not [e for p in procs.values() for e in pv.iter_errors(p)])
     check("every group is schema-valid", not [e for g in groups.values() for e in gv.iter_errors(g)])
+    grv = Draft202012Validator(json.load(open(os.path.join(SD, "guardrail-policy.schema.json"))))
+    check("the shared default guardrail is schema-valid",
+          not list(grv.iter_errors(seed["GuardrailPolicy"][0])))
+
+    # --- full catalog: prefix is a {e2e -> prefix} map, per-row resolution -----
+    multi = bpc.build_seed(
+        [{"type": "End to end", "seq": "65.00.000.000", "title": "65 Order to cash"},
+         {"type": "Scenario", "seq": "65.05.010.100", "title": "65.05.010.100 A"},
+         {"type": "End to end", "seq": "75.00.000.000", "title": "75 Source to pay"},
+         {"type": "Scenario", "seq": "75.05.010.100", "title": "75.05.010.100 B"}],
+        bpc.E2E_PREFIX, "full")
+    mids = {p["id"] for p in multi["Process"]}
+    check("full-catalog import prefixes each chain distinctly",
+          "OC.5.10.100" in mids and "SP.5.10.100" in mids)
 
     # --- multi-model: write it as a model, fold it, toggle back ---------------
     with tempfile.TemporaryDirectory() as tmp:

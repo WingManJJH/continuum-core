@@ -44,13 +44,54 @@ function load() {
 }
 load().catch(function (e) { $("#canvas").innerHTML = '<div class="muted">failed to load: ' + esc(e) + "</div>"; });
 
+var NAV_CAP = 200;  // don't paint thousands of DOM nodes — search narrows instead
 function renderNav() {
-  $("#proc-list").innerHTML = state.procs.map(function (p) {
+  var q = (state.navQuery || "").trim().toLowerCase();
+  var all = state.procs || [];
+  var list = q ? all.filter(function (p) {
+    return p.id.toLowerCase().indexOf(q) >= 0 || (p.name || "").toLowerCase().indexOf(q) >= 0;
+  }) : all;
+  var shown = list.slice(0, NAV_CAP);
+  var countEl = $("#proc-count");
+  if (countEl) {
+    if (all.length > NAV_CAP && !q) {
+      countEl.textContent = all.length.toLocaleString() + " processes — type to search"; countEl.hidden = false;
+    } else if (list.length > shown.length) {
+      countEl.textContent = "showing " + shown.length + " of " + list.length.toLocaleString() + " — refine search"; countEl.hidden = false;
+    } else if (q) {
+      countEl.textContent = list.length + " match" + (list.length === 1 ? "" : "es"); countEl.hidden = false;
+    } else { countEl.hidden = true; }
+  }
+  // on a large model with no query, show top-level domains as a jumping-off point
+  if (all.length > NAV_CAP && !q) {
+    var doms = {};
+    all.forEach(function (p) { var d = p.id.slice(0, 2); doms[d] = (doms[d] || 0) + 1; });
+    $("#proc-list").innerHTML = Object.keys(doms).sort().map(function (d) {
+      return '<li class="navdom" data-domq="' + esc(d) + '"><div class="pid">' + esc(d)
+        + '</div><div class="pnm">' + doms[d] + " processes</div></li>";
+    }).join("");
+    return;
+  }
+  $("#proc-list").innerHTML = shown.map(function (p) {
     return '<li data-p="' + esc(p.id) + '" class="' + (p.id === state.sel ? "active" : "") + '">'
       + '<div class="pid">' + esc(p.id) + '</div><div class="pnm">' + esc(p.name) + "</div></li>";
-  }).join("");
+  }).join("") || '<li class="muted">no matches</li>';
 }
+(function () {
+  var s = document.getElementById("proc-search"); if (!s) return;
+  var t;
+  s.addEventListener("input", function () {
+    clearTimeout(t);
+    t = setTimeout(function () { state.navQuery = s.value; renderNav(); }, 120);
+  });
+})();
 $("#proc-list").addEventListener("click", function (e) {
+  var dom = e.target.closest("li[data-domq]");
+  if (dom) {   // drilling a domain on a large model narrows the search to it
+    var s = document.getElementById("proc-search");
+    state.navQuery = dom.getAttribute("data-domq"); if (s) s.value = state.navQuery;
+    renderNav(); return;
+  }
   var li = e.target.closest("li[data-p]"); if (!li) return;
   state.sel = li.getAttribute("data-p"); state.task = null; state.gwsel = null; state.nav = [];
   renderNav(); renderTitle(); renderCenter(); renderProps();
@@ -639,21 +680,36 @@ function chainSvg(chain) {
   return '<div class="vs-scroll">' + s.join("") + "</div>" + note;
 }
 function renderLandscape(L) {
+  function pcard(p) {
+    var ai = p.agent_steps ? p.agent_steps + " AI &middot; " : "";
+    return '<div class="pcard" data-open="' + esc(p.id) + '">'
+      + '<div class="pcid">' + esc(p.id) + "</div>"
+      + '<div class="pcname">' + esc(p.name) + "</div>"
+      + '<div class="pcmeta">' + p.steps + " steps &middot; " + ai + "owner " + esc(shortRole(p.owner)) + "</div>"
+      + '<div class="pcbadges"><span class="gdot ' + (p.reviewed ? "good" : "warn") + '"></span>'
+      + (p.reviewed ? "reviewed guardrail" : "default guardrail")
+      + (p.risks ? ' &middot; <span class="rtag">' + p.risks + " risk</span>" : "")
+      + (p.kpis ? " &middot; " + p.kpis + " KPI" : "") + "</div></div>";
+  }
+  var q = (state.lsQuery || "").trim().toLowerCase();
+  var big = L.processes_total > 60;   // collapse domains by default past this
+  var DCAP = 48;                      // cards rendered per domain before "show all"
+  var expanded = state.lsExpanded || {};
   var house = L.domains.map(function (d) {
-    var cards = d.processes.map(function (p) {
-      var ai = p.agent_steps ? p.agent_steps + " AI &middot; " : "";
-      return '<div class="pcard" data-open="' + esc(p.id) + '">'
-        + '<div class="pcid">' + esc(p.id) + "</div>"
-        + '<div class="pcname">' + esc(p.name) + "</div>"
-        + '<div class="pcmeta">' + p.steps + " steps &middot; " + ai + "owner " + esc(shortRole(p.owner)) + "</div>"
-        + '<div class="pcbadges"><span class="gdot ' + (p.reviewed ? "good" : "warn") + '"></span>'
-        + (p.reviewed ? "reviewed guardrail" : "default guardrail")
-        + (p.risks ? ' &middot; <span class="rtag">' + p.risks + " risk</span>" : "")
-        + (p.kpis ? " &middot; " + p.kpis + " KPI" : "") + "</div></div>";
-    }).join("");
-    return '<section class="domain"><h3><span class="dcode">' + esc(d.code) + '</span> ' + esc(d.name)
-      + ' <span class="dcount">' + d.processes.length + "</span></h3>"
-      + '<div class="pcards">' + cards + "</div></section>";
+    var procs = d.processes;
+    if (q) procs = procs.filter(function (p) { return p.id.toLowerCase().indexOf(q) >= 0 || (p.name || "").toLowerCase().indexOf(q) >= 0; });
+    if (!procs.length) return "";
+    var open = q ? true : (!big || expanded[d.code]);
+    var head = '<h3 class="dhead' + (big && !q ? " toggle" : "") + '" data-dom="' + esc(d.code) + '">'
+      + (big && !q ? '<span class="caret">' + (open ? "▾" : "▸") + "</span> " : "")
+      + '<span class="dcode">' + esc(d.code) + '</span> ' + esc(d.name)
+      + ' <span class="dcount">' + procs.length + "</span></h3>";
+    if (!open) return '<section class="domain collapsed">' + head + "</section>";
+    var full = q || (state.lsFull && state.lsFull[d.code]);
+    var cap = full ? procs.length : DCAP;
+    var cards = procs.slice(0, cap).map(pcard).join("");
+    var more = procs.length > cap ? '<div class="ls-more-wrap"><button class="ls-more" data-dom="' + esc(d.code) + '">Show all ' + procs.length + " &rarr;</button></div>" : "";
+    return '<section class="domain">' + head + '<div class="pcards">' + cards + "</div>" + more + "</section>";
   }).join("");
   var C = L.catalogs;
   function catcol(title, rows) { return '<div class="catcol"><h4>' + title + "</h4>" + rows + "</div>"; }
@@ -669,11 +725,20 @@ function renderLandscape(L) {
     return '<div class="catrow"><div class="catmain"><span class="catname" title="' + esc(x.risk) + '">' + esc(x.id) + '</span></div>'
       + '<div class="catprocs">' + pchips([x.process]) + "</div></div>";
   }).join("");
+  var vsSec = "";  // the value stream is only legible up to a point; past it, prompt to search
+  if (!L.chain || L.chain.nodes.length <= 80) {
+    vsSec = '<div class="vs-sec"><div class="catshead">Value stream &mdash; how work flows end&rarr;start across processes'
+      + '<span class="vs-legend"><span class="vs-key orig"></span> origination <span class="vs-key term"></span> terminal</span></div>'
+      + chainSvg(L.chain) + "</div>";
+  } else {
+    vsSec = '<div class="vs-sec"><div class="catshead">Value stream</div>'
+      + '<div class="vs-empty muted">This model has ' + L.chain.nodes.length + " linked processes across " + L.chain.stages
+      + " stages &mdash; too many to draw at once. Open a chain from the house below to follow its hand-offs.</div></div>";
+  }
   return '<div class="landscape">'
-    + '<div class="lshead">Process landscape &mdash; <b>' + L.processes_total + "</b> processes across <b>" + L.domains.length + "</b> APQC domains. Click any process to open it.</div>"
-    + '<div class="vs-sec"><div class="catshead">Value stream &mdash; how work flows end&rarr;start across processes'
-    + '<span class="vs-legend"><span class="vs-key orig"></span> origination <span class="vs-key term"></span> terminal</span></div>'
-    + chainSvg(L.chain) + "</div>"
+    + '<div class="lshead">Process landscape &mdash; <b>' + L.processes_total.toLocaleString() + "</b> processes across <b>" + L.domains.length + "</b> domains. Click any process to open it.</div>"
+    + '<input id="ls-search" class="ls-search" type="search" placeholder="Search all processes…" value="' + esc(state.lsQuery || "") + '" autocomplete="off">'
+    + vsSec
     + '<div class="house">' + house + "</div>"
     + '<div class="catalogs"><div class="catshead">Catalogs &mdash; what threads across the org</div><div class="catgrid">'
     + catcol("Roles (" + C.roles.length + ")", roleRows)
@@ -686,6 +751,34 @@ function wireLandscape() {
   c.querySelectorAll("[data-open]").forEach(function (el) {
     el.addEventListener("click", function () { openProcess(el.getAttribute("data-open")); });
   });
+  // collapse / expand a domain
+  c.querySelectorAll("h3.dhead.toggle").forEach(function (h) {
+    h.addEventListener("click", function () {
+      var d = h.getAttribute("data-dom");
+      state.lsExpanded = state.lsExpanded || {};
+      state.lsExpanded[d] = !state.lsExpanded[d];
+      renderCenter();
+    });
+  });
+  // "show all N" within a domain
+  c.querySelectorAll(".ls-more").forEach(function (b) {
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      state.lsFull = state.lsFull || {}; state.lsFull[b.getAttribute("data-dom")] = true; renderCenter();
+    });
+  });
+  // search across the whole landscape
+  var s = document.getElementById("ls-search");
+  if (s) {
+    var t;
+    s.addEventListener("input", function () {
+      clearTimeout(t);
+      t = setTimeout(function () {
+        state.lsQuery = s.value; renderCenter();
+        var again = document.getElementById("ls-search"); if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      }, 160);
+    });
+  }
 }
 var lsBtn = document.getElementById("landscape-btn");
 if (lsBtn) lsBtn.addEventListener("click", function () {
@@ -1169,6 +1262,8 @@ function saveGuardrail(e) {
         // a different model = a different world: drop caches and reload from the top
         state.landscape = null; state.architecture = null; state.strategy = null;
         state.sel = null; state.task = null; state.nav = []; state.view = "landscape";
+        state.navQuery = ""; state.lsQuery = ""; state.lsExpanded = {}; state.lsFull = {}; state.archExpanded = {};
+        var ps = document.getElementById("proc-search"); if (ps) ps.value = "";
         fill(res.models || [], res.active);
         load().then(function () { renderCenter(); });
       });
