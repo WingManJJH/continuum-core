@@ -78,25 +78,29 @@ function xGrid(rows, cols, type, abFn, L, justify) {
     + 'grid-template-rows:repeat(' + (rows.length || 1) + ',' + XCELL + 'px);gap:' + XGAP + 'px;'
     + (justify === "end" ? "justify-content:flex-end;" : "") + '">' + cells + "</div>";
 }
+function _xPen(kind, id) {
+  return kind ? ' <button class="strat-edit sx" data-strat-edit="' + kind + '" data-strat-id="' + esc(id) + '" title="Edit">✎</button>' : "";
+}
 // a vertical (rotated) axis card — objectives / metrics / owners
-function vCard(id, label, cls, extra) {
-  return '<div class="vcard ' + cls + '" ' + (extra || "") + ' style="height:' + XAXIS + 'px"><span class="vtext">' + esc(label) + "</span></div>";
+function vCard(id, label, cls, extra, editKind) {
+  return '<div class="vcard ' + cls + '" ' + (extra || "") + ' style="height:' + XAXIS + 'px"><span class="vtext">' + esc(label) + _xPen(editKind, id) + "</span></div>";
 }
 // a horizontal axis card — initiatives / goals
-function hCard(id, label, cls, extra) {
-  return '<div class="hcard ' + cls + '" ' + (extra || "") + "><span>" + esc(label) + "</span></div>";
+function hCard(id, label, cls, extra, editKind) {
+  return '<div class="hcard ' + cls + '" ' + (extra || "") + "><span>" + esc(label) + _xPen(editKind, id) + "</span></div>";
 }
 function renderXMatrix(X) {
   var O = X.objectives, G = X.goals, I = X.initiatives, M = X.metrics, W = X.owners, L = X.links;
-  var objCards = O.map(function (o) { return vCard(o.id, o.name, "nx-obj rot", 'data-obj="' + esc(o.id) + '"'); }).join("");
+  var objCards = O.map(function (o) { return vCard(o.id, o.name, "nx-obj rot", 'data-obj="' + esc(o.id) + '"', "objective"); }).join("");
   var metCards = M.map(function (m) {
     var st = m.status === "on_target" ? "good" : m.status === "off_target" ? "crit" : "";
     var lbl = m.name + " · " + (m.value == null ? "—" : m.value) + "/" + m.target + (m.status === "off_target" ? " ✗" : m.status === "on_target" ? " ✓" : "");
-    return vCard(m.id, lbl, "nx-met " + st, 'data-kpi="' + esc(m.id) + '"');
+    return vCard(m.id, lbl, "nx-met " + st, 'data-kpi="' + esc(m.id) + '"', "kpi");
   }).join("");
-  var ownCards = W.map(function (o) { return vCard(o.id, o.name, "nx-own rot", ""); }).join("");
-  var initCards = I.map(function (it) { return hCard(it.id, it.name, "nx-init", ""); }).join("");
-  var goalCards = G.map(function (g) { return hCard(g.id, g.name, "nx-goal", 'data-obj="' + esc(g.id) + '"'); }).join("");
+  var ownCards = W.map(function (o) { return vCard(o.id, o.name, "nx-own rot", "", "role"); }).join("");
+  var initCards = I.map(function (it) { return hCard(it.id, it.name, "nx-init", "", "initiative"); }).join("")
+    + '<button class="nx-addinit" data-strat-add="initiative" title="Add an initiative">+</button>';
+  var goalCards = G.map(function (g) { return hCard(g.id, g.name, "nx-goal", 'data-obj="' + esc(g.id) + '"', "objective"); }).join("");
 
   var A = xGrid(I, O, "init_obj", function (it, o) { return [it.id, o.id]; }, L);              // init(rows) × obj(cols)
   var C = xGrid(I, M, "init_metric", function (it, m) { return [it.id, m.id]; }, L);           // init × metric
@@ -179,12 +183,18 @@ function wireStrategy() {
   c.querySelectorAll("[data-open]").forEach(function (el) {
     el.addEventListener("click", function () { openProcess(el.getAttribute("data-open")); });
   });
-  // pencil → open the strategy entity editor (gated like every other edit)
+  // pencil → open the right editor (gated like every other edit). Owners are
+  // roles, so they open the role drawer; everything else the strategy editor.
   c.querySelectorAll(".strat-edit").forEach(function (b) {
     b.addEventListener("click", function (e) {
       e.stopPropagation();
-      openStratEdit(b.getAttribute("data-strat-edit"), b.getAttribute("data-strat-id") || "");
+      var kind = b.getAttribute("data-strat-edit"), id = b.getAttribute("data-strat-id") || "";
+      if (kind === "role") { if (typeof openRoleDrawer === "function") openRoleDrawer(id); }
+      else openStratEdit(kind, id);
     });
+  });
+  c.querySelectorAll("[data-strat-add]").forEach(function (b) {
+    b.addEventListener("click", function (e) { e.stopPropagation(); openStratEdit(b.getAttribute("data-strat-add"), ""); });
   });
   // click an objective anywhere -> highlight it + its processes across the view
   c.querySelectorAll("[data-obj]").forEach(function (el) {
@@ -208,6 +218,10 @@ function _stratEntity(kind, id) {
   var S = state.strategy && state.strategy.strategy; if (!S) return null;
   if (kind === "enterprise") return S.enterprise || {};
   if (kind === "objective") return (S.objectives || []).find(function (o) { return o.id === id; }) || null;
+  if (kind === "initiative") {
+    var X = state.strategy && state.strategy.xmatrix;
+    return (X && X.initiatives || []).find(function (it) { return it.id === id; }) || null;
+  }
   if (kind === "kpi") {
     for (var i = 0; i < (S.objectives || []).length; i++) {
       var f = _findKpi(S.objectives[i].kpis, id); if (f) return f;
@@ -219,13 +233,15 @@ var STRAT_META = {
   enterprise: { entity: "Enterprise", op: "edit_enterprise", label: "Enterprise" },
   objective:  { entity: "StrategicObjective", op: "edit_objective", label: "Objective" },
   kpi:        { entity: "KPI", op: "edit_kpi", label: "KPI" },
+  initiative: { entity: "Initiative", op: "edit_initiative", label: "Initiative" },
 };
 function openStratEdit(kind, id) {
   var meta = STRAT_META[kind]; if (!meta) return;
-  var e = _stratEntity(kind, id);
+  var adding = kind === "initiative" && !id;   // + Add initiative (no id yet)
+  var e = adding ? { name: "", description: "" } : _stratEntity(kind, id);
   if (!e) { alert("Could not find that item — try reloading the strategy view."); return; }
   var modal = document.getElementById("strat-modal"), body = document.getElementById("strat-body");
-  document.getElementById("strat-title").textContent = "Edit " + meta.label + (id ? " · " + id : "");
+  document.getElementById("strat-title").textContent = (adding ? "Add " : "Edit ") + meta.label + (id ? " · " + id : "");
   var fields = "";
   if (kind === "enterprise") {
     fields = '<label>Mission<textarea id="se-mission" rows="2">' + esc(e.mission || "") + "</textarea></label>"
@@ -233,6 +249,9 @@ function openStratEdit(kind, id) {
       + '<label>Values <span class="hint">comma-separated</span><input id="se-values" value="' + esc((e.values || []).join(", ")) + '"></label>';
   } else if (kind === "objective") {
     fields = '<label>Name<input id="se-name" value="' + esc(e.name || "") + '"></label>';
+  } else if (kind === "initiative") {
+    fields = '<label>Name<input id="se-name" value="' + esc(e.name || "") + '"></label>'
+      + '<label>Description<textarea id="se-desc" rows="2">' + esc(e.description || "") + "</textarea></label>";
   } else {  // kpi
     fields = '<label>Name<input id="se-name" value="' + esc(e.name || "") + '"></label>'
       + '<label>Target<input id="se-target" value="' + esc(e.target == null ? "" : String(e.target)) + '"></label>';
@@ -246,13 +265,20 @@ function openStratEdit(kind, id) {
   document.getElementById("se-cancel").onclick = function () { modal.hidden = true; };
   document.getElementById("strat-form").onsubmit = function (ev) {
     ev.preventDefault();
-    var changes = {};
+    var changes = {}, newId = id;
     if (kind === "enterprise") {
       changes = { mission: document.getElementById("se-mission").value.trim(),
                   vision: document.getElementById("se-vision").value.trim(),
                   values: parseCsv(document.getElementById("se-values").value) };
     } else if (kind === "objective") {
       changes = { name: document.getElementById("se-name").value.trim() };
+    } else if (kind === "initiative") {
+      changes = { name: document.getElementById("se-name").value.trim(),
+                  description: document.getElementById("se-desc").value.trim() };
+      if (adding) {
+        if (!changes.name) { alert("An initiative needs a name."); return; }
+        newId = "init." + changes.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      }
     } else {
       changes = { name: document.getElementById("se-name").value.trim() };
       var tv = document.getElementById("se-target").value.trim();
@@ -261,17 +287,24 @@ function openStratEdit(kind, id) {
     var reason = document.getElementById("se-reason").value.trim();
     var msg = document.getElementById("strat-msg");
     // build the gated proposal args to match each store method's signature
+    var gateOp = adding ? "add_initiative" : meta.op;
     var args = kind === "enterprise" ? { changes: changes }
              : kind === "objective" ? { obj_id: id, changes: changes }
+             : kind === "initiative" ? (adding ? { init_id: newId, name: changes.name, description: changes.description }
+                                               : { init_id: id, changes: changes })
              : { kpi_id: id, changes: changes };
     if (typeof routeThroughGate === "function" && routeThroughGate(
-        meta.entity, document.getElementById("strat-form"), meta.op, args,
-        meta.label + " change" + (id ? " · " + id : ""), reason, msg)) {
+        meta.entity, document.getElementById("strat-form"), gateOp, args,
+        (adding ? "New " : "") + meta.label + (id ? " · " + id : ""), reason, msg)) {
       return;
     }
     // direct save
-    var endpoint = kind === "enterprise" ? "/api/enterprise" : kind === "objective" ? "/api/objective" : "/api/kpi";
+    var endpoint = kind === "enterprise" ? "/api/enterprise" : kind === "objective" ? "/api/objective"
+                 : kind === "initiative" ? "/api/initiative" : "/api/kpi";
     var payload = kind === "enterprise" ? { changes: changes, actor: ACTOR, reason: reason }
+                : kind === "initiative" ? (adding
+                    ? { op: "add", id: newId, name: changes.name, description: changes.description, actor: ACTOR, reason: reason }
+                    : { op: "edit", id: id, changes: changes, actor: ACTOR, reason: reason })
                 : { id: id, changes: changes, actor: ACTOR, reason: reason };
     fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); }).then(function (res) {
