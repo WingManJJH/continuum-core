@@ -129,9 +129,18 @@ class Handler(BaseHTTPRequestHandler):
                                         "revoked, or expired."}, 404)
             return self._json({"ok": True, "view": view})
         if u.path == "/api/stream":
-            # Server-Sent Events: push "changed" whenever the governed model's
-            # change log grows, so every open board/canvas refreshes live. Each
-            # connection runs in its own thread (ThreadingHTTPServer).
+            # Server-Sent Events: watch the three governance logs and push a typed
+            # event when any grows, so every open board/canvas reflects a model
+            # edit ("changed"), a new/decided change request ("approvals"), or an
+            # approval-policy change ("policy") live. Each connection runs in its
+            # own thread (ThreadingHTTPServer).
+            def _size(p):
+                try:
+                    return os.path.getsize(p) if os.path.exists(p) else 0
+                except OSError:
+                    return 0
+            watched = [("changed", cc.EDITS_LOG), ("approvals", QUEUE.log_path),
+                       ("policy", POLICY.log_path)]
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
@@ -139,17 +148,19 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Connection", "keep-alive")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
-                log = cc.EDITS_LOG
-                last = os.path.getsize(log) if os.path.exists(log) else 0
+                last = {name: _size(p) for name, p in watched}
                 self.wfile.write(b"retry: 3000\ndata: hello\n\n")
                 self.wfile.flush()
                 while True:
                     time.sleep(1.5)
-                    cur = os.path.getsize(log) if os.path.exists(log) else 0
-                    if cur != last:
-                        last = cur
-                        self.wfile.write(b"data: changed\n\n")
-                    else:
+                    emitted = False
+                    for name, p in watched:
+                        cur = _size(p)
+                        if cur != last[name]:
+                            last[name] = cur
+                            self.wfile.write(("data: %s\n\n" % name).encode())
+                            emitted = True
+                    if not emitted:
                         self.wfile.write(b": ping\n\n")   # comment heartbeat keeps the socket alive
                     self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, OSError):
@@ -211,7 +222,11 @@ class Handler(BaseHTTPRequestHandler):
                 if op == "propose":
                     cr = QUEUE.propose(b.get("target_op", ""), b.get("args", {}) or {},
                                        proposed_by=actor, reason=reason,
-                                       title=b.get("title", ""), target=b.get("target", ""))
+                                       title=b.get("title", ""), target=b.get("target", ""),
+                                       assignee=b.get("assignee", ""))
+                elif op == "assign":
+                    cr = QUEUE.assign(b.get("id", ""), b.get("assignee", ""), actor=actor,
+                                      reason=reason or "reassigned change request")
                 elif op == "approve":
                     cr = QUEUE.approve(b.get("id", ""), reviewer=b.get("reviewer", actor),
                                        decision_reason=b.get("decision_reason", ""))

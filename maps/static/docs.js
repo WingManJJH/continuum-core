@@ -51,7 +51,8 @@ var DOCS = [
     + "<p>A reviewer opens the queue and <b>Approves</b> it — which applies the change through the exact same audited, versioned, hash-chained path a direct edit uses — or <b>Rejects</b> it with a reason (no model change). The proposer can <b>Withdraw</b> a request they no longer want.</p>"
     + "<ul><li><b>Separation of duties</b> is recorded: if the reviewer is also the proposer the decision is allowed but flagged <b>self-approved</b> on the trail.</li>"
     + "<li>If the model moved on and a queued change no longer applies cleanly, Approve surfaces the reason and leaves the request pending.</li>"
-    + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li></ul>"
+    + "<li>Every proposal, approval, rejection and withdrawal is itself an event on a tamper-evident chain.</li>"
+    + "<li>A request can be <b>assigned</b> to a reviewer (a role), and the queue is <b>live</b> — a new request pops a toast and updates the badge in every open window without a reload.</li></ul>"
     + "<p><b>Policy — which changes need review.</b> The <b>Policy</b> tab in the Approvals window sets a mode per kind of change: <b>required</b> (a direct edit is refused — it must be submitted), <b>optional</b> (the editor offers the “Submit for approval” choice), or <b>off</b> (commits directly). The gate toggle appears on the guardrail, role, and master-data (process / hierarchy) editors; setting a kind to <i>required</i> forces every one of its edits through review. Changing the policy is itself governed (who / when / why).</p>" },
 
   { id: "board", title: "Live board (Present mode)", html:

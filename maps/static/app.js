@@ -1371,6 +1371,11 @@ function refreshLive() {
   var es;
   try { es = new EventSource("/api/stream"); } catch (e) { return; }
   es.onopen = function () { setLive(true); };
-  es.onmessage = function (e) { if (e.data === "changed") { setLive(true); refreshLive(); } };
+  es.onmessage = function (e) {
+    setLive(true);
+    if (e.data === "changed") { refreshLive(); }                       // model edit
+    else if (e.data === "approvals") { if (typeof onApprovalsChanged === "function") onApprovalsChanged(); }
+    else if (e.data === "policy") { if (typeof onPolicyChanged === "function") onPolicyChanged(); }
+  };
   es.onerror = function () { setLive(false); };   // EventSource auto-reconnects
 })();

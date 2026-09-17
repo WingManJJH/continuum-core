@@ -11,15 +11,26 @@ function _apTs(ts) { try { return new Date(ts).toLocaleString(); } catch (e) { r
 
 // Submit a change for approval (used by the guardrail editor's "Submit for
 // approval" path and reusable for any gated op). Returns the fetch promise.
-function proposeChange(targetOp, args, title, reason) {
+function proposeChange(targetOp, args, title, reason, assignee) {
   return fetch("/api/approvals", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ op: "propose", target_op: targetOp, args: args,
-      title: title, actor: APPR_PROPOSER, reason: reason }),
+      title: title, actor: APPR_PROPOSER, reason: reason,
+      assignee: assignee || APPR_REVIEWER }),   // default reviewer owns it
   }).then(function (r) { return r.json(); }).then(function (res) {
     refreshApprovalsBadge();
     return res;
   });
+}
+
+// roles (for the reassign picker), fetched lazily and cached
+var _apprRoles = null;
+function loadApprRoles() {
+  if (_apprRoles) return Promise.resolve(_apprRoles);
+  return fetch("/api/roles").then(function (r) { return r.json(); }).then(function (d) {
+    _apprRoles = (d.roles || []).map(function (r) { return { id: r.id, name: r.name }; });
+    return _apprRoles;
+  }).catch(function () { _apprRoles = []; return _apprRoles; });
 }
 
 // ---- approval policy (which entity types need review) --------------------
@@ -66,6 +77,7 @@ function routeThroughGate(entity, containerEl, targetOp, args, title, reason, ms
   return true;
 }
 
+var _lastPending = null;
 function refreshApprovalsBadge() {
   var badge = document.getElementById("appr-badge");
   if (!badge) return Promise.resolve(0);
@@ -73,8 +85,37 @@ function refreshApprovalsBadge() {
     var n = d.pending || 0;
     badge.textContent = n;
     badge.hidden = n === 0;
+    _lastPending = n;
     return n;
   }).catch(function () { return 0; });
+}
+
+// ---- live handlers (typed SSE events) ------------------------------------
+function apprToast(msg) {
+  var t = document.getElementById("appr-toast");
+  if (!t) { t = document.createElement("div"); t.id = "appr-toast"; t.className = "appr-toast"; document.body.appendChild(t); }
+  t.innerHTML = '<b>Approvals</b> ' + esc(msg) + ' <button type="button" id="appr-toast-open">Review</button>';
+  t.classList.add("show");
+  var open = document.getElementById("appr-toast-open");
+  if (open) open.onclick = function () { t.classList.remove("show"); openApprovals(); };
+  clearTimeout(apprToast._t);
+  apprToast._t = setTimeout(function () { t.classList.remove("show"); }, 6000);
+}
+function onApprovalsChanged() {
+  var prev = _lastPending;
+  refreshApprovalsBadge().then(function (n) {
+    if (prev != null && n > prev) apprToast(n === 1 ? "A change is awaiting review." : n + " changes are awaiting review.");
+  });
+  var modal = document.getElementById("appr-modal");
+  if (modal && !modal.hidden && _apprFilter !== "policy") loadApprovals();
+}
+function onPolicyChanged() {
+  loadGatePolicy().then(function () {
+    // re-render an open editor so its gate control reflects the new policy
+    if (typeof renderProps === "function" && document.getElementById("gr-form")) renderProps();
+    var modal = document.getElementById("appr-modal");
+    if (modal && !modal.hidden && _apprFilter === "policy") renderPolicy();
+  });
 }
 
 function _apDecision(cr) {
@@ -90,7 +131,7 @@ function renderApprovals(list, filter) {
   if (!list.length) {
     return '<div class="muted" style="padding:12px">' +
       (filter === "pending" ? "No changes are waiting for review." : "No change requests yet.") +
-      " Changes can be submitted for approval from the guardrail editor (“Submit for approval”).</div>";
+      " Changes can be submitted from the guardrail, role, and master-data editors (“Submit for approval”).</div>";
   }
   return list.map(function (cr) {
     var badge = '<span class="appr-st st-' + esc(cr.status) + '">' + esc(cr.status) + "</span>";
@@ -101,12 +142,25 @@ function renderApprovals(list, filter) {
       var ch = a.changes ? Object.keys(a.changes).join(", ") : "";
       argPreview = (t ? "<code>" + esc(t) + "</code>" : "") + (ch ? ' <span class="muted">— ' + esc(ch) + "</span>" : "");
     } catch (e) { argPreview = ""; }
-    var actions = "";
+    var actions = "", assignRow = "";
     if (cr.status === "pending") {
+      var roleList = (_apprRoles || []).slice();
+      // keep the current assignee selectable even if it isn't a HumanRole (e.g. a
+      // governance/reviewer role that lives outside the roles master list)
+      if (cr.assignee && !roleList.some(function (r) { return r.id === cr.assignee; })) {
+        roleList.unshift({ id: cr.assignee, name: _apShort(cr.assignee) });
+      }
+      var opts = '<option value="">— unassigned —</option>' + roleList.map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === cr.assignee ? " selected" : "") + ">" + esc(r.name) + "</option>";
+      }).join("");
+      assignRow = '<div class="appr-assign"><span class="muted">Assigned to</span>'
+        + '<select class="appr-assignee" data-id="' + esc(cr.id) + '">' + opts + "</select></div>";
       actions = '<div class="appr-actions">'
         + '<button class="save appr-approve" data-id="' + esc(cr.id) + '">Approve</button>'
         + '<button class="ghost appr-reject" data-id="' + esc(cr.id) + '">Reject</button>'
         + '<button class="ghost appr-withdraw" data-id="' + esc(cr.id) + '">Withdraw</button></div>';
+    } else if (cr.assignee) {
+      assignRow = '<div class="appr-meta">was assigned to ' + esc(_apShort(cr.assignee)) + "</div>";
     }
     return '<div class="appr-card">'
       + '<div class="appr-top">' + badge + '<b>' + esc(cr.title || cr.op) + "</b> "
@@ -114,6 +168,7 @@ function renderApprovals(list, filter) {
       + '<div class="appr-arg">' + argPreview + "</div>"
       + '<div class="appr-meta">proposed by ' + esc(_apShort(cr.proposed_by)) + " · " + esc(_apTs(cr.proposed_at))
       + (cr.reason ? " — " + esc(cr.reason) : "") + "</div>"
+      + assignRow
       + _apDecision(cr)
       + actions + "</div>";
   }).join("");
@@ -131,7 +186,11 @@ function openApprovals() {
 function loadApprovals() {
   var body = document.getElementById("appr-body");
   var qs = _apprFilter === "pending" ? "?status=pending" : "";
-  fetch("/api/approvals" + qs).then(function (r) { return r.json(); }).then(function (d) {
+  Promise.all([
+    fetch("/api/approvals" + qs).then(function (r) { return r.json(); }),
+    loadApprRoles(),
+  ]).then(function (parts) {
+    var d = parts[0];
     body.innerHTML = renderApprovals(d.approvals || [], _apprFilter);
     body.querySelectorAll(".appr-approve").forEach(function (b) {
       b.addEventListener("click", function () { decide("approve", b.getAttribute("data-id")); });
@@ -142,7 +201,18 @@ function loadApprovals() {
     body.querySelectorAll(".appr-withdraw").forEach(function (b) {
       b.addEventListener("click", function () { decide("withdraw", b.getAttribute("data-id")); });
     });
+    body.querySelectorAll(".appr-assignee").forEach(function (sel) {
+      sel.addEventListener("change", function () { reassign(sel.getAttribute("data-id"), sel.value); });
+    });
     refreshApprovalsBadge();
+  });
+}
+function reassign(id, assignee) {
+  fetch("/api/approvals", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ op: "assign", id: id, assignee: assignee, actor: APPR_REVIEWER, reason: "reassigned via queue" }),
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    if (!res.ok) alert("Could not reassign: " + res.error);
   });
 }
 function decide(op, id) {
