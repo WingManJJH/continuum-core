@@ -33,6 +33,26 @@ BIZ_TYPES = {"End to end", "Process area", "Process", "Scenario"}
 DEFAULT_GUARDRAIL = "gr.DEFAULT"
 DEFAULT_ROLE = "role.unassigned"
 
+# The 15 BPC end-to-end value chains -> a distinct 2-letter Continuum prefix
+# (our id scheme requires an alpha prefix; the BPC's E2E number is numeric).
+E2E_PREFIX = {
+    "10": "AD",  # Acquire to dispose
+    "20": "CR",  # Case to resolution
+    "30": "CM",  # Concept to market
+    "40": "DR",  # Design to retire
+    "50": "FP",  # Forecast to plan
+    "55": "HR",  # Hire to retire
+    "60": "IV",  # Inventory to deliver
+    "65": "OC",  # Order to cash
+    "70": "PP",  # Plan to produce
+    "75": "SP",  # Source to pay
+    "80": "PJ",  # Project to profit
+    "85": "PQ",  # Prospect to quote
+    "90": "RR",  # Record to report
+    "95": "SD",  # Service to deliver
+    "99": "AO",  # Administer to operate
+}
+
 
 def _strip_html(s: str) -> str:
     if not s:
@@ -67,9 +87,16 @@ def _parent(idv: str):
     return idv.rsplit(".", 1)[0] if "." in idv else None
 
 
-def build_seed(rows: list[dict], prefix: str, model_name: str) -> dict:
-    """Turn parsed BPC rows into a schema-valid model seed dict."""
+def build_seed(rows: list[dict], prefix, model_name: str) -> dict:
+    """Turn parsed BPC rows into a schema-valid model seed dict. `prefix` is either
+    a single 2-letter prefix (one E2E) or a {e2e_number: prefix} map (full catalog)."""
     groups, procs, seen = {}, {}, set()
+
+    def prefix_for(seq):
+        if isinstance(prefix, str):
+            return prefix
+        parts = _seg(seq)
+        return prefix.get(str(parts[0])) if parts else None
 
     def uniq(idv):
         base, n = idv, 2
@@ -81,7 +108,10 @@ def build_seed(rows: list[dict], prefix: str, model_name: str) -> dict:
     for r in rows:
         if r.get("type") not in BIZ_TYPES:
             continue
-        idv, level = map_id(prefix, r.get("seq", ""))
+        pfx = prefix_for(r.get("seq", ""))
+        if not pfx:
+            continue
+        idv, level = map_id(pfx, r.get("seq", ""))
         if not idv or level == 0:
             continue
         name = re.sub(r"^[\d.]+\s*", "", str(r.get("title", "")).strip()) or idv
@@ -127,13 +157,15 @@ def build_seed(rows: list[dict], prefix: str, model_name: str) -> dict:
 
     role = {"id": DEFAULT_ROLE, "name": "Unassigned owner", "raci": {}, "skills": [],
             "version": 1, "status": "active"}
-    guard = {"id": DEFAULT_GUARDRAIL, "attaches_to": prefix,
-             "allowed_actions": [], "forbidden_actions": ["*"],
-             "escalate_if": "true", "data_scope": [], "rate_limit": None,
+    # deny-by-default: nothing allowed, so any automated action escalates to a human.
+    guard = {"id": DEFAULT_GUARDRAIL, "attaches_to": {"kind": "process", "ref": "default"},
+             "allowed_actions": [], "forbidden_actions": [],
+             "escalate_if": "always", "data_scope": [], "rate_limit": None,
              "escalation_path": DEFAULT_ROLE, "audit_requirement": "timestamp_outcome",
              "version": 1, "status": "active"}
+    sig = prefix.lower() if isinstance(prefix, str) else "full"
     seed = {"_note": f"Imported from Microsoft Business Process Catalog — {model_name}",
-            "model_sig": "bpc-" + prefix.lower(),
+            "model_sig": "bpc-" + sig,
             "StrategicObjective": [], "Enterprise": [], "Initiative": [], "Correlation": [],
             "KPI": [], "Process": list(procs.values()), "Task": [],
             "HumanRole": [role], "AgentBinding": [], "GuardrailPolicy": [guard],
@@ -175,7 +207,9 @@ def read_xlsx(path: str, e2e_code: str) -> list[dict]:
     out = []
     for row in it:
         seq = str(g(row, "Process Sequence ID") or "")
-        if not seq.startswith(e2e_code + "."):
+        if e2e_code and not seq.startswith(e2e_code + "."):
+            continue
+        if not seq:
             continue
         out.append({"type": g(row, "Work Item Type"), "seq": seq, "title": title(row),
                     "product": g(row, "Product"), "module": g(row, "Module"),
@@ -185,18 +219,26 @@ def read_xlsx(path: str, e2e_code: str) -> list[dict]:
 
 def main(argv):
     import argparse
-    ap = argparse.ArgumentParser(description="Import a Microsoft BPC end-to-end into a Continuum model")
+    ap = argparse.ArgumentParser(description="Import the Microsoft BPC into a Continuum model")
     ap.add_argument("xlsx")
-    ap.add_argument("--e2e", required=True, help="BPC end-to-end code, e.g. 65")
-    ap.add_argument("--prefix", required=True, help="2-letter Continuum prefix, e.g. OC")
+    ap.add_argument("--full", action="store_true", help="import all 15 end-to-end chains")
+    ap.add_argument("--e2e", help="a single BPC end-to-end code, e.g. 65 (omit with --full)")
+    ap.add_argument("--prefix", help="2-letter Continuum prefix for a single --e2e, e.g. OC")
     ap.add_argument("--slug", required=True, help="model slug (dir under data/models/)")
     ap.add_argument("--name", required=True)
     args = ap.parse_args(argv)
-    rows = read_xlsx(args.xlsx, args.e2e)
-    seed = build_seed(rows, args.prefix.upper(), args.name)
+    if args.full:
+        rows = read_xlsx(args.xlsx, None)
+        seed = build_seed(rows, E2E_PREFIX, args.name)
+    else:
+        if not (args.e2e and args.prefix):
+            ap.error("either --full, or both --e2e and --prefix")
+        rows = read_xlsx(args.xlsx, args.e2e)
+        seed = build_seed(rows, args.prefix.upper(), args.name)
     base = write_model(args.slug, args.name, seed,
                        source="Microsoft Business Process Catalog",
-                       description=f"BPC end-to-end {args.e2e} imported as model '{args.slug}'.")
+                       description=("Full Microsoft BPC (15 end-to-end chains)." if args.full
+                                    else f"BPC end-to-end {args.e2e}.") + f" Model '{args.slug}'.")
     print(f"imported {len(seed['ProcessGroup'])} groups + {len(seed['Process'])} processes -> {base}")
 
 
