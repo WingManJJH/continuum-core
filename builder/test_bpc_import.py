@@ -31,7 +31,8 @@ ROWS = [
     {"type": "End to end", "seq": "65.00.000.000", "title": "65 Order to cash"},
     {"type": "Process area", "seq": "65.05.000.000", "title": "65.05 Develop sales policies"},
     {"type": "Process", "seq": "65.05.010.000", "title": "65.05.010 Develop order management policies"},
-    {"type": "Scenario", "seq": "65.05.010.100", "title": "65.05.010.100 Define order policies", "product": "Finance"},
+    {"type": "Scenario", "seq": "65.05.010.100", "title": "65.05.010.100 Define order policies", "product": "Finance",
+     "desc": "<div>Set up <b>order</b> policies.</div>", "learn": '<a href="https://learn.microsoft.com/x">x</a>'},
     {"type": "Scenario", "seq": "65.05.010.100", "title": "65.05.010.100 Define call center policies", "product": "Commerce"},
     # a scenario whose L3 (65.05.020) has NO explicit Process row -> must be synthesized
     {"type": "Scenario", "seq": "65.05.020.100", "title": "65.05.020.100 Create retail stores", "product": "Commerce"},
@@ -54,6 +55,8 @@ def main():
     check("the missing L3 group was synthesized", "OC.5.20" in groups and groups["OC.5.20"]["custom"].get("implied"))
     check("collision-suffixed process still parents to its L3", procs["OC.5.10.100.2"]["parent_ref"] == "OC.5.10")
     check("product kept in custom metadata", procs["OC.5.10.100"]["custom"]["product"] == "Finance")
+    check("description stripped of HTML into custom", procs["OC.5.10.100"]["custom"]["description"] == "Set up order policies.")
+    check("learn URL extracted into custom", procs["OC.5.10.100"]["custom"]["learn_url"] == "https://learn.microsoft.com/x")
 
     # referential integrity: every parent resolves to a group
     gids = set(groups)

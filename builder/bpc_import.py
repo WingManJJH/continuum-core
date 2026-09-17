@@ -62,6 +62,11 @@ def _strip_html(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _first_url(s: str):
+    m = re.search(r'https?://[^\s"<)]+', str(s or ""))
+    return m.group(0) if m else None
+
+
 def _seg(seq: str):
     """Return the sequence parts as ints: '65.05.010.100' -> [65,5,10,100]."""
     return [int(x) for x in str(seq).split(".") if x != ""]
@@ -121,6 +126,9 @@ def build_seed(rows: list[dict], prefix, model_name: str) -> dict:
             custom["product"] = r["product"]
         if r.get("module"):
             custom["module"] = r["module"]
+        learn = _first_url(r.get("learn"))
+        if learn:
+            custom["learn_url"] = learn
         if level <= 3:                     # L1/L2/L3 -> ProcessGroup
             if idv in groups:              # first title wins; keep the group
                 continue
@@ -130,6 +138,8 @@ def build_seed(rows: list[dict], prefix, model_name: str) -> dict:
                            "custom": custom, "version": 1, "status": "active"}
         else:                              # L4 Scenario -> Process
             pid = uniq(idv)
+            if desc:
+                custom = dict(custom, description=desc)   # keep the Microsoft summary
             procs[pid] = {"id": pid, "apqc_code": pid, "name": name,
                           "owner_role": DEFAULT_ROLE, "inputs": [], "outputs": [],
                           "interfaces": {}, "kpi_refs": [], "risk_refs": [],
@@ -213,7 +223,7 @@ def read_xlsx(path: str, e2e_code: str) -> list[dict]:
             continue
         out.append({"type": g(row, "Work Item Type"), "seq": seq, "title": title(row),
                     "product": g(row, "Product"), "module": g(row, "Module"),
-                    "desc": g(row, "Description")})
+                    "desc": g(row, "Description"), "learn": g(row, "Microsoft Learn URL")})
     return out
 
 
