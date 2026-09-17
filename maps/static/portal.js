@@ -211,7 +211,7 @@ function flowSVG(p) {
   Object.keys(nodes).forEach(function (id) {
     var n = nodes[id];
     if (n.kind === "start" || n.kind === "end") {
-      parts.push('<circle class="tip" cx="' + n.cx + '" cy="' + n.cy + '" r="' + R + '"/><text class="tip" x="' + n.cx + '" y="' + (n.cy + 3) + '" text-anchor="middle">' + n.kind + "</text>");
+      parts.push('<circle class="tip' + (n.kind === "start" ? " start" : n.kind === "end" ? " end" : "") + '" cx="' + n.cx + '" cy="' + n.cy + '" r="' + R + '"/><text class="tip" x="' + n.cx + '" y="' + (n.cy + 3) + '" text-anchor="middle">' + n.kind + "</text>");
       ext(n.cx - R, n.cy - R); ext(n.cx + R, n.cy + R);
     } else if (n.kind === "gateway") {
       var c = GW / 2, x = n.cx - c, y = n.cy - c;

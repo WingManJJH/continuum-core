@@ -22,6 +22,27 @@ import layout  # decorative node positions, kept out of the governed model  # no
 
 def all_maps(g: cc.Graph | None = None) -> list[dict]:
     g = g or cc.Graph()
+    pname = {p["id"]: p["name"] for p in g.all("Process")}
+    # chain: every end event with a next_process_ref feeds the next process's start.
+    # Build the inbound side once so each process knows who hands off to it.
+    inbound = {}  # process_id -> [{from_process, from_process_name, from_event?}]
+    # process-level hand-offs (the implicit end → next process's start)
+    for pr in g.all("Process"):
+        if pr["status"] != "active":
+            continue
+        for nxt in pr.get("next_process_refs", []) or []:
+            inbound.setdefault(nxt, []).append({
+                "from_process": pr["id"], "from_process_name": pname.get(pr["id"], pr["id"]),
+            })
+    # explicit end-event hand-offs (advanced: a specific end event links onward)
+    for ev in g.all("Event"):
+        if ev["status"] == "active" and ev["kind"] == "end" and ev.get("next_process_ref"):
+            nxt = ev["next_process_ref"]
+            inbound.setdefault(nxt, []).append({
+                "from_process": ev["process_ref"],
+                "from_process_name": pname.get(ev["process_ref"], ev["process_ref"]),
+                "from_event": ev["id"],
+            })
     out = []
     for p in sorted(g.all("Process"), key=lambda x: x["id"]):
         pgr = g.get("GuardrailPolicy", p.get("guardrail_ref"))
@@ -67,15 +88,23 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
                                  key=lambda f: f["id"])]
         events = [{"id": x["id"], "kind": x["kind"], "trigger": x["trigger"],
                    "name": x.get("name", ""), "timer": x.get("timer"),
-                   "message_ref": x.get("message_ref")}
+                   "message_ref": x.get("message_ref"),
+                   "next_process_ref": x.get("next_process_ref"),
+                   "next_process_name": pname.get(x.get("next_process_ref")) if x.get("next_process_ref") else None}
                   for x in sorted((x for x in g.all("Event")
                                    if x["process_ref"] == p["id"] and x["status"] == "active"),
                                   key=lambda x: x["id"])]
+        p_inbound = inbound.get(p["id"], [])
+        p_next = [{"id": nx, "name": pname.get(nx, nx)} for nx in (p.get("next_process_refs", []) or [])]
+        # every process has a (implicit) start; one no upstream process hands off
+        # to is where the value stream originates — a top-level start.
+        origination = not p_inbound
         out.append({
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],
             "guardrail": f"{p['guardrail_ref']}.v{pgr['version']}" if pgr else None,
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
             "gateways": gateways, "flows": flows, "events": events, "explicit": bool(flows),
+            "inbound": p_inbound, "next": p_next, "origination": origination,
             "parent_ref": p.get("parent_ref"), "objective_refs": p.get("objective_refs", []),
             "custom": p.get("custom", {}), "maturity_score": p.get("maturity_score"),
             "layout": layout.load_process(p["id"]),  # {node_id: {x,y}} — decorative

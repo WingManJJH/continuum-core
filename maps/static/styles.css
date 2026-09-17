@@ -681,3 +681,13 @@ label.ck input { width: auto; margin: 0; }
   background: transparent; color: var(--fg); border-radius: 6px; cursor: pointer; opacity: .7;
   font-size: 14px; margin: 2px; }
 .nx-addinit:hover { opacity: 1; border-style: solid; }
+
+/* ── process terminals: green start, red end + hand-off annotations ──── */
+circle.tip.start { fill: #dff5e6; stroke: #2fbf71; stroke-width: 2; }
+circle.tip.end   { fill: #fce4e0; stroke: #f0533a; stroke-width: 2; }
+text.tip-anno { fill: var(--muted); font-size: 9px; }
+text.tip-anno.orig { fill: #2fbf71; font-weight: 600; }
+.tip-node[data-node] { cursor: pointer; }
+.term-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.term-dot.start { background: #2fbf71; }
+.term-dot.end { background: #f0533a; }

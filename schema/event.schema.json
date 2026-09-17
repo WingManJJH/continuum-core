@@ -18,6 +18,7 @@
     "name": {"type": "string", "maxLength": 80},
     "timer": {"type": ["string", "null"], "maxLength": 120, "description": "For trigger=timer: an ISO-8601 duration/date or a cron-like expression (e.g. 'P1D', '2026-01-01', '0 9 * * 1'). Free text — surfaced verbatim, not evaluated here."},
     "message_ref": {"type": ["string", "null"], "maxLength": 120, "description": "For trigger=message: the name of the message that fires this event (e.g. 'payment_received')."},
+    "next_process_ref": {"type": ["string", "null"], "pattern": "^[A-Z]{2}\\.[0-9.]+$", "description": "For an end event: the apqc_code of the process this one hands off to next — the link that chains processes into an end-to-end value stream. The next process's start is then this process's downstream. Null/absent for a terminal end."},
     "version": {"type": "integer", "minimum": 1},
     "status": {"type": "string", "enum": ["draft", "active", "deprecated"]}
   }
