@@ -98,6 +98,13 @@ Process Description
 Outcome
 The Order-to-Cash process begins with a customer order and ends with cash collected.
 The Design to Retire (DTR) process delivers food products and assets.
+3.1 Product Planning
+3.1.1 Define Product Offering
+3.1.2 Assess Feasibility
+3.2 Initial Bill of Materials
+3.2.1 Define Unit of Measure
+19. Not A Chain
+19.1 Should Be Ignored
 """
 
 
@@ -110,12 +117,22 @@ def test_sunrise():
     items = sr.build_items(chains, SUNRISE_TEXT)
     seed = mi.build_model_seed(items, "Sunrise test", sig="sunrise")
     check("sunrise: builds a schema-valid, clean model", valid(seed))
-    check("sunrise: has a root + category groups + chain processes",
-          any(g["id"] == "SR" for g in seed["ProcessGroup"]) and len(seed["Process"]) == 7)
-    otc = next(p for p in seed["Process"] if p["name"] == "Order-to-Cash")
-    check("sunrise: name-matched description extracted", "cash collected" in otc["custom"].get("description", ""))
+    check("sunrise: has a root SR group and the category groups",
+          any(g["id"] == "SR" for g in seed["ProcessGroup"]) and any(g["id"] == "SR.2" for g in seed["ProcessGroup"]))
+    otc = next((p for p in seed["Process"] if p["name"] == "Order-to-Cash"), None)
+    check("sunrise: name-matched description extracted", otc and "cash collected" in otc["custom"].get("description", ""))
     dtr_txt = sr.chain_description(SUNRISE_TEXT, "Hire to Retire")
     check("sunrise: no wrong description when the name doesn't match", dtr_txt == "")
+
+    # deep body parse: dotted headings become areas (groups) + activities (processes)
+    subs = sr.parse_subprocesses(SUNRISE_TEXT, {c["no"] for c in chains})
+    check("sunrise: parses body sub-processes", (3, 1, None) in subs and (3, 1, 1) in subs and (3, 2, 1) in subs)
+    check("sunrise: ignores dotted headings for non-chain numbers", (19, 1, None) not in subs)
+    names = {p["name"] for p in seed["Process"]}
+    gnames = {g["name"] for g in seed["ProcessGroup"]}
+    check("sunrise: activities became processes", "Define Product Offering" in names and "Assess Feasibility" in names)
+    check("sunrise: areas became groups", "Product Planning" in gnames)
+    check("sunrise: a chain that decomposes is a group, not a leaf", "Design to Retire" in gnames)
 
 
 def main():

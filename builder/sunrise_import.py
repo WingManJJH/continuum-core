@@ -28,6 +28,8 @@ CATEGORIES = [("Steering", 1, "Steering processes"), ("Core", 2, "Core processes
 _CAT_RE = re.compile(r"^(Steering|Core|Enabling|Support)\s+Processes\b", re.I)
 _CHAIN_RE = re.compile(r"^\s*(\d+)\.\s+([A-Za-z][A-Za-z0-9 /&'\-]+?(?:[- ]to[- ][A-Za-z].*)?)\s*$")
 _STOP_RE = re.compile(r"^Process Description\b")
+# dotted body headings: <chain>.<area>[.<activity>]  Name  (the deep hierarchy)
+_SUB_RE = re.compile(r"^\s*(\d{1,2})\.(\d{1,2})(?:\.(\d{1,2}))?\s+([A-Za-z][A-Za-z0-9 ,/&'\-]{2,70})\s*$")
 
 
 def _slug(name: str) -> str:
@@ -70,10 +72,29 @@ def chain_description(text: str, name: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+def parse_subprocesses(text: str, chain_nos: set) -> dict:
+    """The deep hierarchy from the body: dotted headings <chain>.<area>[.<activity>].
+    Kept only for known chain numbers; deduped by number, longest name wins."""
+    lines = text.splitlines()
+    start = next((i for i, l in enumerate(lines) if l.strip().startswith("Process Description")), 0)
+    best = {}
+    for l in lines[start:]:
+        m = _SUB_RE.match(l)
+        if not m:
+            continue
+        c, a = int(m.group(1)), int(m.group(2))
+        b = int(m.group(3)) if m.group(3) else None
+        if c not in chain_nos:
+            continue
+        key, name = (c, a, b), m.group(4).strip()
+        if key not in best or len(name) > len(best[key]):
+            best[key] = name
+    return best
+
+
 def build_items(chains: list[dict], text: str = "") -> list[dict]:
     catseg = {c[0]: (c[1], c[2]) for c in CATEGORIES}
-    items, counters = [], {}
-    made_cat = set()
+    items, counters, made_cat, chain_code = [], {}, set(), {}
     for ch in chains:
         seg, label = catseg.get(ch["category"], (4, ch["category"] + " processes"))
         if seg not in made_cat:
@@ -81,11 +102,29 @@ def build_items(chains: list[dict], text: str = "") -> list[dict]:
                           "custom": {"source": "Sunrise Farms"}})
             made_cat.add(seg)
         counters[seg] = counters.get(seg, 0) + 1
-        code = f"SR.{seg}.{counters[seg]}"
-        items.append({"code": code, "kind": "process", "name": ch["name"],
-                      "description": chain_description(text, ch["name"]),
-                      "custom": {"source": "Sunrise Farms", "sunrise_no": ch["no"],
-                                 "category": ch["category"]}})
+        chain_code[ch["no"]] = f"SR.{seg}.{counters[seg]}"
+
+    subs = parse_subprocesses(text, set(chain_code))
+    chains_with_subs = {c for (c, a, b) in subs}
+
+    for ch in chains:
+        code = chain_code[ch["no"]]
+        cm = {"source": "Sunrise Farms", "sunrise_no": ch["no"], "category": ch["category"]}
+        if ch["no"] in chains_with_subs:  # a chain that decomposes -> a group
+            items.append({"code": code, "kind": "group", "name": ch["name"],
+                          "description": chain_description(text, ch["name"]), "custom": cm})
+        else:                              # no sub-processes parsed -> a single leaf
+            items.append({"code": code, "kind": "process", "name": ch["name"],
+                          "description": chain_description(text, ch["name"]), "custom": cm})
+    # areas (N.A) -> group; activities (N.A.B) -> process; ancestor synthesis fills gaps
+    for (c, a, b), name in sorted(subs.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2] or 0)):
+        base = chain_code[c]
+        if b is None:
+            items.append({"code": f"{base}.{a}", "kind": "group", "name": name,
+                          "custom": {"source": "Sunrise Farms"}})
+        else:
+            items.append({"code": f"{base}.{a}.{b}", "kind": "process", "name": name,
+                          "custom": {"source": "Sunrise Farms"}})
     if items:  # the model root
         items.insert(0, {"code": "SR", "level": 1, "kind": "group", "name": "Sunrise Farms",
                          "custom": {"source": "Sunrise Farms"}})
