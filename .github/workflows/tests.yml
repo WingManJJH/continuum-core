@@ -68,6 +68,7 @@ jobs:
           python bpmn/test_visio.py
           python builder/test_build.py
           python builder/test_bpc_import.py
+          python builder/test_importers.py
           python builder/test_bpc_enrich.py
           python mcp_server/test_typesafe.py
           python advisor/test_advisor.py

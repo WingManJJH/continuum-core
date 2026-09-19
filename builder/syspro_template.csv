@@ -1,0 +1,13 @@
+code,name,level,kind,parent,description
+SY,SYSPRO,1,group,,SYSPRO ERP process model
+SY.1,Finance,2,group,SY,Financial management processes
+SY.1.10,General Ledger,3,process,SY.1,Maintain and reconcile the general ledger
+SY.1.20,Accounts Payable,3,process,SY.1,Process supplier invoices and payments
+SY.1.30,Accounts Receivable,3,process,SY.1,Bill customers and collect receipts
+SY.2,Distribution,2,group,SY,Sales and inventory processes
+SY.2.10,Sales Orders,3,process,SY.2,Capture and fulfil sales orders
+SY.2.20,Purchase Orders,3,process,SY.2,Raise and receive purchase orders
+SY.2.30,Inventory Control,3,process,SY.2,Track stock and movements
+SY.3,Manufacturing,2,group,SY,Production processes
+SY.3.10,Work in Progress,3,process,SY.3,Manage jobs through production
+SY.3.20,Material Requirements Planning,3,process,SY.3,Plan materials against demand
