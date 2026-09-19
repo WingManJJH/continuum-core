@@ -26,8 +26,10 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 import continuum_core as cc  # noqa: E402
+import model_import  # noqa: E402  — the generic normalized-rows -> model core
 
 BIZ_TYPES = {"End to end", "Process area", "Process", "Scenario"}
 DEFAULT_GUARDRAIL = "gr.DEFAULT"
@@ -93,34 +95,25 @@ def _parent(idv: str):
 
 
 def build_seed(rows: list[dict], prefix, model_name: str) -> dict:
-    """Turn parsed BPC rows into a schema-valid model seed dict. `prefix` is either
-    a single 2-letter prefix (one E2E) or a {e2e_number: prefix} map (full catalog)."""
-    groups, procs, seen = {}, {}, set()
-
+    """Map parsed BPC rows to normalized items and hand them to the generic
+    importer. `prefix` is either a single 2-letter prefix (one E2E) or a
+    {e2e_number: prefix} map (full catalog)."""
     def prefix_for(seq):
         if isinstance(prefix, str):
             return prefix
         parts = _seg(seq)
         return prefix.get(str(parts[0])) if parts else None
 
-    def uniq(idv):
-        base, n = idv, 2
-        while idv in seen:
-            idv = f"{base}.{n}"; n += 1
-        seen.add(idv)
-        return idv
-
+    items = []
     for r in rows:
         if r.get("type") not in BIZ_TYPES:
             continue
         pfx = prefix_for(r.get("seq", ""))
         if not pfx:
             continue
-        idv, level = map_id(pfx, r.get("seq", ""))
-        if not idv or level == 0:
+        code, level = map_id(pfx, r.get("seq", ""))
+        if not code or level == 0:
             continue
-        name = re.sub(r"^[\d.]+\s*", "", str(r.get("title", "")).strip()) or idv
-        desc = _strip_html(r.get("desc", ""))[:600]
         custom = {"bpc_seq": str(r.get("seq", "")), "source": "Microsoft BPC"}
         if r.get("product"):
             custom["product"] = r["product"]
@@ -129,69 +122,18 @@ def build_seed(rows: list[dict], prefix, model_name: str) -> dict:
         learn = _first_url(r.get("learn"))
         if learn:
             custom["learn_url"] = learn
-        if level <= 3:                     # L1/L2/L3 -> ProcessGroup
-            if idv in groups:              # first title wins; keep the group
-                continue
-            groups[idv] = {"id": idv, "name": name, "level": level,
-                           "parent_ref": _parent(idv), "owner_role": None,
-                           "objective_refs": [], "description": desc,
-                           "custom": custom, "version": 1, "status": "active"}
-        else:                              # L4 Scenario -> Process
-            pid = uniq(idv)
-            if desc:
-                custom = dict(custom, description=desc)   # keep the Microsoft summary
-            procs[pid] = {"id": pid, "apqc_code": pid, "name": name,
-                          "owner_role": DEFAULT_ROLE, "inputs": [], "outputs": [],
-                          "interfaces": {}, "kpi_refs": [], "risk_refs": [],
-                          "guardrail_ref": DEFAULT_GUARDRAIL,
-                          "parent_ref": _parent(idv), "next_process_refs": [],  # pre-suffix id
-                          "custom": custom, "maturity_score": None,
-                          "version": 1, "status": "active"}
-
-    # Fill any gaps in the group hierarchy: a scenario can reference an L3 process
-    # the catalog never gave an explicit row for. Synthesize the missing ancestors
-    # so every parent_ref resolves (referential integrity).
-    def ensure(gid):
-        if not gid or gid in groups:
-            return
-        groups[gid] = {"id": gid, "name": gid, "level": min(gid.count(".") + 1, 5),
-                       "parent_ref": _parent(gid), "owner_role": None,
-                       "objective_refs": [], "description": "(implied by the catalog)",
-                       "custom": {"source": "Microsoft BPC", "implied": True},
-                       "version": 1, "status": "active"}
-        ensure(_parent(gid))
-    for idv in list(groups):
-        ensure(_parent(idv))
-    for p in procs.values():
-        ensure(p["parent_ref"])
-
-    role = {"id": DEFAULT_ROLE, "name": "Unassigned owner", "raci": {}, "skills": [],
-            "version": 1, "status": "active"}
-    # deny-by-default: nothing allowed, so any automated action escalates to a human.
-    guard = {"id": DEFAULT_GUARDRAIL, "attaches_to": {"kind": "process", "ref": "default"},
-             "allowed_actions": [], "forbidden_actions": [],
-             "escalate_if": "always", "data_scope": [], "rate_limit": None,
-             "escalation_path": DEFAULT_ROLE, "audit_requirement": "timestamp_outcome",
-             "version": 1, "status": "active"}
-    sig = prefix.lower() if isinstance(prefix, str) else "full"
-    seed = {"_note": f"Imported from Microsoft Business Process Catalog — {model_name}",
-            "model_sig": "bpc-" + sig,
-            "StrategicObjective": [], "Enterprise": [], "Initiative": [], "Correlation": [],
-            "KPI": [], "Process": list(procs.values()), "Task": [],
-            "HumanRole": [role], "AgentBinding": [], "GuardrailPolicy": [guard],
-            "RiskControl": [], "ProcessGroup": list(groups.values()),
-            "Gateway": [], "SequenceFlow": [], "Event": []}
-    return seed
+        items.append({
+            "code": code, "level": level,
+            "kind": "group" if level <= 3 else "process",
+            "name": re.sub(r"^[\d.]+\s*", "", str(r.get("title", "")).strip()) or code,
+            "description": _strip_html(r.get("desc", "")), "custom": custom,
+        })
+    sig = "bpc-" + (prefix.lower() if isinstance(prefix, str) else "full")
+    return model_import.build_model_seed(items, model_name, sig=sig)
 
 
-def write_model(slug: str, name: str, seed: dict, source: str, description: str) -> str:
-    base = cc.model_base(slug)
-    os.makedirs(base, exist_ok=True)
-    with open(os.path.join(base, "seed.json"), "w") as f:
-        json.dump(seed, f, indent=1)
-    with open(os.path.join(base, "model.json"), "w") as f:
-        json.dump({"name": name, "source": source, "description": description}, f, indent=1)
-    return base
+# write_model lives in the generic importer; re-exported so callers/tests keep working
+write_model = model_import.write_model
 
 
 # ---- optional xlsx reader (CLI only; needs openpyxl) ---------------------
