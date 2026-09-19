@@ -40,6 +40,8 @@ import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
 import visio_import as visio  # noqa: E402  — Visio .vsdx import
 sys.path.insert(0, os.path.join(HERE, "..", "builder"))
 import build as builder  # noqa: E402  — build a process from instructions
+import bpc_enrich  # noqa: E402  — Jev (System One) governance enrichment
+import typesafe  # noqa: E402  — the Jev seam (availability check)
 
 STORE = gov.GovernanceStore()
 QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
@@ -127,7 +129,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"entities": POLICY.entities(), "modes": list(policy_mod.MODES),
                                "op_entity": policy_mod.OP_ENTITY})
         if u.path == "/api/models":
-            return self._json({"models": cc.list_models(), "active": cc.ACTIVE_MODEL})
+            return self._json({"models": cc.list_models(), "active": cc.ACTIVE_MODEL,
+                               "jev": typesafe.available()})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
@@ -271,6 +274,15 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError:
                     pass
                 return self._json({"ok": True, "active": cc.ACTIVE_MODEL, "models": cc.list_models()})
+            if u.path == "/api/enrich":
+                # Jev (System One) governance enrichment of the ACTIVE model's
+                # processes — advisory typed classifications written via the store.
+                if not typesafe.available():
+                    return self._json_code({"ok": False, "error":
+                        "Jev isn't configured — set CONTINUUM_TYPESAFE_API_KEY to enable enrichment."}, 400)
+                res = bpc_enrich.enrich(STORE, limit=b.get("limit"), dry=bool(b.get("dry")),
+                                        actor=actor)
+                return self._json({"ok": True, "model": cc.ACTIVE_MODEL, **res})
             if u.path == "/api/layout":
                 # decorative node positions only — NOT a model edit, so it does not
                 # go through the governance store, the version chain, or the audit log.

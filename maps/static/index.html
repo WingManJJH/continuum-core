@@ -10,6 +10,7 @@
   <header>
     <div class="brand">Continuum <span>· Process Canvas</span></div>
     <select id="model-select" class="model-select" title="Active process model"></select>
+    <button id="enrich-btn" class="toggle" type="button" title="Classify this model's processes with Jev" hidden>✦ Enrich</button>
     <div class="spacer"></div>
     <span id="live-dot" class="live-dot" title="Live — the model updates in real time"></span>
     <button class="toggle" id="present-btn" type="button">▶ Present</button>
@@ -186,6 +187,27 @@
         <button id="appr-close" class="x" type="button">&times;</button>
       </div>
       <div id="appr-body"></div>
+    </div>
+  </div>
+
+  <!-- Enrich with Jev (System One governance classification) -->
+  <div id="enrich-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Enrich with Jev</h2><button id="enrich-close" class="x" type="button">&times;</button></div>
+      <div id="enrich-body">
+        <p class="modal-sub">Jev (a fast, typed “System One” model) classifies each process in the active model — <b id="enrich-model">this model</b> — into governed master data: an operational-risk score, a customer-facing flag, and an automation-potential score. Answers are <b>advisory</b> and are written through the versioned, audited edit path; nothing is a final decision.</p>
+        <form id="enrich-form">
+          <label>How many processes<select id="enrich-limit">
+            <option value="25">First 25 (quick preview)</option>
+            <option value="100" selected>First 100</option>
+            <option value="500">First 500</option>
+            <option value="">All in this model</option>
+          </select></label>
+          <label class="ck"><input type="checkbox" id="enrich-dry"> Dry run — classify without writing</label>
+          <div id="enrich-msg" class="msg" hidden></div>
+          <div class="actions"><button type="button" id="enrich-cancel" class="ghost">Cancel</button><button type="submit" class="save">Run</button></div>
+        </form>
+      </div>
     </div>
   </div>
 

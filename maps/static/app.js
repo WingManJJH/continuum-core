@@ -1264,14 +1264,20 @@ function saveGuardrail(e) {
 })();
 
 // ---------- model switcher (default / imported BPC / SYSPRO / …) ----------
+var ACTIVE_MODEL_NAME = "the active model";
 (function () {
   var sel = document.getElementById("model-select"); if (!sel) return;
-  function fill(models, active) {
+  var enrichBtn = document.getElementById("enrich-btn");
+  function fill(models, active, jev) {
     sel.innerHTML = models.map(function (m) {
       return '<option value="' + esc(m.slug) + '"' + (m.slug === active ? " selected" : "") + ">" + esc(m.name) + "</option>";
     }).join("");
+    var cur = models.find(function (m) { return m.slug === active; });
+    ACTIVE_MODEL_NAME = cur ? cur.name : active;
+    // the Enrich button appears only when Jev is configured (a key is set)
+    if (enrichBtn) enrichBtn.hidden = !jev;
   }
-  fetch("/api/models").then(function (r) { return r.json(); }).then(function (d) { fill(d.models || [], d.active); })
+  fetch("/api/models").then(function (r) { return r.json(); }).then(function (d) { fill(d.models || [], d.active, d.jev); })
     .catch(function () { sel.hidden = true; });
   sel.addEventListener("change", function () {
     var slug = sel.value;
@@ -1284,9 +1290,46 @@ function saveGuardrail(e) {
         state.sel = null; state.task = null; state.nav = []; state.view = "landscape";
         state.navQuery = ""; state.lsQuery = ""; state.lsExpanded = {}; state.lsFull = {}; state.archExpanded = {};
         var ps = document.getElementById("proc-search"); if (ps) ps.value = "";
-        fill(res.models || [], res.active);
+        var m = (res.models || []).find(function (x) { return x.slug === res.active; });
+        ACTIVE_MODEL_NAME = m ? m.name : res.active;
         load().then(function () { renderCenter(); });
       });
+  });
+})();
+
+// ---------- enrich the active model with Jev (System One) ----------
+(function () {
+  var btn = document.getElementById("enrich-btn"); if (!btn) return;
+  var modal = document.getElementById("enrich-modal");
+  btn.addEventListener("click", function () {
+    var nm = document.getElementById("enrich-model"); if (nm) nm.textContent = ACTIVE_MODEL_NAME;
+    var msg = document.getElementById("enrich-msg"); if (msg) msg.hidden = true;
+    modal.hidden = false;
+  });
+  document.getElementById("enrich-close").addEventListener("click", function () { modal.hidden = true; });
+  document.getElementById("enrich-cancel").addEventListener("click", function () { modal.hidden = true; });
+  modal.addEventListener("click", function (e) { if (e.target === modal) modal.hidden = true; });
+  document.getElementById("enrich-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var limit = document.getElementById("enrich-limit").value;
+    var dry = document.getElementById("enrich-dry").checked;
+    var msg = document.getElementById("enrich-msg");
+    var runBtn = document.querySelector("#enrich-form .save"); runBtn.disabled = true;
+    msg.textContent = "Classifying with Jev…"; msg.className = "msg"; msg.hidden = false;
+    fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: limit ? parseInt(limit, 10) : null, dry: dry, actor: ACTOR }) })
+      .then(function (r) { return r.json(); }).then(function (res) {
+        runBtn.disabled = false;
+        if (!res.ok) { msg.textContent = res.error; msg.className = "msg err"; msg.hidden = false; return; }
+        msg.textContent = res.dry
+          ? "Dry run: classified " + res.processed + " processes (nothing written)."
+          : "Enriched " + res.updated + " of " + res.processed + " processes — risk, customer-facing, and automation-potential written to master data.";
+        msg.className = "msg ok"; msg.hidden = false;
+        if (!res.dry) {  // the model changed — drop caches and reload
+          state.landscape = null; state.architecture = null; state.sel = null; state.task = null;
+          load().then(function () { renderCenter(); });
+        }
+      }).catch(function () { runBtn.disabled = false; msg.textContent = "Enrichment failed."; msg.className = "msg err"; msg.hidden = false; });
   });
 })();
 

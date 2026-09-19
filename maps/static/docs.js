@@ -54,7 +54,8 @@ var DOCS = [
 
   { id: "models", title: "Models (switching process models)", html:
     "<p>The <b>model selector</b> (top-left, next to the title) chooses which <b>process model</b> the whole app folds — its own hierarchy, processes, governance, and audit trail. The <b>Default model</b> ships with the app; alternate models (e.g. an imported <b>Microsoft Business Process Catalog</b>, or a SYSPRO / Sunrise edition) live side by side and are fully isolated — switching is instant and your choice sticks across restarts.</p>"
-    + "<p>Each model is a self-contained workspace: edits, versions, approvals, and the change log belong to the model you're in, so importing or editing one never touches another. (Imported models are generated locally from their source — they aren't part of the shared app.)</p>" },
+    + "<p>Each model is a self-contained workspace: edits, versions, approvals, and the change log belong to the model you're in, so importing or editing one never touches another. (Imported models are generated locally from their source — they aren't part of the shared app.)</p>"
+    + "<p><b>✦ Enrich</b> (next to the selector, shown only when <code>CONTINUUM_TYPESAFE_API_KEY</code> is set) classifies the active model's processes with <b>Jev</b> — a fast typed “System One” model — into governed master data (operational-risk score, customer-facing flag, automation-potential score). It's ideal for an imported catalog whose governance columns are empty. Answers are <b>advisory</b> and written through the versioned, audited edit path; use the <b>dry run</b> to preview without writing.</p>" },
 
   { id: "approvals", title: "Approvals (the review gate)", html:
     "<p>Some changes shouldn't go live the moment one person clicks Save. When you edit a guardrail you can tick <b>“Submit for approval instead of saving directly.”</b> That queues the change as a <b>Change Request</b> — it does <i>not</i> touch the live model — and it waits in the <b>Approvals</b> queue (top of the screen; the badge shows how many are pending).</p>"
@@ -153,7 +154,7 @@ function openModalCard() { var m = document.querySelector(".modal:not([hidden]) 
 var TOUR = [
   { title: "Welcome", steps: [
     { sel: "#model-select", before: function () { tourReset(); }, title: "Pick your model",
-      body: "This selector chooses which <b>process model</b> you're working in — the Default model, or an imported one like the <b>Microsoft Business Process Catalog</b>, SYSPRO, or Sunrise. Each is a fully isolated workspace; switching is instant." },
+      body: "This selector chooses which <b>process model</b> you're working in — the Default model, or an imported one like the <b>Microsoft Business Process Catalog</b>, SYSPRO, or Sunrise. Each is a fully isolated workspace; switching is instant. When Jev is configured, <b>✦ Enrich</b> here classifies a whole imported model into governed risk / ownership / automation metadata." },
     { sel: ".brand", before: function () { tourOpen("CO.3.2.7"); }, title: "Welcome to Continuum",
       body: "This is the Process Canvas — an easy visual modeler on top of a <b>governed</b> process model. In a few minutes you'll see the whole thing, end to end. Use <b>Next</b>, or jump around with <b>Chapters</b>." },
     { sel: "#proc-list", title: "Your processes",
