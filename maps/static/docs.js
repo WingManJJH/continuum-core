@@ -92,7 +92,7 @@ var DOCS = [
     + "<li><b>Canvas</b> (:8789) — this app.</li>"
     + "<li><b>Advisor</b> (:8790) — analyze a process / guardrail / anything against ISO 9001, APQC, and the Core Model.</li>"
     + "<li><b>Ask</b> (:8791) — ask a plain-English question; it writes a read-only query over the graph and answers with a table.</li></ul>"
-    + "<p>Set <code>CONTINUUM_LLM_API_KEY</code> to light up the Advisor's AI reviewer and the Ask planner.</p>" },
+    + "<p>Set <code>CONTINUUM_LLM_API_KEY</code> to light up the Advisor's AI reviewer and the Ask planner (System Two — planning &amp; narrative). Set <code>CONTINUUM_TYPESAFE_API_KEY</code> to enable the <b>System One</b> seam (TypeSafe's Jev) for fast, typed decisions &mdash; e.g. classifying an imported catalog's processes into governed risk / ownership / automation metadata. Both are optional and off until keyed.</p>" },
 
   { id: "tips", title: "Tips", html:
     "<ul><li><b>Esc</b> leaves Connect mode; clicking empty canvas leaves Connect or clears the selection.</li>"
