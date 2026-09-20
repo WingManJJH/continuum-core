@@ -18,11 +18,14 @@ sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, HERE)
 import continuum_core as cc  # noqa: E402
 import layout  # decorative node positions, kept out of the governed model  # noqa: E402
+sys.path.insert(0, os.path.join(HERE, "..", "governance"))
+import capa as capa_mod  # noqa: E402  — corrective-action flags per process (ISO 9001 §10.2)
 
 
 def all_maps(g: cc.Graph | None = None) -> list[dict]:
     g = g or cc.Graph()
     pname = {p["id"]: p["name"] for p in g.all("Process")}
+    car_flags = capa_mod.CAPAStore().process_flags(g)  # {pid: {open, overdue, severity, cars}}
     # chain: every end event with a next_process_ref feeds the next process's start.
     # Build the inbound side once so each process knows who hands off to it.
     inbound = {}  # process_id -> [{from_process, from_process_name, from_event?}]
@@ -105,6 +108,7 @@ def all_maps(g: cc.Graph | None = None) -> list[dict]:
             "kpis": p.get("kpi_refs", []), "risks": risks, "tasks": tasks,
             "gateways": gateways, "flows": flows, "events": events, "explicit": bool(flows),
             "inbound": p_inbound, "next": p_next, "origination": origination,
+            "cars": car_flags.get(p["id"]),   # open corrective actions on this process, or None
             "parent_ref": p.get("parent_ref"), "objective_refs": p.get("objective_refs", []),
             "custom": p.get("custom", {}), "maturity_score": p.get("maturity_score"),
             "layout": layout.load_process(p["id"]),  # {node_id: {x,y}} — decorative
@@ -200,6 +204,8 @@ def landscape(g: cc.Graph | None = None) -> dict:
     processes. Phase D navigation — read-only, from the one graph."""
     g = g or cc.Graph()
     procs = sorted((p for p in g.all("Process") if p["status"] == "active"), key=lambda p: p["id"])
+    caps = capa_mod.CAPAStore()
+    car_flags = caps.process_flags(g)
     role_use: dict[str, set] = {}
     kpi_use: dict[str, set] = {}
     domains: dict[str, dict] = {}
@@ -221,6 +227,7 @@ def landscape(g: cc.Graph | None = None) -> dict:
             "id": p["id"], "name": p["name"], "owner": p["owner_role"],
             "steps": len(tasks), "agent_steps": agent_steps, "reviewed": reviewed,
             "risks": len(p.get("risk_refs", [])), "kpis": len(p.get("kpi_refs", [])),
+            "cars": car_flags.get(p["id"]),   # open corrective actions on this process, or None
         })
 
     def _name(etype, eid):
@@ -281,6 +288,7 @@ def landscape(g: cc.Graph | None = None) -> dict:
         "domains": [domains[d] for d in sorted(domains)],
         "catalogs": {"roles": roles, "kpis": kpis, "risks": risks},
         "chain": chain,
+        "capa": caps.summary(g),   # corrective-action headline for the landscape
     }
 
 

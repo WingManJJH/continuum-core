@@ -1921,5 +1921,88 @@
   ],
   "Gateway": [],
   "SequenceFlow": [],
-  "Event": []
+  "Event": [],
+  "CorrectiveAction":   [
+    {
+      "id": "car.2026.000",
+      "title": "Unauthorized access granted without secondary approval",
+      "nonconformance": "An access-request incident found a privileged system-access grant that skipped the required secondary approval, exposing production data for 3 days before detection.",
+      "source": "incident",
+      "severity": "critical",
+      "state": "closed",
+      "owner_role": "role.it.security_lead",
+      "date_raised": "2026-08-10",
+      "date_due": "2026-08-31",
+      "date_closed": "2026-08-30",
+      "affected_process_refs": [
+        "IT.8.4.2"
+      ],
+      "containment": "Revoked the grant and audited all access changes in the exposure window.",
+      "root_cause": "The access-grant step allowed an agent path that did not enforce the escalate_if secondary-approval branch when the request arrived out of business hours.",
+      "corrective_action": "Tightened gr.IT.8.4.2 so any privileged grant escalates regardless of time of day.",
+      "preventive_action": "Added a coverage check to the advisor so any high-stakes action allowed without an escalation branch is flagged model-wide.",
+      "effectiveness_check": "Re-ran the access scenario after the change; the out-of-hours path now escalates. Verified over 30 days with zero recurrences.",
+      "risk_refs": [
+        "rc.unauthorized_access"
+      ],
+      "related_car_refs": [],
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "car.2026.001",
+      "title": "KYC false-approval rate above tolerance",
+      "nonconformance": "The KYC verification KPI breached its target: false-approvals exceeded the accepted threshold for two consecutive weeks.",
+      "source": "kpi_breach",
+      "severity": "major",
+      "state": "investigating",
+      "owner_role": "role.ops.support_lead",
+      "date_raised": "2026-09-05",
+      "date_due": "2026-10-05",
+      "date_closed": null,
+      "affected_process_refs": [
+        "CO.3.2.7"
+      ],
+      "containment": "Manually re-reviewing all auto-approved verifications above the risk score band pending root-cause.",
+      "root_cause": "",
+      "corrective_action": "",
+      "preventive_action": "",
+      "effectiveness_check": "",
+      "risk_refs": [
+        "rc.kyc_false_verify"
+      ],
+      "related_car_refs": [],
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    },
+    {
+      "id": "car.2026.002",
+      "title": "Duplicate expense reimbursements paid",
+      "nonconformance": "An internal audit found a small number of expense reimbursements were paid twice because a resubmitted claim was not matched to the original.",
+      "source": "internal_audit",
+      "severity": "minor",
+      "state": "open",
+      "owner_role": "role.finance.ap_lead",
+      "date_raised": "2026-09-01",
+      "date_due": "2026-09-15",
+      "date_closed": null,
+      "affected_process_refs": [
+        "FN.9.3.1"
+      ],
+      "containment": "Recovering the duplicate payments; adding a manual duplicate check to the weekly run.",
+      "root_cause": "",
+      "corrective_action": "",
+      "preventive_action": "",
+      "effectiveness_check": "",
+      "risk_refs": [
+        "rc.expense_fraud"
+      ],
+      "related_car_refs": [],
+      "custom": {},
+      "version": 1,
+      "status": "active"
+    }
+  ]
 }

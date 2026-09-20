@@ -876,6 +876,8 @@ function renderProps() {
   if (!t) {
     $("#props").innerHTML = procProps(p);
     var mb = $("#pmeta-open"); if (mb && typeof openMasterData === "function") mb.onclick = function () { openMasterData("process", p.id); };
+    var cr = $("#p-car-raise"); if (cr && typeof raiseCarFor === "function") cr.onclick = function () { raiseCarFor(p.id); };
+    var cv = $("#p-car-view"); if (cv && typeof openCapa === "function") cv.onclick = function () { openCapa(); };
     return;
   }
   $("#props").innerHTML = taskProps(p, t);
@@ -1163,6 +1165,24 @@ function terminalProps(p, which) {
   return '<div class="p-sec"><div class="lbl"><span class="term-dot start"></span>Start condition</div>' + body2
     + '<div class="p-row muted" style="margin-top:8px">Inbound links are derived from other processes\' end hand-offs. Set a hand-off on an upstream process\'s <b>end</b>.</div></div>';
 }
+function carSection(p) {
+  var f = p.cars;
+  var head = '<div class="p-sec"><div class="lbl">corrective actions <span class="hint">CAPA · §10.2</span></div>';
+  var body;
+  if (f && f.open) {
+    var cars = (f.cars || []).map(function (c) {
+      return '<div class="p-car" data-car="' + esc(c.id) + '"><span class="capa-sev sev-' + esc(c.severity) + '">' + esc(c.severity) + "</span>"
+        + (c.overdue ? '<span class="capa-overdue">overdue</span> ' : " ")
+        + "<code>" + esc(c.id) + "</code> " + esc(trunc(c.title, 40)) + "</div>";
+    }).join("");
+    body = '<div class="p-row"><span class="pill risk">' + f.open + " open" + (f.overdue ? " · " + f.overdue + " overdue" : "") + "</span></div>" + cars;
+  } else {
+    body = '<div class="p-row muted">No open corrective actions on this process.</div>';
+  }
+  return head + body
+    + '<div class="p-row"><button id="p-car-raise" class="ghost-btn">＋ Raise a CAR</button>'
+    + (f && f.open ? ' <button id="p-car-view" class="ghost-btn">View CARs</button>' : "") + "</div></div>";
+}
 function procProps(p) {
   var risks = p.risks.map(function (r) { return '<span class="pill risk" title="' + esc(r.risk) + '">' + esc(r.id) + "</span>"; }).join("");
   var kpis = p.kpis.map(function (k) { return '<span class="pill">' + esc(k) + "</span>"; }).join("");
@@ -1175,6 +1195,7 @@ function procProps(p) {
     + '<div class="p-sec"><div class="lbl">hierarchy</div><div class="p-row">parent <b>' + esc(p.parent_ref || "—") + "</b>"
     + ((p.objective_refs && p.objective_refs.length) ? " · objectives " + p.objective_refs.map(function (o) { return '<span class="pill">' + esc(o.replace(/^obj\./, "")) + "</span>"; }).join("") : "") + "</div>"
     + (p.custom && Object.keys(p.custom).length ? '<div class="p-row">' + Object.keys(p.custom).map(function (k) { return '<span class="mdchip">' + esc(k) + ": " + esc(String(p.custom[k])) + "</span>"; }).join("") : "") + "</div>"
+    + carSection(p)
     + '<div class="struct"><button id="pmeta-open" class="ghost-btn">Master data &amp; hierarchy…</button>'
     + '<div class="p-row muted" style="margin-top:8px">Click a step in the flowchart to edit its guardrail.</div></div>';
 }
@@ -1707,6 +1728,7 @@ function refreshLive() {
   else if (state.view === "strategy") fetch("/api/strategy").then(function (r) { return r.json(); }).then(function (d) { state.strategy = d; if (state.view === "strategy") renderCenter(); });
   if (typeof refreshApprovalsBadge === "function") refreshApprovalsBadge();
   if (typeof loadGatePolicy === "function") loadGatePolicy();
+  if (typeof onCapaChanged === "function") onCapaChanged();  // CAR writes land in the edits log
 }
 (function () {
   if (!window.EventSource) return;

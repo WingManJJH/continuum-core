@@ -21,15 +21,18 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 sys.path.insert(0, os.path.join(HERE, "..", "dashboard"))
+sys.path.insert(0, os.path.join(HERE, "..", "governance"))
 import continuum_core as cc  # noqa: E402
 import llm  # shared model seam  # noqa: E402
 import traceability as trace  # noqa: E402
 from rollup import Rollup  # noqa: E402
+import capa as capa_mod  # noqa: E402  — corrective/preventive action register (ISO 9001 §10.2)
 
 STD = {
     "iso9001_44": "ISO 9001 §4.4 — process approach",
     "iso9001_75": "ISO 9001 §7.5 — documented information",
     "iso9001_753": "ISO 9001 §7.5.3 — retention & disposition",
+    "iso9001_102": "ISO 9001 §10.2 — nonconformity & corrective action",
     "iso9004": "ISO 9004 — maturity / PDCA",
     "apqc": "APQC PCF — classification & join key",
     "cm_04": "Continuum §04 — enforcement",
@@ -232,10 +235,19 @@ class RulesAdvisor:
         findings = trace.lint(self.g)
         tc = round(trace.completeness_score(self.g, findings) * 100)
         cov = Rollup(self.g).coverage()
+        caps = capa_mod.CAPAStore()
+        capa_summary = caps.summary(self.g)
+        capa_insights = caps.insights(self.g)
         checks = [
             _c("cm_12", not [f for f in findings if f["severity"] == "ERROR"], "high",
                "No broken references", f"{sum(1 for f in findings if f['severity']=='ERROR')} error(s)",
                "Resolve broken references before they mislead an agent."),
+            _c("iso9001_102", capa_summary["overdue"] == 0, "high", "No overdue corrective actions",
+               f"{capa_summary['overdue']} overdue of {capa_summary['open']} open CAR(s)",
+               "Escalate past-due CARs to their owners so nonconformities close on time (§10.2)."),
+            _c("iso9001_102", capa_summary["critical_open"] == 0, "high", "No critical nonconformity left open",
+               f"{capa_summary['critical_open']} critical CAR(s) open",
+               "Contain and close critical corrective actions first (§10.2)."),
             _c("cm_12", tc >= 100, "medium", "Full strategy traceability",
                f"{tc}% of processes trace to strategy", "Give every process a KPI that reaches an objective (§12)."),
             _c("cm_12", cov["pct"] >= 100, "medium", "Guardrail coverage",
@@ -249,6 +261,9 @@ class RulesAdvisor:
                   "Roll-up scorecard. Analyze a specific process/guardrail for line-by-line findings.")
         w["worst"] = sorted(({"id": p["id"], "score": s} for p, s in zip(procs, pscores)),
                             key=lambda x: x["score"])[:3]
+        # corrective-action insights (ISO 9001 §10.2) — advisory findings the AI
+        # layer surfaces alongside the model scorecard.
+        w["capa"] = {"summary": capa_summary, "insights": capa_insights}
         return w
 
     # ---- dispatch --------------------------------------------------------
