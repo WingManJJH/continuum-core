@@ -30,6 +30,9 @@ def main():
     check("CO.3.2.7 has 4 tasks in sequence", [t["seq"] for t in co["tasks"]] == [1, 2, 3, 4])
     check("CO header carries guardrail version", co["guardrail"] == "gr.CO.3.2.7.v3")
     check("CO links its risk", any(r["id"] == "rc.kyc_false_verify" for r in co["risks"]))
+    check("CO carries its open corrective-action flag (CAPA)",
+          co.get("cars") and co["cars"]["open"] >= 1 and co["cars"]["severity"] == "major")
+    check("a process with no CAR carries no flag", by_id["MS.3.5.2"].get("cars") is None)
 
     t3 = next(t for t in co["tasks"] if t["id"] == "CO.3.2.7.t3")
     check("t3 is agent-bound", "agent.kyc_verifier" in t3["agents"])

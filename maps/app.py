@@ -34,6 +34,7 @@ import portal  # noqa: E402  — read-only share links (operational, not a model
 import store as gov  # noqa: E402  — the tested guardrail write path (one source of truth)
 import approvals as approvals_mod  # noqa: E402  — approval-gate workflow (Phase 3)
 import approval_policy as policy_mod  # noqa: E402  — which changes need approval (Phase 3)
+import capa as capa_mod  # noqa: E402  — CAPA corrective/preventive action register (Phase 3)
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
@@ -46,6 +47,7 @@ import typesafe  # noqa: E402  — the Jev seam (availability check)
 STORE = gov.GovernanceStore()
 QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
 POLICY = policy_mod.ApprovalPolicy()        # which entity types must be gated
+CAPA = capa_mod.CAPAStore()                 # corrective/preventive action register (ISO 9001 §10.2)
 
 # Active model persists across restarts (data/active_model.txt); the whole stack
 # folds whichever model is active (default / an imported BPC model / SYSPRO / …).
@@ -131,6 +133,16 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/models":
             return self._json({"models": cc.list_models(), "active": cc.ACTIVE_MODEL,
                                "jev": typesafe.available()})
+        if u.path == "/api/capa":
+            # the corrective-action register + owner notifications + AI insights,
+            # all from the active model's folded graph (one source of truth).
+            g = cc.Graph()
+            q = parse_qs(u.query)
+            proc = q.get("process", [None])[0]
+            if proc:
+                return self._json({"process": proc, "cars": CAPA.for_process(proc, g)})
+            return self._json({"register": CAPA.register(g), "summary": CAPA.summary(g),
+                               "notifications": CAPA.notifications(g), "insights": CAPA.insights(g)})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
@@ -274,6 +286,27 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError:
                     pass
                 return self._json({"ok": True, "active": cc.ACTIVE_MODEL, "models": cc.list_models()})
+            if u.path == "/api/capa":
+                # corrective-action register writes — raise a CAR for a reported
+                # error, edit its investigation/action fields, or move it through
+                # the lifecycle. All via the versioned, hash-chained store (§7.5).
+                op = b.get("op")
+                if op == "raise":
+                    r = CAPA.raise_car(b.get("title", ""), b.get("nonconformance", ""),
+                                       b.get("source", "other"), b.get("severity", "minor"),
+                                       b.get("owner_role", ""), b.get("affected_process_refs", []) or [],
+                                       actor, reason or "raised a corrective action",
+                                       date_due=b.get("date_due"), containment=b.get("containment", ""),
+                                       risk_refs=b.get("risk_refs"))
+                elif op == "edit":
+                    r = CAPA.edit_car(b.get("id", ""), b.get("changes", {}) or {}, actor,
+                                      reason or "updated the corrective action")
+                elif op == "transition":
+                    r = CAPA.transition(b.get("id", ""), b.get("to_state", ""), actor,
+                                        reason or "advanced the corrective action")
+                else:
+                    return self._json_code({"ok": False, "error": f"unknown op {op}"}, 400)
+                return self._json({"ok": True, "car": r})
             if u.path == "/api/enrich":
                 # Jev (System One) governance enrichment of the ACTIVE model's
                 # processes — advisory typed classifications written via the store.

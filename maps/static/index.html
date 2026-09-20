@@ -15,6 +15,7 @@
     <span id="live-dot" class="live-dot" title="Live — the model updates in real time"></span>
     <button class="toggle" id="present-btn" type="button">▶ Present</button>
     <button class="toggle" id="approvals-btn" type="button">Approvals <span id="appr-badge" class="appr-badge" hidden>0</span></button>
+    <button class="toggle" id="capa-btn" type="button" title="Corrective &amp; preventive actions (CAPA / CAR register)">CARs <span id="capa-badge" class="appr-badge capa-badge" hidden>0</span></button>
     <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
@@ -190,6 +191,27 @@
     </div>
   </div>
 
+  <!-- CAPA — corrective / preventive action register (ISO 9001 §10.2) -->
+  <div id="capa-modal" class="modal" hidden>
+    <div class="modal-card capa-card">
+      <div class="modal-head">
+        <h2>Corrective actions</h2>
+        <nav class="appr-tabs capa-tabs">
+          <button data-cf="open" class="active" type="button">Open</button>
+          <button data-cf="mine" type="button">Mine</button>
+          <button data-cf="all" type="button">All</button>
+          <button data-cf="insights" type="button">AI insights</button>
+        </nav>
+        <button id="capa-close" class="x" type="button">&times;</button>
+      </div>
+      <div class="capa-toolbar">
+        <button id="capa-new" class="add-btn" type="button">+ Raise a CAR</button>
+        <span id="capa-summary" class="capa-summary"></span>
+      </div>
+      <div id="capa-body"></div>
+    </div>
+  </div>
+
   <!-- Enrich with Jev (System One governance classification) -->
   <div id="enrich-modal" class="modal" hidden>
     <div class="modal-card">
@@ -283,6 +305,7 @@
   <script src="history.js"></script>
   <script src="present.js"></script>
   <script src="approvals.js"></script>
+  <script src="capa.js"></script>
   <script src="docs.js"></script>
 </body>
 </html>

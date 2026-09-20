@@ -111,7 +111,7 @@ def build_model_seed(items: list[dict], model_name: str, sig: str = "model") -> 
             "KPI": [], "Process": list(procs.values()), "Task": [],
             "HumanRole": [role], "AgentBinding": [], "GuardrailPolicy": [guard],
             "RiskControl": [], "ProcessGroup": list(groups.values()),
-            "Gateway": [], "SequenceFlow": [], "Event": []}
+            "Gateway": [], "SequenceFlow": [], "Event": [], "CorrectiveAction": []}
 
 
 def write_model(slug: str, name: str, seed: dict, source: str, description: str) -> str:

@@ -750,3 +750,66 @@ h3.dhead .caret { font-size: 11px; color: var(--muted); width: 12px; display: in
 .ov-desc { font-size: 14px; line-height: 1.55; color: var(--ink); margin: 4px 0 12px; }
 .ov-learn { display: inline-block; font-size: 13px; font-weight: 600; color: var(--accent, #2f8fbf); text-decoration: none; }
 .ov-learn:hover { text-decoration: underline; }
+
+/* ---------- CAPA — corrective / preventive actions (ISO 9001 §10.2) ---------- */
+.appr-badge.capa-badge.overdue { background: var(--crit); color: #fff; }
+.capa-card { max-width: 860px; }
+.capa-toolbar { display: flex; align-items: center; gap: 12px; padding: 4px 2px 10px; }
+.capa-summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.capa-summary .pill.risk { background: var(--crit-bg); color: var(--crit); }
+#capa-body { max-height: 62vh; overflow: auto; }
+
+.capa-cardw { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--surface); }
+.capa-top { cursor: pointer; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.capa-top code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.capa-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.capa-affected { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.capa-proc { cursor: pointer; }
+.capa-proc:hover { border-color: var(--accent); }
+
+.capa-sev { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: .02em; }
+.capa-sev.sev-minor { background: var(--surface-2); color: var(--muted); }
+.capa-sev.sev-major { background: var(--warn-bg); color: var(--warn); }
+.capa-sev.sev-critical { background: var(--crit-bg); color: var(--crit); }
+.capa-state { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); }
+.capa-state.cst-closed { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.capa-state.cst-cancelled { color: var(--muted); }
+.capa-state.cst-investigating, .capa-state.cst-open { background: var(--surface-2); }
+.capa-overdue { font-size: 11px; font-weight: 700; color: var(--crit); text-transform: uppercase; }
+
+.capa-detail { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.capa-field { margin-bottom: 8px; }
+.capa-fl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.capa-fv { font-size: 13px; white-space: pre-wrap; margin: 2px 0; }
+.capa-edit { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); color: var(--ink); resize: vertical; }
+.capa-editrow { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.capa-editrow label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.capa-editrow input, .capa-editrow select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); color: var(--ink); }
+.capa-lifecycle { margin: 8px 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.capa-cardactions { display: flex; align-items: center; gap: 10px; }
+.capa-msg { font-size: 12px; }
+.capa-msg.ok { color: var(--good); }
+.capa-msg.err { color: var(--crit); }
+
+.capa-section-h { font-weight: 600; margin: 14px 2px 8px; }
+.capa-insight { border-left: 3px solid var(--line); padding: 6px 10px; margin-bottom: 8px; background: var(--surface); }
+.capa-insight.sev-high { border-left-color: var(--crit); }
+.capa-insight.sev-medium { border-left-color: var(--warn); }
+.capa-insight.sev-low { border-left-color: var(--muted); }
+.capa-ih { font-weight: 600; font-size: 13px; }
+.capa-id { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.capa-ir { font-size: 12px; margin-top: 3px; }
+.capa-notif { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.capa-nrow { font-size: 12px; margin-top: 3px; }
+.capa-nrow code { font-family: var(--mono); color: var(--muted); }
+
+.capa-form { display: flex; flex-direction: column; gap: 8px; }
+.capa-formh { font-weight: 600; font-size: 15px; }
+.capa-form label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.capa-form input, .capa-form select, .capa-form textarea { font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--ground); color: var(--ink); }
+.capa-formrow { display: flex; gap: 10px; flex-wrap: wrap; }
+.capa-formrow label { flex: 1; min-width: 120px; }
+
+/* corrective actions in the process properties panel */
+.p-car { font-size: 12px; margin: 4px 0; display: flex; align-items: center; gap: 5px; }
+.p-car code { font-family: var(--mono); color: var(--muted); }
