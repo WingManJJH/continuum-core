@@ -191,10 +191,14 @@ function renderCapaInsights() {
   var body = document.getElementById("capa-body");
   var ins = (_capaData && _capaData.insights) || [], notif = (_capaData && _capaData.notifications) || {};
   var insHtml = ins.length ? ins.map(function (f) {
-    return '<div class="capa-insight sev-' + esc(f.severity) + '"><div class="capa-ih">' + esc(f.title) + "</div>"
+    var jev = f.source === "jev" ? '<span class="capa-jev" title="Advisory — a Jev (System One) typed judgment">✦ Jev</span>' : "";
+    return '<div class="capa-insight sev-' + esc(f.severity) + '"><div class="capa-ih">' + esc(f.title) + jev + "</div>"
       + '<div class="capa-id">' + esc(f.detail) + "</div>"
       + (f.recommendation ? '<div class="capa-ir">→ ' + esc(f.recommendation) + "</div>" : "") + "</div>";
   }).join("") : '<div class="muted" style="padding:12px">No corrective-action findings — nothing overdue, critical, or clustering.</div>';
+  var jevNote = (_capaData && _capaData.jev)
+    ? " · includes <b>✦ Jev</b> enrichment (advisory typed judgments)"
+    : " · set <code>CONTINUUM_TYPESAFE_API_KEY</code> to add ✦ Jev enrichment";
   var roles = (notif.by_role && Object.keys(notif.by_role)) || [];
   var notifHtml = roles.length ? roles.map(function (r) {
     var items = notif.by_role[r];
@@ -205,7 +209,7 @@ function renderCapaInsights() {
           + ' <span class="muted">(' + (i.kind === "owner" ? "you own this" : "affects " + esc(i.process)) + ")</span></div>";
       }).join("") + "</div>";
   }).join("") : '<div class="muted" style="padding:12px">No owners to notify — no open corrective actions.</div>';
-  body.innerHTML = '<div class="capa-section-h">Insights <span class="muted">— deterministic ISO 9001 §10.2 findings, also shown in the AI advisor</span></div>'
+  body.innerHTML = '<div class="capa-section-h">Insights <span class="muted">— ISO 9001 §10.2 findings' + jevNote + "</span></div>"
     + insHtml
     + '<div class="capa-section-h">Owners to notify</div>' + notifHtml;
 }

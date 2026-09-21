@@ -58,6 +58,7 @@ jobs:
           python governance/test_approvals.py
           python governance/test_approval_policy.py
           python governance/test_capa.py
+          python governance/test_capa_enrich.py
           python maps/test_mapdata.py
           python maps/test_layout.py
           python maps/test_landscape.py

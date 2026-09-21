@@ -35,6 +35,7 @@ import store as gov  # noqa: E402  — the tested guardrail write path (one sour
 import approvals as approvals_mod  # noqa: E402  — approval-gate workflow (Phase 3)
 import approval_policy as policy_mod  # noqa: E402  — which changes need approval (Phase 3)
 import capa as capa_mod  # noqa: E402  — CAPA corrective/preventive action register (Phase 3)
+import capa_enrich  # noqa: E402  — Jev (System One) enrichment of the CAPA insights
 sys.path.insert(0, os.path.join(HERE, "..", "bpmn"))
 import export as bpmn_export  # noqa: E402  — BPMN 2.0 XML export
 import import_bpmn as bpmn_import  # noqa: E402  — BPMN 2.0 XML import
@@ -141,8 +142,17 @@ class Handler(BaseHTTPRequestHandler):
             proc = q.get("process", [None])[0]
             if proc:
                 return self._json({"process": proc, "cars": CAPA.for_process(proc, g)})
+            insights = CAPA.insights(g)
+            jev_on = typesafe.available()
+            if jev_on:
+                # Jev only ADDS advisory findings; a hiccup never breaks the register.
+                try:
+                    insights = insights + capa_enrich.jev_insights(CAPA.open_cars(g))
+                except Exception:  # noqa: BLE001
+                    pass
             return self._json({"register": CAPA.register(g), "summary": CAPA.summary(g),
-                               "notifications": CAPA.notifications(g), "insights": CAPA.insights(g)})
+                               "notifications": CAPA.notifications(g),
+                               "insights": insights, "jev": jev_on})
         if u.path == "/api/changes":
             return self._json({"changes": hist.model_changes()})
         if u.path == "/api/history":
