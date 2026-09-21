@@ -50,10 +50,30 @@ function addAnalysis(r) {
     + '<div class="scorecard"><span class="score ' + scoreClass(r.score) + '">' + r.score + '%</span>'
     + '<div class="sc-meta"><div class="subj">' + esc(r.subject) + '</div>'
     + '<div class="line">analyzed against: ' + esc(stds.join(" · ")) + "</div></div></div>"
-    + findings + passline + worst + llmBlock(r)
+    + findings + passline + worst + capaBlock(r) + llmBlock(r)
     + (r.note ? '<div class="note">' + esc(r.note) + "</div>" : "")
     + "</div>";
   thread.appendChild(el); scroll();
+}
+function capaBlock(r) {
+  var c = r.capa; if (!c) return "";   // only whole-model analyses carry the CAPA roll-up
+  var s = c.summary || {};
+  var head = '<div class="capa-head">Corrective actions <span>ISO 9001 §10.2 &middot; the CAPA register</span></div>';
+  var sum = '<div class="capa-sum"><span class="capa-pill">' + (s.open || 0) + " open</span>"
+    + (s.overdue ? '<span class="capa-pill crit">' + s.overdue + " overdue</span>" : "")
+    + (s.critical_open ? '<span class="capa-pill crit">' + s.critical_open + " critical</span>" : "")
+    + '<span class="capa-total">' + (s.total || 0) + " total</span></div>";
+  if (!c.insights || !c.insights.length)
+    return '<div class="capa-block">' + head + sum
+      + '<div class="capa-empty">No corrective-action findings — nothing overdue, critical, or clustering.</div></div>';
+  var items = c.insights.map(function (f) {
+    return '<div class="find"><span class="sev ' + esc(f.severity) + '">' + esc(f.severity) + "</span>"
+      + '<div><div class="t">' + esc(f.title) + "</div>"
+      + '<div class="d">' + esc(f.detail) + "</div>"
+      + (f.recommendation ? '<div class="r">' + esc(f.recommendation) + "</div>" : "")
+      + '<span class="std">ISO 9001 §10.2 — corrective action</span></div></div>';
+  }).join("");
+  return '<div class="capa-block">' + head + sum + items + "</div>";
 }
 function llmBlock(r) {
   if (!r.llm_status || r.llm_status === "off") return "";
