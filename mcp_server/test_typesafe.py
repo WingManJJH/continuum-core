@@ -82,6 +82,33 @@ def main():
     except RuntimeError:
         check("refuses with no access", True)
 
+    # --- wire translation to the real /v1/systemone contract (pure, no network) ---
+    scored = [{"id": "sev", "kind": "score", "scale": [1, 5],
+               "prompt": "how severe?", "levels": ["tiny", "small", "moderate", "big", "huge"]},
+              {"id": "cust", "kind": "noul", "prompt": "customer-facing?",
+               "true": "touches a customer", "false": "internal only"},
+              {"id": "own", "kind": "choice", "options": ["a", "b"],
+               "prompt": "owner?", "option_desc": {"a": "team A", "b": "team B"}}]
+    api_q = ts._to_api_questions(scored)
+    check("score -> ordered level array as criteria", api_q["sev"]["criteria"] == ["tiny", "small", "moderate", "big", "huge"]
+          and api_q["sev"]["type"] == "score" and api_q["sev"]["instructions"] == "how severe?")
+    check("noul -> true/false criteria", api_q["cust"]["criteria"] == {"true": "touches a customer", "false": "internal only"})
+    check("choice -> option:description criteria", api_q["own"]["criteria"] == {"a": "team A", "b": "team B"})
+    # score with no levels falls back to (hi-lo+1) synthesized labels
+    check("score criteria synthesized when no levels given",
+          len(ts._to_api_questions([{"id": "s", "kind": "score", "scale": [1, 5], "prompt": "p"}])["s"]["criteria"]) == 5)
+    # response parsing: API score is 0..(levels-1); internal score is lo + api_score
+    resp = {"answers": {"sev": {"type": "score", "score": 3.0, "confidence": 0.9},
+                        "cust": {"type": "noul", "noul": 0.8},
+                        "own": {"type": "choice", "choice": "b", "probabilities": {"a": 0.3, "b": 0.7}}}}
+    raw = ts._from_api_answers(scored, resp)
+    check("API score 3 on a [1,5] scale -> internal 4", raw["sev"]["score"] == 4)
+    check("noul passes through", raw["cust"]["noul"] == 0.8)
+    check("choice maps 'choice' -> internal 'value'", raw["own"]["value"] == "b")
+    # end-to-end: parsed raw is coerced into the declared types
+    coerced = {q["id"]: ts._coerce(q, raw[q["id"]]) for q in scored}
+    check("parsed + coerced score stays in scale", coerced["sev"]["score"] == 4)
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
         print("FAILED:", ", ".join(FAIL))

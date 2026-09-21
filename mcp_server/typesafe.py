@@ -19,7 +19,14 @@ network for tests.
 Env:
   CONTINUUM_TYPESAFE_API_KEY
   CONTINUUM_TYPESAFE_MODEL     (default below)
-  CONTINUUM_TYPESAFE_BASE_URL  (default: TypeSafe decide endpoint)
+  CONTINUUM_TYPESAFE_BASE_URL  (default: TypeSafe System One endpoint)
+
+Wire shape follows the live API (https://docs.typesafe.ai/api.md): POST to
+/v1/systemone with {model, state, questions:{id:{type,instructions,criteria}}},
+answers come back {answers:{id:{noul|choice|score,probabilities,confidence,legend}}}.
+The internal question list ({id,kind,prompt,options|scale}) is translated to that
+shape in _to_api_questions/_from_api_answers, so callers and the injected-transport
+tests keep the small internal interface.
 
 Jev outputs are probabilistic classifications — advisory signal, not authority.
 They must land through the governed, audited write path with a human or a
@@ -33,8 +40,8 @@ import os
 API_KEY_ENV = "CONTINUUM_TYPESAFE_API_KEY"
 MODEL_ENV = "CONTINUUM_TYPESAFE_MODEL"
 BASE_URL_ENV = "CONTINUUM_TYPESAFE_BASE_URL"
-DEFAULT_MODEL = "jev-1"
-DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/decide"
+DEFAULT_MODEL = "jev-latest"
+DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/systemone"
 KINDS = ("choice", "score", "noul")
 
 
@@ -117,15 +124,61 @@ def _coerce(q: dict, ans):
             "probabilities": probs}
 
 
+def _to_api_questions(questions: list[dict]) -> dict:
+    """Internal question list -> the API's questions object {id:{type,instructions,
+    criteria}}. `prompt` is the instruction; `criteria` passes through when a caller
+    authored it, else it is synthesized from options / scale. Score criteria is an
+    ordered array of level descriptions (low -> high); a caller SHOULD pass `levels`
+    for a good score — synthesized labels are a last resort."""
+    obj = {}
+    for q in questions:
+        kind = q["kind"]
+        instr = q.get("prompt") or q.get("instructions") or q["id"]
+        if "criteria" in q:
+            crit = q["criteria"]
+        elif kind == "noul":
+            crit = {"true": q.get("true", "The statement is true."),
+                    "false": q.get("false", "The statement is false.")}
+        elif kind == "choice":
+            desc = q.get("option_desc") or {}
+            crit = {opt: desc.get(opt) for opt in q["options"]}
+        else:  # score — ordered level descriptions
+            lo, hi = q["scale"]
+            crit = q.get("levels") or ["level %d" % i for i in range(lo, hi + 1)]
+        obj[q["id"]] = {"type": kind, "instructions": instr, "criteria": crit}
+    return obj
+
+
+def _from_api_answers(questions: list[dict], data) -> dict:
+    """API response -> the internal raw shape _coerce expects (keyed by question id).
+    The API's score is a position on 0..(levels-1); a score question's scale is
+    [lo, hi] with (hi-lo+1) levels, so the internal score is lo + api_score."""
+    answers = data.get("answers", data) if isinstance(data, dict) else {}
+    out = {}
+    for q in questions:
+        a = answers.get(q["id"]) if isinstance(answers, dict) else None
+        a = a if isinstance(a, dict) else {}
+        if q["kind"] == "noul":
+            out[q["id"]] = {"noul": a.get("noul")}
+        elif q["kind"] == "choice":
+            out[q["id"]] = {"value": a.get("choice"), "confidence": a.get("confidence"),
+                            "probabilities": a.get("probabilities")}
+        else:  # score
+            lo, _hi = q["scale"]
+            s = a.get("score")
+            out[q["id"]] = {"score": (lo + s) if isinstance(s, (int, float)) else None,
+                            "confidence": a.get("confidence")}
+    return out
+
+
 def _call_api(state, questions: list[dict]) -> dict:
-    """POST state + typed questions to Jev over stdlib urllib (no new dependency).
-    The wire shape follows the documented choice/score/noul primitives; adjust the
-    endpoint/field names here if TypeSafe's API differs from the defaults."""
+    """POST state + typed questions to Jev's System One endpoint over stdlib urllib
+    (no new dependency), and translate the answer back to the internal shape."""
     import urllib.request as _rq
-    body = json.dumps({"model": model(), "state": state, "questions": questions}).encode()
+    body = json.dumps({"model": model(), "state": state,
+                       "questions": _to_api_questions(questions)}).encode()
     req = _rq.Request(os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL), data=body, headers={
         "content-type": "application/json", "authorization": "Bearer " + api_key()})
     with _rq.urlopen(req, timeout=30) as resp:  # nosec - fixed TypeSafe endpoint
         data = json.loads(resp.read())
-    # accept {"answers": {id: ...}} or a bare {id: ...}
-    return data.get("answers", data) if isinstance(data, dict) else {}
+    return _from_api_answers(questions, data)
