@@ -118,7 +118,9 @@ def run():
 
         closed = _drive_to_closed(s, "car.2026.002")
         check("transition: drives to closed through the gates", closed["state"] == "closed")
-        check("transition: stamps date_closed on closure", closed["date_closed"] == TODAY)
+        # date_closed is stamped with the real close date (capa._today()), NOT the
+        # fixed TODAY the register reads run against — compare to the real today.
+        check("transition: stamps date_closed on closure", closed["date_closed"] == capa._today())
 
         reopened = s.transition("car.2026.002", "investigating", ACTOR, "recurred")
         check("transition: reopening a closed CAR clears date_closed", reopened["date_closed"] is None)
