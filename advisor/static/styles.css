@@ -98,3 +98,15 @@ header .spacer { flex: 1; }
 .go { font: inherit; font-weight: 600; padding: 8px 18px; border-radius: 9px; border: 1px solid var(--accent);
   background: var(--accent); color: var(--accent-ink); cursor: pointer; }
 .go:disabled { opacity: .55; cursor: default; }
+
+/* ---------- CAPA — corrective-action roll-up (ISO 9001 §10.2) ---------- */
+.capa-block { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.capa-head { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--warn); margin: 4px 0; }
+.capa-head span { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.capa-sum { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+.capa-pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); }
+.capa-pill.crit { background: var(--crit-bg); color: var(--crit); font-weight: 600; }
+.capa-total { color: var(--muted); font-size: 12px; }
+.capa-empty { color: var(--muted); font-size: 12.5px; padding: 2px 0 4px; }
+.capa-block .std { color: var(--warn); }
