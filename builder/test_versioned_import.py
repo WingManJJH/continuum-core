@@ -200,6 +200,7 @@ def run(seed0):
     check("batches are listed with who / when / counts", [b["batch"] for b in vi.batches(slug)][:2] == ["B0001", "B0002"])
     review_fixes(seed0, s)
     one_inbox(seed0, s)
+    round_two(seed0, s)
 
 
 def review_fixes(seed0, s):
@@ -362,6 +363,101 @@ def one_inbox(seed0, s):
     check("reverting the batch withdraws its pending inbox request", all(c["status"] != "pending" for c in pd))
     with cc.use_model(slug):
         check("the proposals log verifies", cc.verify_log(os.path.join(cc.model_base(slug), "proposals.log.jsonl"))["ok"])
+
+
+def round_two(seed0, s):
+    """Regression tests for the second independent review (D57)."""
+    import threading
+    import approvals
+    slug = "r2"
+    vi.import_model(slug, "R2", seed0, SRC, actor=A)
+    # a malformed record refuses the whole import, before anything is written
+    bad = copy.deepcopy(seed0)
+    bad["Process"].append({"id": "ZZ.1", "name": {"x": 1}, "status": 5})
+    try:
+        vi.import_model(slug, "R2", bad, SRC, actor=A)
+        refused = False
+    except vi.ImportError_ as e:
+        refused = "schemas" in str(e)
+    with cc.use_model(slug):
+        check("a malformed record refuses the whole import; nothing written", refused and cc.Graph().get("Process", "ZZ.1") is None
+              and len(vi.batches(slug)) == 1)
+    # import requests can't be proposed by hand
+    with cc.use_model(slug):
+        q = approvals.ApprovalQueue(s)
+        try:
+            q.propose("accept_import_change", {"sid": "S0002-0001"}, proposed_by=A, reason="please reject")
+            forged = True
+        except approvals.ApprovalError:
+            forged = False
+    check("an import request can't be proposed by hand", not forged)
+    # a request whose staged change was decided elsewhere settles instead of sticking
+    with cc.use_model(slug):
+        s.edit_process("CO.3.2.7", {"name": "ours r2"}, A, "edit")
+    s1 = copy.deepcopy(seed0)
+    proc(s1, "CO.3.2.7")["name"] = "theirs r2"
+    vi.import_model(slug, "R2", s1, SRC, actor=A)
+    st = vi.staged(slug)[0]
+    vi.accept(slug, st["sid"], "role.qms.iso_advisor", via_queue=True)   # decided, inbox not told
+    with cc.use_model(slug):
+        cr = approvals.ApprovalQueue(s).approve(st["cr_id"], reviewer="role.qms.iso_advisor")
+    check("a request whose change was already decided settles (no stuck pending)", cr["status"] == "approved")
+    # a failure after the writes still leaves a revertible batch
+    s2 = copy.deepcopy(s1)
+    proc(s2, "FN.9.3.1")["name"] = "tail crash"
+    be = cc.storage.get()
+    real = be.write_json
+
+    def boom(path, obj, indent=2):
+        if path.endswith("import_baselines.json"):
+            raise OSError("disk full")
+        return real(path, obj, indent)
+    be.write_json = boom
+    try:
+        vi.import_model(slug, "R2", s2, SRC, actor=A)
+    except OSError:
+        pass
+    finally:
+        be.write_json = real
+    fb = [b for b in vi.batches(slug) if b["kind"] == "import-failed"]
+    out = vi.revert(slug, fb[-1]["batch"], A, "undo the failed tail") if fb else {"reverted": 0}
+    with cc.use_model(slug):
+        nm = cc.Graph().get("Process", "FN.9.3.1")["name"]
+    check("a failure at the very end is still recorded and revertible", fb and out["reverted"] == 1 and nm != "tail crash")
+    # two approvers on the same ordinary request: applied once
+    with cc.use_model(slug):
+        q = approvals.ApprovalQueue(s)
+        cr = q.propose("edit_process", {"process_id": "PD.2.4.1", "changes": {"name": "once"}}, proposed_by=A, reason="r")
+        before = cc.Graph().get("Process", "PD.2.4.1")["version"]
+    res = []
+
+    def appr(who):
+        try:
+            with cc.use_model(slug):
+                approvals.ApprovalQueue(s).approve(cr["id"], reviewer=who)
+            res.append("ok")
+        except Exception as e:  # noqa: BLE001
+            res.append(type(e).__name__)
+    ts = [threading.Thread(target=appr, args=(w,)) for w in ("role.qms.iso_advisor", "role.finance.cfo", "role.ops.support_lead")]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    with cc.use_model(slug):
+        after = cc.Graph().get("Process", "PD.2.4.1")["version"]
+    check("three approvers at once: the change is applied exactly once", after == before + 1 and res.count("ok") == 1, str(res))
+    # many imports at once don't exhaust anything (Postgres pool) and stay serialized
+    ids, errs = [], []
+
+    def go(n):
+        try:
+            sx = copy.deepcopy(s1)
+            proc(sx, "IT.8.4.2")["name"] = f"wave {n}"
+            ids.append(vi.import_model(slug, "R2", sx, SRC, actor=A)["batch"])
+        except Exception as e:  # noqa: BLE001
+            errs.append(repr(e)[:120])
+    ts = [threading.Thread(target=go, args=(n,)) for n in range(14)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    check("14 imports at once all complete with distinct batches", not errs and len(set(ids)) == 14, f"{errs[:2]}")
 
 
 if __name__ == "__main__":

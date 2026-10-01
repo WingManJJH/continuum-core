@@ -144,10 +144,12 @@ class ApprovalQueue:
 
     # --- writes ------------------------------------------------------------
     def propose(self, op: str, args: dict, proposed_by: str, reason: str,
-                title: str = "", target: str = "", assignee: str = "") -> dict:
+                title: str = "", target: str = "", assignee: str = "", _system: bool = False) -> dict:
         """Queue a change without touching the model. Validates the op and the
         SHAPE of the args against the real method signature, so a bad request is
         refused up front — but full schema/referential checks run at apply time."""
+        if op == IMPORT_OP and not _system:   # D57: raised by imports only, never by hand
+            raise ApprovalError("import changes are raised by an import, not proposed by hand")
         if not reason or not reason.strip():
             raise ApprovalError("a change reason is required (ISO 9001 §7.5)")
         if not proposed_by or not proposed_by.startswith("role."):
@@ -187,11 +189,42 @@ class ApprovalQueue:
         })
         return self.get(cr_id)
 
+    def _decision_lock(self):
+        return cc.storage.get().mutex(self.log_path)   # one decision on a request at a time (D57)
+
     def approve(self, cr_id: str, reviewer: str, decision_reason: str = "") -> dict:
         """Apply a pending request through the real audited store method."""
+        with self._decision_lock():
+            return self._approve(cr_id, reviewer, decision_reason)
+
+    def _import_stage(self, cr):
+        """The staged change an import request decides — only if it is bound to THIS request."""
+        sid = (cr.get("args") or {}).get("sid", "")
+        st = {x["sid"]: x for x in self.store._vi().staged(cc.ACTIVE_MODEL, "all")}.get(sid)
+        return st if st and st.get("cr_id") == cr["id"] else None
+
+    def _settle_import(self, cr) -> dict | None:
+        """An import request whose staged change is gone or already decided is
+        closed to match it, instead of staying pending forever."""
+        st = self._import_stage(cr)
+        if st is None:
+            return self.close(cr["id"], "superseded", "role.import.service", "its staged import change no longer exists")
+        if st["status"] != "pending":
+            if st["status"] == "superseded":
+                return self.close(cr["id"], "superseded", "role.import.service", "superseded by a newer import or a revert")
+            d = st.get("decision") or {}
+            return self.mirror(cr["id"], "approved" if st["status"] == "accepted" else "rejected",
+                               d.get("by") or "role.import.service", d.get("reason") or "decided on the Imports screen")
+        return None
+
+    def _approve(self, cr_id: str, reviewer: str, decision_reason: str = "") -> dict:
         cr = self.get(cr_id)
         if cr["status"] != "pending":
             raise ApprovalError(f"request is already {cr['status']}")
+        if cr["op"] == IMPORT_OP:
+            settled = self._settle_import(cr)
+            if settled is not None:
+                return settled
         if not reviewer or not reviewer.startswith("role."):
             raise ApprovalError("reviewer must be a role (e.g. role.qms.iso_advisor)")
         method = self._method(cr["op"])
@@ -216,6 +249,10 @@ class ApprovalQueue:
         return self.get(cr_id)
 
     def reject(self, cr_id: str, reviewer: str, decision_reason: str) -> dict:
+        with self._decision_lock():
+            return self._reject(cr_id, reviewer, decision_reason)
+
+    def _reject(self, cr_id: str, reviewer: str, decision_reason: str) -> dict:
         cr = self.get(cr_id)
         if cr["status"] != "pending":
             raise ApprovalError(f"request is already {cr['status']}")
@@ -224,6 +261,9 @@ class ApprovalQueue:
         if not decision_reason or not decision_reason.strip():
             raise ApprovalError("a reason is required to reject a change")
         if cr["op"] == IMPORT_OP:  # "keep ours": the staged import change is rejected (and remembered)
+            settled = self._settle_import(cr)
+            if settled is not None:
+                return settled
             try:
                 self.store.reject_import_change(cr["args"].get("sid", ""), reviewer, decision_reason.strip())
             except EditError as exc:
@@ -235,6 +275,10 @@ class ApprovalQueue:
         return self.get(cr_id)
 
     def withdraw(self, cr_id: str, actor: str, decision_reason: str = "") -> dict:
+        with self._decision_lock():
+            return self._withdraw(cr_id, actor, decision_reason)
+
+    def _withdraw(self, cr_id: str, actor: str, decision_reason: str = "") -> dict:
         cr = self.get(cr_id)
         if cr["status"] != "pending":
             raise ApprovalError(f"request is already {cr['status']}")

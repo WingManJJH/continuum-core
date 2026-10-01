@@ -53,6 +53,52 @@ import continuum_core as cc  # noqa: E402
 IGNORED = {"version"}  # compared content excludes the version counter
 
 
+SCHEMA_DIR = os.path.normpath(os.path.join(HERE, "..", "schema"))
+TYPE_SCHEMA = {
+    "StrategicObjective": "strategic-objective", "KPI": "kpi", "Process": "process", "Task": "task",
+    "HumanRole": "human-role", "AgentBinding": "agent-binding", "GuardrailPolicy": "guardrail-policy",
+    "RiskControl": "risk-control", "Gateway": "gateway", "SequenceFlow": "sequence-flow", "Event": "event",
+    "ProcessGroup": "process-group", "Enterprise": "enterprise", "Initiative": "initiative",
+    "Correlation": "correlation", "CorrectiveAction": "corrective-action", "Capability": "capability",
+    "Application": "application", "Obligation": "obligation", "Control": "control", "Risk": "risk",
+}
+MAX_RECORDS = int(os.environ.get("CONTINUUM_IMPORT_MAX_RECORDS", "250000"))
+_VALIDATORS: dict = {}
+
+
+def validate_seed(seed: dict) -> None:
+    """Every record of a known type must match its locked schema, or nothing is
+    imported (D57): one malformed record must never break a model for everyone."""
+    from jsonschema import Draft202012Validator
+    if not isinstance(seed, dict):
+        raise ImportError_("an import is a model export: an object of record lists")
+    errors, n = [], 0
+    for etype, rows in seed.items():
+        if not isinstance(rows, list):
+            continue
+        n += len(rows)
+        if n > MAX_RECORDS:
+            raise ImportError_(f"too many records (over {MAX_RECORDS}); split the import")
+        if etype not in TYPE_SCHEMA:
+            continue
+        if etype not in _VALIDATORS:
+            with open(os.path.join(SCHEMA_DIR, TYPE_SCHEMA[etype] + ".schema.json")) as f:
+                _VALIDATORS[etype] = Draft202012Validator(json.load(f))
+        for i, r in enumerate(rows):
+            if not isinstance(r, dict) or not r.get("id"):
+                errors.append(f"{etype}[{i}]: not a record with an id")
+                continue
+            for e in _VALIDATORS[etype].iter_errors(r):
+                errors.append(f"{etype} {r.get('id')}: {'.'.join(map(str, e.path)) or '(record)'} {e.message}")
+                break
+            if len(errors) >= 10:
+                break
+        if len(errors) >= 10:
+            break
+    if errors:
+        raise ImportError_("the import was refused — records don't match the model's schemas: " + "; ".join(errors[:10]))
+
+
 class ImportError_(ValueError):
     """A refused import / review decision — safe to show in the UI."""
 
@@ -154,6 +200,8 @@ def _fold_staged(slug) -> dict:
                                                         "based_on_version", "incoming", "diff", "reasons",
                                                         "incoming_hash", "cr_id")},
                               "staged_at": ev["ts"], "status": "pending", "decision": None}
+        elif ev["kind"] == "link" and ev["sid"] in out:
+            out[ev["sid"]]["cr_id"] = ev["cr_id"]
         elif ev["sid"] in out:
             out[ev["sid"]]["status"] = ev["status"]
             out[ev["sid"]]["decision"] = {"by": ev.get("by"), "reason": ev.get("reason", ""), "at": ev["ts"],
@@ -181,7 +229,9 @@ def _next_batch(p) -> str:
 # --------------------------------------------------------------------------- import
 def plan(slug: str, seed: dict, source: str) -> dict:
     """What an import WOULD do — nothing is written."""
-    return _run(slug, _normalized(seed), source, actor=None, dry=True)
+    seed = _normalized(seed)
+    validate_seed(seed)
+    return _run(slug, seed, source, actor=None, dry=True)
 
 
 def import_model(slug: str, name: str, seed: dict, source: str, description: str = "",
@@ -191,6 +241,7 @@ def import_model(slug: str, name: str, seed: dict, source: str, description: str
     p = _paths(slug)
     be = cc.storage.get()
     seed = _normalized(seed)
+    validate_seed(seed)
     with cc.use_model(slug, cc.current_user()), be.mutex(p["imports"]):
         if be.read_json(p["seed"], None) is None:
             be.write_json(p["seed"], seed, indent=1)
@@ -203,10 +254,11 @@ def import_model(slug: str, name: str, seed: dict, source: str, description: str
                    "retired": 0, "unchanged": 0, "staged": 0, "events": []}
             _append(p["imports"], {**rep, "actor": _actor(actor), "reason": reason or f"baseline import from {source}"})
             return rep
-        meta = be.read_json(p["meta"], {}) or {}
+        rep = _run(slug, seed, source, actor, dry=False, reason=reason)
+        meta = be.read_json(p["meta"], {}) or {}   # only after the batch succeeded (D57)
         be.write_json(p["meta"], {**meta, "name": name or meta.get("name"), "source": source,
                                   "description": description or meta.get("description", "")}, indent=1)
-        return _run(slug, seed, source, actor, dry=False, reason=reason)
+        return rep
 
 
 def _run(slug, seed, source, actor, dry, reason=""):
@@ -254,17 +306,20 @@ def _run(slug, seed, source, actor, dry, reason=""):
             sid = f"S{batch[1:]}-{len(rep['staged_ids']) + 1:04d}"
             diff = _diff(cur, inc or {}) if inc else []
             fields = ", ".join(d["field"] for d in diff[:4]) + ("…" if len(diff) > 4 else "")
+            # stage first, then the inbox request, then the link (D57): a failure in
+            # between leaves a staged change that is still decidable on Imports,
+            # never an inbox request pointing at nothing
+            _append(p["staged"], {"kind": "stage", "sid": sid, "batch": batch, "source": source, "etype": etype,
+                                  "id": eid, "change": change, "based_on_version": cur.get("version"),
+                                  "incoming": inc, "incoming_hash": ih, "diff": diff, "reasons": reasons})
+            rep["staged_ids"].append(sid)
             cr = _queue().propose(
                 "accept_import_change", {"sid": sid}, proposed_by=_review_actor(actor),
                 reason="; ".join(reasons) + f" (import {batch} from {source})",
                 title=(f"Import {batch}: retire {etype} {eid}" if change == "delete"
                        else f"Import {batch}: {etype} {eid}" + (f" — {fields}" if fields else "")),
-                target=eid)
-            _append(p["staged"], {"kind": "stage", "sid": sid, "batch": batch, "source": source, "etype": etype,
-                                  "id": eid, "change": change, "based_on_version": cur.get("version"),
-                                  "incoming": inc, "incoming_hash": ih, "diff": diff, "reasons": reasons,
-                                  "cr_id": cr["id"]})
-            rep["staged_ids"].append(sid)
+                target=eid, _system=True)
+            _append(p["staged"], {"kind": "link", "sid": sid, "cr_id": cr["id"]})
 
         def write(etype, eid, op, cur, body):
             rep["changes"].append({"etype": etype, "id": eid, "action": op})
@@ -334,6 +389,20 @@ def _run(slug, seed, source, actor, dry, reason=""):
                                               "reason": f"{batch} no longer proposes this change"})
                         _close_cr(old, actor, f"import {batch} no longer proposes this change")
                     rep["superseded"].append(old["sid"])
+
+            if dry:
+                rep.pop("events")
+                return rep
+            bl_all[source] = new_baseline
+            bl_all.setdefault("__reverted__", {})[source] = reverted
+            be.write_json(p["baselines"], bl_all)
+            _append(p["imports"], {"batch": batch, "kind": "import", "source": source, "actor": _actor(actor),
+                                   "reason": why, **{k: rep[k] for k in ("created", "updated", "retired", "unchanged",
+                                                                         "staged", "skipped_rejected", "skipped_types",
+                                                                         "staged_ids", "superseded")},
+                                   "events": [{k: e[k] for k in ("event_id", "etype", "id", "op", "from_version",
+                                                                 "to_version")} for e in rep["events"]],
+                                   "prev": {e["event_id"]: e["prev"] for e in rep["events"]}})
         except Exception as e:
             if not dry:
                 _append(p["imports"], {"batch": batch, "kind": "import-failed", "source": source,
@@ -343,20 +412,6 @@ def _run(slug, seed, source, actor, dry, reason=""):
                                                   for x in rep["events"]],
                                        "prev": {x["event_id"]: x["prev"] for x in rep["events"]}})
             raise
-
-        if dry:
-            rep.pop("events")
-            return rep
-        bl_all[source] = new_baseline
-        bl_all.setdefault("__reverted__", {})[source] = reverted
-        be.write_json(p["baselines"], bl_all)
-        _append(p["imports"], {"batch": batch, "kind": "import", "source": source, "actor": _actor(actor),
-                               "reason": why, **{k: rep[k] for k in ("created", "updated", "retired", "unchanged",
-                                                                     "staged", "skipped_rejected", "skipped_types",
-                                                                     "staged_ids", "superseded")},
-                               "events": [{k: e[k] for k in ("event_id", "etype", "id", "op", "from_version",
-                                                             "to_version")} for e in rep["events"]],
-                               "prev": {e["event_id"]: e["prev"] for e in rep["events"]}})
         return {k: v for k, v in rep.items() if k != "events"} | {"events": len(rep["events"])}
 
 

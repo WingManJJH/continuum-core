@@ -295,6 +295,35 @@ def run(port, seed):
     finally:
         gsrv.shutdown()
 
+    # round two (D57): bodies are bounded and checked before they are read
+    import socket
+    import time as _t
+
+    def raw(headers, body=b""):
+        sk = socket.create_connection(("127.0.0.1", port), timeout=5)
+        ck = "; ".join(f"{k}={v}" for k, v in alice.cookies.items())
+        sk.sendall((f"POST /api/process/edit?ws=acme HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nCookie: {ck}\r\n"
+                    "Content-Type: application/json\r\n" + headers + "\r\n").encode() + body)
+        t0 = _t.time()
+        try:
+            data = sk.recv(200).decode(errors="replace")
+        except socket.timeout:
+            data = ""
+        sk.close()
+        return data.split(" ")[1] if data.startswith("HTTP/") else "none", _t.time() - t0
+    code, dt = raw("Content-Length: 1000000000\r\n")
+    check("a huge Content-Length is refused at once (413), nothing read", code == "413" and dt < 2)
+    check("a negative Content-Length is 400", raw("Content-Length: -1\r\n")[0] == "400")
+    check("a non-numeric Content-Length is 400", raw("Content-Length: lots\r\n")[0] == "400")
+    deep = b"[" * 5000 + b"]" * 5000
+    check("deeply nested JSON is a clean 400", raw(f"Content-Length: {len(deep)}\r\n", deep)[0] == "400")
+    st, js, _, _ = carol.req("POST", "/api/approvals?ws=acme", {"op": "propose", "target_op": "accept_import_change",
+                                                                "args": {"sid": "S0002-0001"}, "reason": "x"})
+    check("a viewer is refused before the body matters", st == 403)
+    st, js, _, _ = alice.req("POST", "/api/approvals?ws=acme", {"op": "propose", "target_op": "accept_import_change",
+                                                                "args": {"sid": "S0002-0001"}, "reason": "please reject"})
+    check("nobody can hand-propose an import request", st == 400 and "import" in js["error"])
+
     # sessions
     alice.req("POST", "/api/members?ws=acme", {"op": "signout_all", "email": "bob@example.com"})
     st, _, _, _ = bob.req("GET", "/api/maps?ws=acme")

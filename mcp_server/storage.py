@@ -322,6 +322,9 @@ class PostgresBackend:
         import psycopg  # noqa: F401  (fail fast with a clear error if not installed)
         from psycopg_pool import ConnectionPool
         self.url = url
+        self._mutex_guard = threading.Lock()
+        self._mutex_locks: dict[str, threading.RLock] = {}
+        self._mutex_depth = threading.local()
         self.pool = ConnectionPool(url, min_size=min_size, max_size=max_size, open=True,
                                    kwargs={"autocommit": False})
 
@@ -406,16 +409,34 @@ class PostgresBackend:
 
     @contextmanager
     def mutex(self, path):
+        """Exclusive across threads (an in-process lock, so waiters hold nothing)
+        and processes (a session advisory lock on a dedicated connection outside
+        the pool, so a held lock never starves the pool its holder needs)."""
+        import psycopg
         ws, name = workspace_of(path)
-        with self.pool.connection() as conn:
-            conn.autocommit = True
-            key = ws + "|mutex|" + name
-            conn.execute("select pg_advisory_lock(hashtextextended(%s, 1))", (key,))
+        key = ws + "|mutex|" + name
+        with self._mutex_guard:
+            tl = self._mutex_locks.setdefault(key, threading.RLock())
+        held = self._mutex_depth.__dict__.setdefault("held", {})
+        with tl:
+            if held.get(key):   # re-entered on this thread: the advisory lock is already ours
+                held[key] += 1
+                try:
+                    yield
+                finally:
+                    held[key] -= 1
+                return
+            conn = psycopg.connect(self.url, autocommit=True)
             try:
-                yield
+                conn.execute("select pg_advisory_lock(hashtextextended(%s, 1))", (key,))
+                held[key] = 1
+                try:
+                    yield
+                finally:
+                    held[key] = 0
+                    conn.execute("select pg_advisory_unlock(hashtextextended(%s, 1))", (key,))
             finally:
-                conn.execute("select pg_advisory_unlock(hashtextextended(%s, 1))", (key,))
-                conn.autocommit = False
+                conn.close()
 
     def _lock(self, c, ws, name):
         c.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (ws + "|" + name,))

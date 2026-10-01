@@ -6,6 +6,43 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-02 — Second independent review: 9 findings fixed
+
+### D57 — Fixes from the second security and correctness reviews (D55–D56 and everything since D54)
+
+**Security**
+
+1. **Import requests are system-only (medium).** Only an import can raise an `accept_import_change` request; `propose` refuses it otherwise.
+   - Approve and reject act only on the staged change bound to that request (the `cr_id` link).
+   - A request whose staged change was already decided, superseded or is missing settles to match it, rather than raising an error or staying pending forever.
+   - Before this, an editor could raise a decoy request against a real staged change and have it rejected.
+2. **Imported records are schema-checked (medium).** Every record of a known type must match its locked schema, or the whole import is refused before anything is written.
+   - The refusal lists up to 10 errors.
+   - Record count is capped by `CONTINUUM_IMPORT_MAX_RECORDS` (default 250k).
+   - All four real models validate.
+3. **Request bodies are bounded (medium).** `Content-Length` is checked before anything is read: 2 MB by default, 50 MB for imports, 413 above that, and 400 for a negative or non-numeric value.
+   - The role floor is checked before the body is read.
+   - Deeply nested JSON is a clean 400.
+   - Socket timeout is 60 s.
+   - `/auth/dev` bodies are capped at 4 KB.
+   - The canvas parses JSON safely in single-user mode too.
+
+**Correctness**
+
+4. **Postgres import lock no longer exhausts the connection pool (high).**
+   - An in-process lock comes first, so waiting threads hold no connection.
+   - The advisory lock runs on a dedicated connection outside the pool.
+   - The lock is re-entrant per thread.
+   - 14 concurrent imports now complete; before, 10 or more stalled for 30 s.
+5. **Stage first, then request (high).** The staged change is written first, then the inbox request, then a `link` event, so a failure in between never leaves a request pointing at nothing.
+6. **A late failure is still revertible (medium).** The baselines write and the final batch record are now inside the failure guard.
+7. **Approvals are applied exactly once (medium).** Approve, reject and withdraw run under a storage mutex and re-check the request's status inside it. Before this, a second approver could re-apply the change.
+8. **Model metadata waits for success (low).** `model.json` is updated only after the batch succeeds.
+
+All are pinned by regression tests (`test_versioned_import` 49 and `test_web` 75, on both backends).
+
+---
+
 ## 2026-10-02 — One review inbox
 
 ### D56 — Staged import changes are change requests in the approvals inbox

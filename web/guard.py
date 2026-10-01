@@ -31,6 +31,25 @@ import continuum_core as cc  # noqa: E402
 
 PUBLIC = ("/portal.html", "/portal.js", "/styles.css", "/favicon.ico", "/api/portal/view")
 IDENTITY_FIELDS = ("actor", "reviewer", "proposed_by")
+MAX_BODY = int(float(os.environ.get("CONTINUUM_MAX_BODY_MB", "2")) * 1024 * 1024)
+MAX_IMPORT_BODY = int(float(os.environ.get("CONTINUUM_MAX_IMPORT_MB", "50")) * 1024 * 1024)
+BODY_PATHS = {"/api/imports": MAX_IMPORT_BODY, "/api/import/bpmn": MAX_IMPORT_BODY}
+
+
+def body_length(handler, path: str):
+    """(length, error) from Content-Length, checked BEFORE anything is read (D57)."""
+    raw = handler.headers.get("Content-Length")
+    if raw in (None, ""):
+        return 0, None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None, (400, "Content-Length is not a number")
+    if n < 0:
+        return None, (400, "Content-Length is negative")
+    if n > BODY_PATHS.get(path, MAX_BODY):
+        return None, (413, f"request too large (limit {BODY_PATHS.get(path, MAX_BODY) // (1024 * 1024)} MB)")
+    return n, None
 
 # (app, method, path) -> extra rule: function(body) -> minimum role. Default: GET viewer, writes editor.
 ADMIN_PATHS = {"/api/approval-policy", "/api/members", "/api/imports/revert", "/api/imports", "/api/build/model"}
@@ -110,6 +129,7 @@ def _signin_page(next_url, error=""):
 def protect(Handler, app: str):
     class Guarded(Handler):
         _cc_app = app
+        timeout = int(os.environ.get("CONTINUUM_SOCKET_TIMEOUT", "60"))   # a stalled client can't pin a thread
 
         # ---- entry points
         def do_GET(self):
@@ -132,6 +152,11 @@ def protect(Handler, app: str):
             u = urlparse(self.path)
             if u.path.startswith("/auth/"):
                 return self._auth_route(method, u)
+            if method in ("POST", "PUT", "DELETE"):
+                _n, err = body_length(self, u.path)
+                if err:
+                    self.close_connection = True
+                    return _json(self, {"ok": False, "error": err[1]}, err[0])
             if auth.mode() == "off":
                 if u.path == "/api/me":
                     return _json(self, {"ok": True, "auth": "off"})  # single-user: the UI keeps its role picker
@@ -174,14 +199,18 @@ def protect(Handler, app: str):
                 g = auth.access(user["email"], ws)
             body = None
             if method in ("POST", "PUT", "DELETE"):
-                n = int(self.headers.get("Content-Length") or 0)
+                floor = required_role(method, u.path, None)   # role check before reading the body (D57)
+                if auth.RANK[g["role"]] < auth.RANK[floor]:
+                    self.close_connection = True
+                    return _json(self, {"ok": False, "error": f"this needs the {floor} role on {ws} (you are {g['role']})"}, 403)
+                n, _err = body_length(self, u.path)
                 raw = self.rfile.read(n) if n else b""
                 ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip()
                 if raw and ctype != "application/json":
                     return _json(self, {"ok": False, "error": "requests must be JSON"}, 415)
                 try:
                     body = json.loads(raw or b"{}")
-                except (json.JSONDecodeError, UnicodeDecodeError):
+                except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
                     return _json(self, {"ok": False, "error": "invalid JSON"}, 400)
                 if not isinstance(body, dict):
                     return _json(self, {"ok": False, "error": "the request body must be a JSON object"}, 400)
@@ -269,7 +298,9 @@ def protect(Handler, app: str):
                                      cookies=[auth.cookie_header(auth.OIDC_COOKIE, ck, 600)])
                     return _send(self, 200, _signin_page(auth._safe_next(nxt)), "text/html; charset=utf-8")
                 if u.path == "/auth/dev" and method == "POST" and auth.mode() == "dev":
-                    n = int(self.headers.get("Content-Length") or 0)
+                    n, err = body_length(self, u.path)
+                    if err or n > 4096:
+                        raise auth.AuthError("sign-in request too large or malformed", 400)
                     form = parse_qs(self.rfile.read(n).decode()) if n else {}
                     if self.headers.get("Origin") and urlparse(self.headers["Origin"]).netloc != self.headers.get("Host", ""):
                         raise auth.AuthError("cross-origin sign-in refused", 403)

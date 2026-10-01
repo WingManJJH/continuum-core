@@ -281,8 +281,13 @@ class Handler(BaseHTTPRequestHandler):
         # add / rename / reorder / remove a step — all through the versioned,
         # hash-chained governance write path.
         u = urlparse(self.path)
-        length = int(self.headers.get("Content-Length", 0))
-        b = json.loads(self.rfile.read(length) or b"{}")
+        try:
+            length = max(0, int(self.headers.get("Content-Length", 0) or 0))
+            b = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, RecursionError, UnicodeDecodeError):
+            return self._json_code({"ok": False, "error": "invalid JSON body"}, 400)
+        if not isinstance(b, dict):
+            return self._json_code({"ok": False, "error": "the request body must be a JSON object"}, 400)
         if ea_api.handles("POST", u.path):
             return self._ea("POST", u, b)
         actor = b.get("actor", "role.ops.support_lead")
