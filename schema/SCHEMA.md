@@ -95,3 +95,12 @@ python3 continuum-core/mcp_server/token_budget.py --validate
 ## Lock changelog
 
 - **v1 (2026-08-25)** — Initial lock. Eight entities + event envelope. Encodes Core Model §02/§04 verbatim; no fields added beyond the spec's stated ones except explicit `id`/`version`/`status` scaffolding and the `_envelope` required by §07's event-sourced write discipline.
+- **v1.1 (2026-10-01, D45)** — Additive: five EA / GRC building blocks — `capability`, `application` (systems and agents), `obligation`, `control`, `risk`. Relationships live on the new records (`*_refs`), so no Phase 1 schema changed and every existing record stays valid. `RiskControl` remains valid and is read by the rules as a paired risk + control; `GovernanceStore.split_risk_control` converts one when it needs testing or sharing.
+
+| Prefix | Entity | Example |
+|---|---|---|
+| `cap.` | Capability | `cap.identity_verification` |
+| `app.` | Application (system or agent) | `app.identity_hub` |
+| `obl.` | Obligation | `obl.iso9001.7_5` |
+| `ctl.` | Control | `ctl.second_look_kyc` |
+| `rsk.` | Risk | `rsk.synthetic_identity` |

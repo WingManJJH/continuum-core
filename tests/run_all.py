@@ -31,7 +31,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # (group, script, extra args). Order matters only for readability of the report.
 SUITES: list[tuple[str, str, list[str]]] = [
     ("harness", "mcp_server/token_budget.py", ["--validate"]),
-    ("harness", "mcp_server/traceability.py", []),
+    ("core", "mcp_server/traceability.py", []),
     ("harness", "mcp_server/scenario.py", []),
     ("core", "governance/test_store.py", []),
     ("core", "enforcement/test_enforce.py", []),

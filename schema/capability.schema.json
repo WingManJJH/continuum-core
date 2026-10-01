@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/capability",
+  "title": "Capability",
+  "description": "What the business must be able to do, independent of how (EA building block, D45). Capabilities nest via parent_ref (L1-L5) and are realized by processes. LOCKED addition.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "level",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^cap\\.[a-z0-9_.]+$"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 800
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "parent_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^cap\\.[a-z0-9_.]+$"
+    },
+    "importance": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "maxLength": 160,
+      "description": "Accountable owner: a HumanRole id (role.\u2026) or a named person/team."
+    },
+    "process_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+$"
+      },
+      "uniqueItems": true,
+      "description": "Processes that realize this capability (process \u2014realizes\u2192 capability)."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}

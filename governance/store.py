@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 # make the sibling mcp_server package importable
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
+sys.path.insert(0, HERE)
 import continuum_core as cc  # noqa: E402
 
 from jsonschema import Draft202012Validator  # noqa: E402
@@ -48,15 +49,15 @@ EDITABLE_GROUP_FIELDS = ["name", "level", "parent_ref", "owner_role", "objective
 EDITABLE_PROCESS_FIELDS = ["name", "owner_role", "parent_ref", "objective_refs", "custom", "maturity_score", "next_process_refs"]
 
 
-class EditError(ValueError):
-    """A rejected edit — the reason is safe to show the owner in the UI."""
+from errors import EditError  # noqa: E402,F401  (one class shared by every write path)
+from ea_store import EnterpriseWrites  # noqa: E402  (D45 — EA/GRC write paths)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class GovernanceStore:
+class GovernanceStore(EnterpriseWrites):
     def __init__(self):
         with open(os.path.join(SCHEMA_DIR, "guardrail-policy.schema.json")) as f:
             self._gr_validator = Draft202012Validator(json.load(f))

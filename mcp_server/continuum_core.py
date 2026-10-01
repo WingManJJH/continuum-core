@@ -87,6 +87,10 @@ REASON_CODES = {
 }
 
 
+# D45 — the five EA / GRC building blocks (schemas in schema/<name>.schema.json).
+EA_TYPES = ("Capability", "Application", "Obligation", "Control", "Risk")
+
+
 class Graph:
     """In-memory fold of the seed graph, indexed by id per entity type."""
 
@@ -105,6 +109,7 @@ class Graph:
             "ProcessGroup",  # L1–L5 hierarchy (management architecture view)
             "Enterprise", "Initiative", "Correlation",  # Phase 2: strategy layer (OKR / X-matrix)
             "CorrectiveAction",  # Phase 3: CAPA — corrective / preventive action register (ISO 9001 §10.2)
+            *EA_TYPES,  # D45: enterprise architecture + GRC building blocks
         ):
             self._by_type[etype] = {e["id"]: e for e in raw.get(etype, [])}
         # Fold the change-control log on top of the seed baseline so the state an

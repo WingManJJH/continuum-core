@@ -1,0 +1,9 @@
+{
+  "name": "continuum-studio-tests",
+  "private": true,
+  "description": "Browser tests for the offline Continuum Studio artifact (run by tests/run_all.py, group 'studio').",
+  "dependencies": {
+    "bpmn-js": "18.25.1",
+    "playwright": "^1.56.0"
+  }
+}

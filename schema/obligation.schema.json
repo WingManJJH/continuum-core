@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/obligation",
+  "title": "Obligation",
+  "description": "A requirement the organization must meet or chooses to follow: a standard clause (ISO 9001 / ISO 9004 packs), a regulation, a contract or a policy (GRC building block, D45). Summaries are Continuum's own wording, never verbatim standard text. LOCKED addition.",
+  "type": "object",
+  "required": [
+    "id",
+    "source",
+    "title",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^obl\\.[a-z0-9_.]+$"
+    },
+    "pack": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "clause": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "jurisdiction": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "effective_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "process_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+$"
+      },
+      "uniqueItems": true,
+      "description": "obligation \u2014applies_to\u2192 process"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}

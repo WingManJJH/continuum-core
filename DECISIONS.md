@@ -6,6 +6,43 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — EA / GRC building blocks in the governed model
+
+### D47 — MCP server folds live; Ripple and Vitals are agent tools
+**Finding:** `mcp_server/server.py` folded the graph once at start-up, so an agent kept acting under
+the old guardrail until the server restarted — contrary to "live the moment it is saved".
+**Decision:** fold on every tool call (`_g()`), as every web app already does. New tools
+`get_impact` (Ripple) and `get_vitals`, compact text renders. The budgeted `get_task_context`
+render is unchanged (token budgets hold). `mcp_server/test_server_tools.py` → 6.
+
+### D46 — Python is the rules engine of record; the JS core is parity-gated
+**Decision:** Ripple, Assure, Vitals and Atlas are ported to `enterprise/rules.py`. The browser JS
+core (`studio/core/`) stays only for the offline Studio. `enterprise/test_parity.py` runs both on
+one fixture (the Studio seed, widened with a failing control, a retired system in use, an
+accepted risk, a capability cycle and an overdue review) and requires identical results for every
+Ripple start node (107), Assure, Vitals and Atlas. BFS path *choice* between equal-depth parents is
+order-dependent and not compared; reach, depth, counts, KPIs, guardrails and summaries are.
+Result objects keep the JS contract (camelCase) so canvas and Studio render one payload.
+continuum-core mapping: a process is evidence when `active` and its `custom.next_review_due`
+has not lapsed (continuum-core has no separate approved status — approvals gate the change).
+
+### D45 — Capability, Application, Obligation, Control, Risk as locked schemas
+**Decision:** five new entities in the continuum-core style (ids `cap.` `app.` `obl.` `ctl.` `rsk.`;
+`version` + `status`; snapshot-per-event writes). Relationships are stored once, on the new record
+(`process_refs`, `task_refs`, `capability_refs` …) so no Phase 1 schema changed. Applications carry
+`kind: system | agent`; an agent's execution stays an `AgentBinding` (`agent_binding_refs`); a
+binding no agent Application owns still reads as an agent. Legacy `RiskControl` reads as a risk +
+control pair; `split_risk_control` converts one and retires it. Write paths
+(`governance/ea_store.py`, mixed into `GovernanceStore`): validated, every ref checked (unknown or
+retired refused, capability cycles refused), versioned, retired not deleted, reason + role actor
+required, and approvable (`add_/edit_/retire_<block>`, `record_control_test`; one policy entity per
+block, default *optional*). ISO 9001:2015 (28) and ISO 9004:2018 (33) obligation packs
+(`enterprise/packs/`, own-wording summaries, no standard text), seeded idempotently.
+`EditError` moved to `governance/errors.py` (re-exported by `store`) to break an import cycle.
+`enterprise/test_enterprise.py` → 44.
+
+---
+
 ## 2026-10-01 — Consolidation: one codebase (continuum-core)
 
 ### D44 — One standard test run; continuum-core is the single codebase of record

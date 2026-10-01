@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 import continuum_core as cc  # noqa: E402
 
 from store import EditError  # noqa: E402
+from ea_store import EA_OPS  # noqa: E402
 
 # Write methods on GovernanceStore that may be routed through the gate. Reads are
 # excluded by omission. All of these share the (…domain args…, actor, reason)
@@ -48,6 +49,7 @@ PROPOSABLE_OPS = {
     "add_gateway", "edit_gateway", "remove_gateway",
     "add_event", "edit_event", "remove_event",
     "add_flow", "remove_flow", "edit_flow", "enable_branching",
+    *EA_OPS,  # D45
 }
 
 # Injected by the gate at apply time — never accepted from the caller's args.
