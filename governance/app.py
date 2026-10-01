@@ -24,6 +24,8 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "web"))
 import guard  # noqa: E402  — sign-in, workspaces, roles (D52)
 import store as gov  # noqa: E402
+import continuum_core as cc  # noqa: E402  (store put mcp_server on the path)
+import approval_policy as policy_mod  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
 STORE = gov.GovernanceStore()
@@ -90,6 +92,9 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         payload = json.loads(self.rfile.read(length) or b"{}")
         try:
+            if policy_mod.ApprovalPolicy().requires_gate("GuardrailPolicy"):  # same gate as the canvas (D54)
+                raise gov.EditError("Changes to Guardrails require approval — submit this change for review "
+                                    "in the canvas instead of saving directly.")
             new = STORE.edit_guardrail(
                 q.get("id", [""])[0],
                 changes=payload.get("changes", {}),

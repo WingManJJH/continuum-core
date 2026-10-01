@@ -126,8 +126,8 @@ def revoke(token: str) -> bool:
     """Turn a share link off. Idempotent; returns True if a link was revoked."""
     allp = _load_all()
     rec = allp.get(token or "")
-    if rec is None or rec.get("revoked"):
-        return False
+    if rec is None or rec.get("revoked") or rec.get("workspace", "default") != cc.ACTIVE_MODEL:
+        return False  # unknown, already off, or another model's link
     rec["revoked"] = True
     rec["revoked_at"] = _now().isoformat()
     _save_all(allp)

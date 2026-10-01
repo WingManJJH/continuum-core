@@ -198,6 +198,112 @@ def run(seed0):
     check("every import write names its batch and actor", all(e["actor"]["id"] for e in evs)
           and any("import B" in e["reason"] for e in evs))
     check("batches are listed with who / when / counts", [b["batch"] for b in vi.batches(slug)][:2] == ["B0001", "B0002"])
+    review_fixes(seed0, s)
+
+
+def review_fixes(seed0, s):
+    """Regression tests for the 2026-10-01 independent review (D54)."""
+    import threading
+    # versionless seeds re-import without crashing
+    bare = copy.deepcopy(seed0)
+    for rows in bare.values():
+        if isinstance(rows, list):
+            for r in rows:
+                if isinstance(r, dict):
+                    r.pop("version", None)
+    vi.import_model("bare", "Bare", bare, SRC, actor=A)
+    with cc.use_model("bare"):
+        s.edit_process("CO.3.2.7", {"name": "local"}, A, "edit")
+    b2 = copy.deepcopy(bare)
+    proc(b2, "CO.3.2.7")["name"] = "src"
+    proc(b2, "FN.9.3.1")["name"] = "src FN"
+    try:
+        rep = vi.import_model("bare", "Bare", b2, SRC, actor=A)
+        ok = rep["staged"] == 1 and rep["updated"] == 1
+    except Exception as e:  # noqa: BLE001
+        ok, rep = False, repr(e)
+    check("seeds without version fields re-import (fast-forward + stage)", ok, str(rep)[:200])
+
+    # a newer import that no longer proposes a change withdraws the pending one
+    slug = "sup"
+    vi.import_model(slug, "Sup", seed0, SRC, actor=A)
+    with cc.use_model(slug):
+        s.edit_process("CO.3.2.7", {"name": "ours"}, A, "edit")
+    s1 = copy.deepcopy(seed0)
+    proc(s1, "CO.3.2.7")["name"] = "theirs v2"
+    vi.import_model(slug, "Sup", s1, SRC, actor=A)
+    old_sid = vi.staged(slug)[0]["sid"]
+    s2 = copy.deepcopy(seed0)
+    proc(s2, "CO.3.2.7")["name"] = "ours"   # the source now agrees with us
+    vi.import_model(slug, "Sup", s2, SRC, actor=A)
+    check("a pending change the source no longer proposes is superseded", not vi.staged(slug)
+          and old_sid in [x["sid"] for x in vi.staged(slug, "superseded")])
+
+    # accept moves the baseline: the next source change fast-forwards
+    with cc.use_model(slug):
+        s.edit_process("CO.3.2.7", {"name": "ours again"}, A, "edit")
+    s3 = copy.deepcopy(s2)
+    proc(s3, "CO.3.2.7")["name"] = "theirs v3"
+    vi.import_model(slug, "Sup", s3, SRC, actor=A)
+    sid = vi.staged(slug)[0]["sid"]
+    vi.accept(slug, sid, A)
+    s4 = copy.deepcopy(s3)
+    proc(s4, "CO.3.2.7")["name"] = "theirs v4"
+    rep = vi.import_model(slug, "Sup", s4, SRC, actor=A)
+    check("after an accept, the next source change fast-forwards", rep["updated"] == 1 and rep["staged"] == 0, str(rep)[:200])
+
+    # revert marks records: re-running the same import holds them for review, with the reason
+    s5 = copy.deepcopy(s4)
+    proc(s5, "FN.9.3.1")["name"] = "bad export"
+    r5 = vi.import_model(slug, "Sup", s5, SRC, actor=A)
+    vi.revert(slug, r5["batch"], A, "bad export")
+    rep = vi.import_model(slug, "Sup", s5, SRC, actor=A)
+    st = [x for x in vi.staged(slug) if x["id"] == "FN.9.3.1"]
+    check("re-running a reverted import holds it for review, saying why", rep["updated"] == 0 and len(st) == 1
+          and "reverted" in st[0]["reasons"][0], str(st)[:200])
+
+    # a batch that fails part-way can still be reverted
+    s6 = copy.deepcopy(s4)
+    s6["Process"].insert(0, dict(proc(seed0, "FN.9.3.1"), id="FN.9.3.7", apqc_code="FN.9.3.7", name="new one"))
+    proc(s6, "SC.4.3.6")["name"] = "will conflict"
+    real = cc.append_edit_event
+
+    def flaky(etype, eid, *a, **k):
+        if eid == "SC.4.3.6":
+            raise cc.ConflictError(etype, eid, 1, 2)
+        return real(etype, eid, *a, **k)
+    cc.append_edit_event = flaky
+    try:
+        vi.import_model(slug, "Sup", s6, SRC, actor=A)
+        failed = False
+    except cc.ConflictError:
+        failed = True
+    finally:
+        cc.append_edit_event = real
+    fb = [b for b in vi.batches(slug) if b["kind"] == "import-failed"]
+    check("a part-way failure is recorded with what it wrote", failed and fb and fb[-1]["events"][0]["id"] == "FN.9.3.7")
+    out = vi.revert(slug, fb[-1]["batch"], A, "clean up the failed batch")
+    with cc.use_model(slug):
+        gone = cc.Graph().get("Process", "FN.9.3.7")["status"] == "deprecated"
+    check("…and can be reverted", out["reverted"] == 1 and gone)
+
+    # two imports at once get distinct batch ids (one import per model at a time)
+    ids, errs = [], []
+
+    def go(n):
+        try:
+            sx = copy.deepcopy(s4)
+            proc(sx, "PD.2.4.1")["name"] = f"parallel {n}"
+            ids.append(vi.import_model(slug, "Sup", sx, SRC, actor=A)["batch"])
+        except Exception as e:  # noqa: BLE001
+            errs.append(repr(e))
+    ts = [threading.Thread(target=go, args=(n,)) for n in range(3)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    check("concurrent imports are serialized with distinct batch ids", not errs and len(set(ids)) == 3, f"{ids} {errs}")
+    with cc.use_model(slug):
+        check("all import logs still verify", all(cc.verify_log(os.path.join(cc.model_base(slug), n))["ok"]
+              for n in ("edits.log.jsonl", "imports.log.jsonl", "staged.log.jsonl")))
 
 
 if __name__ == "__main__":

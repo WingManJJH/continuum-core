@@ -103,7 +103,7 @@ def directory() -> dict:
         em = e.get("email", "").lower()
         if k == "user":
             u = users.setdefault(em, {"email": em, "name": "", "epoch": 0, "disabled": False, "created": e["ts"]})
-            u.update({x: e[x] for x in ("name", "disabled") if x in e})
+            u.update({x: e[x] for x in ("name", "disabled", "subject") if x in e})
         elif k == "grant":
             grants[(em, e["workspace"])] = {"email": em, "workspace": e["workspace"], "role": e["role"],
                                            "human_role": e.get("human_role") or "", "by": e["by"], "at": e["ts"]}
@@ -156,6 +156,19 @@ def access(email: str, workspace: str) -> dict | None:
     return g
 
 
+def valid_workspace(ws) -> bool:
+    return isinstance(ws, str) and (ws == "default" or bool(cc.SLUG.match(ws)))
+
+
+def workspace_exists(ws: str) -> bool:
+    return ws == "default" or ws in {m["slug"] for m in cc.list_models()}
+
+
+def is_org_admin(email: str) -> bool:
+    d = directory()
+    return email in _admin_emails() or (d["grants"].get((email, ALL)) or {}).get("role") == "admin"
+
+
 def workspaces_for(email: str) -> list[str]:
     d = directory()
     if access(email, "__probe__"):  # org-wide grant
@@ -166,6 +179,8 @@ def workspaces_for(email: str) -> list[str]:
 def grant(by: str, email: str, workspace: str, role: str, human_role: str = "") -> dict:
     if role not in ROLES:
         raise AuthError(f"role must be one of {', '.join(ROLES)}", 400)
+    if workspace != ALL and not valid_workspace(workspace):
+        raise AuthError("not a valid model id", 400)
     email = email.strip().lower()
     if not EMAIL.match(email):
         raise AuthError("a valid email is required", 400)
@@ -303,21 +318,28 @@ def oidc_begin(next_url: str) -> tuple[str, str]:
 
 
 def _safe_next(n: str | None) -> str:
+    """Only a same-site path: no scheme, no host, no backslash (browsers read
+    '/\\evil.com' as '//evil.com'), no control characters."""
     n = n or "/"
-    return n if n.startswith("/") and not n.startswith("//") else "/"
+    if not n.startswith("/") or "\\" in n or any(ord(ch) < 32 or ord(ch) == 127 for ch in n):
+        return "/"
+    parts = urllib.parse.urlsplit(n)
+    if parts.scheme or parts.netloc or n.startswith("//"):
+        return "/"
+    return n
 
 
 def _verify_rs256(id_token: str, cfg: dict) -> None:
     head = json.loads(_unb64(id_token.split(".")[0]))
-    if head.get("alg") == "none":
-        raise AuthError("unsigned ID token refused", 401)
-    if head.get("alg") != "RS256" or not cfg.get("jwks_uri"):
-        return  # other algs: rely on TLS from the token endpoint (OIDC Core §3.1.3.7)
+    if head.get("alg") != "RS256":   # allow-list: Entra ID and most providers sign ID tokens with RS256
+        raise AuthError(f"ID token algorithm {head.get('alg')!r} is not accepted (RS256 only)", 401)
+    if not cfg.get("jwks_uri"):
+        raise AuthError("the identity provider publishes no signing keys (jwks_uri)", 401)
     try:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import padding, rsa
     except ImportError:
-        return
+        raise AuthError("the 'cryptography' package is required to verify sign-in tokens", 500) from None
     with urllib.request.urlopen(cfg["jwks_uri"], timeout=10) as r:  # nosec - issuer's JWKS
         keys = json.load(r).get("keys", [])
     key = next((k for k in keys if k.get("kid") == head.get("kid")), None) or (keys[0] if len(keys) == 1 else None)
@@ -360,9 +382,22 @@ def oidc_finish(code: str, state: str, cookie_val: str | None) -> dict:
         raise AuthError("ID token expired", 401)
     if claims.get("nonce") != st.get("no"):
         raise AuthError("ID token nonce mismatch", 401)
+    if claims.get("email_verified") is False:
+        raise AuthError("the identity provider says this email is not verified", 403)
     email = (claims.get("email") or claims.get("preferred_username") or claims.get("upn") or "").lower()
     allowed = [d.strip().lower() for d in os.environ.get("CONTINUUM_OIDC_ALLOWED_DOMAINS", "").split(",") if d.strip()]
     if allowed and email.split("@")[-1] not in allowed:
         raise AuthError(f"{email} is not in an allowed sign-in domain", 403)
+    # Bind the account to the provider's stable subject on first sign-in (Entra: oid, else sub):
+    # an email claim alone can be changed by its owner, so it never re-identifies a different subject.
+    subject = f"{claims.get('iss', '').rstrip('/')}|{claims.get('oid') or claims.get('sub') or ''}"
+    if subject.endswith("|"):
+        raise AuthError("the ID token carries no subject", 401)
+    known = directory()["users"].get(email)
+    if known and known.get("subject") and known["subject"] != subject:
+        raise AuthError("this email is bound to a different sign-in identity — ask an administrator", 403)
     user = ensure_user(email, claims.get("name", ""), method="oidc")
+    if not user.get("subject"):
+        _append("user", "system", email=email, subject=subject)
+        user = directory()["users"][email]
     return {"user": user, "next": st.get("nx", "/")}

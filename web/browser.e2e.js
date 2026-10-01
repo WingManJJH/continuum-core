@@ -49,7 +49,7 @@ async function singleUser(browser) {
     // Enterprise: Atlas -> add a capability
     await A.page.click("#enterprise-btn");
     await A.page.waitForSelector(".ea-tabs");
-    ok(await A.page.isVisible("text=No capabilities yet"), "Atlas starts empty with guidance");
+    ok(!!(await A.page.waitForSelector("text=No capabilities yet", { timeout: 10000 }).catch(() => null)), "Atlas starts empty with guidance");
     await A.page.click("[data-ea-add=Capability]");
     await A.page.fill("#ea-form input[name=name]", "Customer onboarding");
     await A.page.selectOption("#ea-form select[name=importance]", "critical");
@@ -68,8 +68,8 @@ async function singleUser(browser) {
     await A.page.click("[data-seed-pack=iso9001]");
     await A.page.waitForSelector(".assure tbody tr");
     ok((await A.page.$$(".assure tbody tr")).length === 28, "ISO 9001 pack adds 28 clauses to Assure");
-    const sel = await A.page.$("[data-map-sel='obl.iso9001.4_4']");
-    await sel.selectOption("CO.3.2.7");
+    await A.page.waitForTimeout(400);   // let the live refresh after seeding settle
+    await A.page.locator("[data-map-sel='obl.iso9001.4_4']").selectOption("CO.3.2.7");   // locators re-resolve if re-rendered
     await A.page.waitForFunction(() => { const s = document.querySelector("[data-map-sel='obl.iso9001.4_4']"); const tr = s && s.closest("tr");
       return tr && tr.querySelector(".ev .ea-chip") && tr.querySelector(".ea-pill.st-covered"); });
     ok(true, "mapping a clause to an active process makes it covered, with the process as evidence");

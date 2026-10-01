@@ -119,7 +119,7 @@ def protect(Handler, app: str):
             return self._cc("HEAD", getattr(super(), "do_HEAD", super().do_GET))
 
         def do_POST(self):
-            return self._cc("POST", super().do_POST)
+            return self._cc("POST", getattr(super(), "do_POST", None))
 
         def do_PUT(self):
             return self._cc("PUT", getattr(super(), "do_PUT", None))
@@ -152,7 +152,13 @@ def protect(Handler, app: str):
                 if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
                     return _json(self, {"ok": False, "error": "cross-origin request refused"}, 403)
             asked = (parse_qs(u.query).get("ws") or [None])[0]
+            if asked is not None and not auth.valid_workspace(asked):
+                return _json(self, {"ok": False, "error": "not a valid model id"}, 400)
             ws = asked or ck.get(auth.WS_COOKIE) or "default"
+            if not auth.valid_workspace(ws) or not auth.workspace_exists(ws):
+                if asked:
+                    return _json(self, {"ok": False, "error": f"no model {asked}"}, 404)
+                ws = "default"
             g = auth.access(user["email"], ws)
             if g is None and asked:
                 return _json(self, {"ok": False, "error": f"you don't have access to {asked}"}, 403)
@@ -175,8 +181,10 @@ def protect(Handler, app: str):
                     return _json(self, {"ok": False, "error": "requests must be JSON"}, 415)
                 try:
                     body = json.loads(raw or b"{}")
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, UnicodeDecodeError):
                     return _json(self, {"ok": False, "error": "invalid JSON"}, 400)
+                if not isinstance(body, dict):
+                    return _json(self, {"ok": False, "error": "the request body must be a JSON object"}, 400)
             need = required_role(method, u.path, body)
             if auth.RANK[g["role"]] < auth.RANK[need]:
                 return _json(self, {"ok": False, "error": f"this needs the {need} role on {ws} (you are {g['role']})"}, 403)
@@ -189,6 +197,8 @@ def protect(Handler, app: str):
                                                    for w in auth.workspaces_for(user["email"])]})
             if u.path == "/api/models" and method == "POST":
                 slug = (body or {}).get("slug") or "default"
+                if not auth.valid_workspace(slug) or not auth.workspace_exists(slug):
+                    return _json(self, {"ok": False, "error": "unknown model"}, 404)
                 if auth.access(user["email"], slug) is None:
                     return _json(self, {"ok": False, "error": f"no access to {slug}"}, 403)
                 with cc.use_model(slug, me):
@@ -221,9 +231,13 @@ def protect(Handler, app: str):
                 if method == "GET":
                     return _json(self, {"ok": True, "workspace": ws, "members": auth.members(ws), "roles": auth.ROLES})
                 op = (body or {}).get("op")
+                # Members are managed for THIS workspace (the one the admin role was checked on).
+                # Only an organization admin may act org-wide ("*") or sign someone out everywhere.
+                org_admin = auth.is_org_admin(user["email"])
                 target_ws = (body or {}).get("workspace") or ws
-                if target_ws == auth.ALL and (auth.access(user["email"], "__probe__") or {}).get("role") != "admin":
-                    return _json(self, {"ok": False, "error": "only an organization admin can grant org-wide access"}, 403)
+                if target_ws != ws and not (target_ws == auth.ALL and org_admin):
+                    return _json(self, {"ok": False, "error": "manage members from the model they belong to"
+                                        if target_ws != auth.ALL else "only an organization admin can act org-wide"}, 403)
                 if op == "grant":
                     g = auth.grant(user["email"], body.get("email", ""), target_ws, body.get("role", "viewer"),
                                    body.get("human_role", ""))
@@ -231,6 +245,8 @@ def protect(Handler, app: str):
                     auth.revoke(user["email"], body.get("email", ""), target_ws)
                     g = None
                 elif op == "signout_all":
+                    if not org_admin:
+                        return _json(self, {"ok": False, "error": "only an organization admin can end someone's sessions"}, 403)
                     auth.signout_everywhere(user["email"], body.get("email", ""))
                     g = None
                 else:

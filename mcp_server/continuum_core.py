@@ -18,6 +18,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import types
@@ -89,9 +90,17 @@ sys.modules[__name__].__class__ = _CoreModule
 GENESIS_HASH = "0" * 64                                                # prev_hash of the first event in a log
 
 
+SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
 def model_base(slug: str) -> str:
-    """The directory holding a model's seed + logs. 'default' is data/ itself."""
-    return DATA_ROOT if slug in (None, "", "default") else os.path.join(MODELS_DIR, slug)
+    """The directory holding a model's seed + logs. 'default' is data/ itself.
+    A slug is a plain folder name (D54): anything else — '..', '/', '\\' — is refused."""
+    if slug in (None, "", "default"):
+        return DATA_ROOT
+    if not isinstance(slug, str) or not SLUG.match(slug):
+        raise ValueError(f"not a valid model id: {slug!r}")
+    return os.path.join(MODELS_DIR, slug)
 
 
 def set_active_model(slug: str) -> str:

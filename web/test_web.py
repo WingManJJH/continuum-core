@@ -237,6 +237,51 @@ def run(port, seed):
     st, js, _, _ = alice.req("GET", "/api/imports?ws=acme")
     check("import batches list who did it", js["batches"][0]["user"] == "alice@example.com")
 
+    # review fixes (D54): members are scoped to the workspace the admin role was checked on
+    erin = Client(port)
+    erin.signin("erin@example.com")
+    alice.req("POST", "/api/members?ws=acme", {"op": "grant", "email": "erin@example.com", "role": "admin"})
+    st, js, _, _ = erin.req("POST", "/api/members?ws=acme", {"op": "grant", "email": "erin@example.com", "role": "admin",
+                                                              "workspace": "beta"})
+    check("a workspace admin can't grant access to another workspace", st == 403)
+    st, js, _, _ = erin.req("POST", "/api/members?ws=acme", {"op": "grant", "email": "erin@example.com", "role": "admin",
+                                                              "workspace": "*"})
+    check("…or org-wide", st == 403)
+    st, js, _, _ = erin.req("POST", "/api/members?ws=acme", {"op": "signout_all", "email": "alice@example.com"})
+    check("…or sign an org admin out everywhere", st == 403)
+    st, js, _, _ = erin.req("GET", "/api/maps?ws=../outside")
+    check("a workspace id that isn't a plain slug is refused", st == 400)
+    st, js, _, _ = alice.req("POST", "/api/members?ws=acme", {"op": "grant", "email": "x@example.com", "role": "viewer",
+                                                               "workspace": "../_system"})
+    check("…and can't be granted", st in (400, 403))
+    st, js, _, _ = erin.req("GET", "/api/maps?ws=nosuchmodel")
+    check("a workspace that doesn't exist is 404", st == 404)
+    st, js, _, _ = erin.req("POST", "/api/process/edit?ws=acme", raw=b"[1]", headers={"Content-Type": "application/json"})
+    check("a JSON body that isn't an object is 400", st == 400)
+    st, _, h, _ = Client(port).req("POST", "/auth/dev", form={"email": "zed@example.com", "next": "/\\evil.example"})
+    check("no open redirect after sign-in (/\\host)", st == 303 and h.get("Location") == "/")
+
+    # the governance app honours the approval gate too (no direct guardrail edit when approval is required)
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gov_app", os.path.join(ROOT, "governance", "app.py"))
+    gov_app = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gov_app)
+    import approval_policy
+    import guard as _g
+    gsrv = serve(_g.protect(gov_app.Handler, "governance"))
+    try:
+        gc = Client(gsrv.server_address[1])
+        gc.cookies = dict(alice.cookies)
+        with cc.use_model("acme"):
+            approval_policy.ApprovalPolicy().set("GuardrailPolicy", "required", "role.qms.iso_advisor", "gate guardrails")
+        st, js, _, _ = gc.req("PUT", "/api/guardrail?ws=acme&id=gr.CO.3.2.7", {"changes": {"escalate_if": "risk_score > 0.5"},
+                                                                               "reason": "direct"})
+        check("governance app refuses a direct guardrail edit when approval is required", st == 400 and "approval" in js["error"])
+        st, js, _, _ = gc.req("POST", "/api/processes?ws=acme", {})
+        check("POST to an app without do_POST is a clean 405 (no crash)", st == 405)
+    finally:
+        gsrv.shutdown()
+
     # sessions
     alice.req("POST", "/api/members?ws=acme", {"op": "signout_all", "email": "bob@example.com"})
     st, _, _, _ = bob.req("GET", "/api/maps?ws=acme")
@@ -332,7 +377,7 @@ def oidc_flow(tmp):
 
         now = int(time.time())
         good = lambda q: {"iss": iss, "aud": "continuum", "exp": now + 300, "nonce": q["nonce"][0],  # noqa: E731
-                          "email": "erin@contoso.com", "name": "Erin"}
+                          "email": "erin@contoso.com", "name": "Erin", "sub": "erin-subject"}
         c, q, st, st2, _ = attempt(good, True)
         check("OIDC: login redirects to the IdP with PKCE (S256), state and nonce",
               st == 302 and q["code_challenge_method"] == ["S256"] and q["state"] and q["nonce"]
@@ -359,7 +404,14 @@ def oidc_flow(tmp):
         state["alg"] = "none"
         _, _, _, st2, page = attempt(good, False)
         check("OIDC: alg=none is refused", st2 == 401)
+        state["alg"] = "HS256"
+        _, _, _, st2, page = attempt(good, False)
+        check("OIDC: algorithms other than RS256 are refused", st2 == 401 and "RS256" in page)
         state["alg"] = "RS256"
+        _, _, _, st2, page = attempt(lambda q: {**good(q), "email_verified": False}, False)
+        check("OIDC: an unverified email is refused", st2 == 403 and "not verified" in page)
+        _, _, _, st2, page = attempt(lambda q: {**good(q), "sub": "someone-else"}, False)
+        check("OIDC: the same email from a different subject can't take the account", st2 == 403 and "bound" in page)
         c2 = Client(port)
         c2.req("GET", "/auth/login?next=/&go=1")
         st2, _, _, page = c2.req("GET", "/auth/callback?code=x&state=forged")

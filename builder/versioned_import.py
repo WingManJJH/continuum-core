@@ -30,7 +30,12 @@ All state lives in the model's own logs (works on files and Postgres):
   imports.log.jsonl  — chained: one record per batch / revert
   staged.log.jsonl   — chained: stage / decide events, folded into the review queue
   import_baselines.json — per source: "Type|id" -> version last written
+                        (+ "__reverted__": records whose import was reverted)
 Models imported before this existed use their seed as the baseline.
+
+One import or review decision per model at a time (a storage mutex). A batch
+writes a start record first; if it fails part-way, a failed record lists what it
+did write, so even a partial batch can be reverted.
 """
 from __future__ import annotations
 
@@ -58,6 +63,24 @@ class StaleError(ImportError_):
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _v(rec) -> int:
+    """A record's version as a number (seeds from some sources carry none)."""
+    v = (rec or {}).get("version")
+    return v if isinstance(v, int) and not isinstance(v, bool) and v > 0 else 1
+
+
+def _normalized(seed: dict) -> dict:
+    """Every record carries a version (the locked schemas require one; some
+    exports omit it). Returns a copy; the caller's seed is not modified."""
+    out = copy.deepcopy(seed)
+    for rows in out.values():
+        if isinstance(rows, list):
+            for r in rows:
+                if isinstance(r, dict) and r.get("id") and not isinstance(r.get("version"), int):
+                    r["version"] = 1
+    return out
 
 
 def _key(etype, eid):
@@ -107,8 +130,9 @@ def _fold_staged(slug) -> dict:
     out: dict[str, dict] = {}
     for ev in cc.read_log(_paths(slug)["staged"]):
         if ev["kind"] == "stage":
-            out[ev["sid"]] = {**{k: ev[k] for k in ("sid", "batch", "etype", "id", "change", "based_on_version",
-                                                    "incoming", "diff", "reasons", "incoming_hash")},
+            out[ev["sid"]] = {**{k: ev.get(k) for k in ("sid", "batch", "source", "etype", "id", "change",
+                                                        "based_on_version", "incoming", "diff", "reasons",
+                                                        "incoming_hash")},
                               "staged_at": ev["ts"], "status": "pending", "decision": None}
         elif ev["sid"] in out:
             out[ev["sid"]]["status"] = ev["status"]
@@ -124,14 +148,20 @@ def staged(slug, status: str | None = "pending") -> list[dict]:
 
 
 def batches(slug) -> list[dict]:
+    """Batch records (baseline / import / failed import / revert), oldest first."""
     with cc.use_model(slug, cc.current_user()):
-        return [e for e in cc.read_log(_paths(slug)["imports"])]
+        return [e for e in cc.read_log(_paths(slug)["imports"]) if e.get("kind") != "import-start"]
+
+
+def _next_batch(p) -> str:
+    seen = {e.get("batch") for e in cc.read_log(p["imports"]) if e.get("kind") != "revert"}
+    return f"B{len(seen) + 1:04d}"
 
 
 # --------------------------------------------------------------------------- import
 def plan(slug: str, seed: dict, source: str) -> dict:
     """What an import WOULD do — nothing is written."""
-    return _run(slug, seed, source, actor=None, dry=True)
+    return _run(slug, _normalized(seed), source, actor=None, dry=True)
 
 
 def import_model(slug: str, name: str, seed: dict, source: str, description: str = "",
@@ -140,22 +170,23 @@ def import_model(slug: str, name: str, seed: dict, source: str, description: str
     existing one gets a versioned batch. Returns the batch report."""
     p = _paths(slug)
     be = cc.storage.get()
-    with cc.use_model(slug, cc.current_user()):
+    seed = _normalized(seed)
+    with cc.use_model(slug, cc.current_user()), be.mutex(p["imports"]):
         if be.read_json(p["seed"], None) is None:
             be.write_json(p["seed"], seed, indent=1)
             be.write_json(p["meta"], {"name": name, "source": source, "description": description}, indent=1)
-            base = {_key(t, r["id"]): r.get("version", 1) for t, r in _seed_items(seed)}
+            base = {_key(t, r["id"]): _v(r) for t, r in _seed_items(seed)}
             bl = be.read_json(p["baselines"], {}) or {}
             bl[source] = base
             be.write_json(p["baselines"], bl)
-            rep = {"batch": "B0001", "kind": "baseline", "source": source, "created": len(base), "updated": 0,
+            rep = {"batch": _next_batch(p), "kind": "baseline", "source": source, "created": len(base), "updated": 0,
                    "retired": 0, "unchanged": 0, "staged": 0, "events": []}
             _append(p["imports"], {**rep, "actor": _actor(actor), "reason": reason or f"baseline import from {source}"})
             return rep
         meta = be.read_json(p["meta"], {}) or {}
         be.write_json(p["meta"], {**meta, "name": name or meta.get("name"), "source": source,
                                   "description": description or meta.get("description", "")}, indent=1)
-    return _run(slug, seed, source, actor, dry=False, reason=reason)
+        return _run(slug, seed, source, actor, dry=False, reason=reason)
 
 
 def _run(slug, seed, source, actor, dry, reason=""):
@@ -167,25 +198,27 @@ def _run(slug, seed, source, actor, dry, reason=""):
         bl_all = be.read_json(p["baselines"], {}) or {}
         baseline = bl_all.get(source)
         if baseline is None:  # imported before D51: the seed is the baseline
-            baseline = {_key(t, r["id"]): r.get("version", 1) for t, r in _seed_items(base_seed)}
+            baseline = {_key(t, r["id"]): _v(r) for t, r in _seed_items(base_seed)}
+        reverted = dict((bl_all.get("__reverted__") or {}).get(source) or {})
         queue = _fold_staged(slug)
         pending_by_key = {_key(s["etype"], s["id"]): s for s in queue.values() if s["status"] == "pending"}
         rejected = {(_key(s["etype"], s["id"]), s["based_on_version"], s["incoming_hash"])
                     for s in queue.values() if s["status"] == "rejected"}
-        n = len(cc.read_log(p["imports"])) + 1
-        batch = f"B{n:04d}"
+        batch = _next_batch(p)
         rep = {"batch": batch, "kind": "import", "source": source, "created": 0, "updated": 0, "retired": 0,
-               "unchanged": 0, "staged": 0, "skipped_rejected": 0, "events": [], "staged_ids": [],
-               "superseded": [], "changes": []}
+               "unchanged": 0, "staged": 0, "skipped_rejected": 0, "skipped_types": [], "events": [],
+               "staged_ids": [], "superseded": [], "changes": []}
         new_baseline = dict(baseline)
         why = f"import {batch} from {source}" + (f" — {reason}" if reason else "")
-        incoming_keys = set()
+        processed, staged_now = set(), set()
 
         def stage(etype, eid, change, cur, inc, reasons):
             k = _key(etype, eid)
+            staged_now.add(k)
             ih = _h(inc) if inc else "delete"
-            if (k, cur["version"], ih) in rejected:
+            if (k, cur.get("version"), ih) in rejected:
                 rep["skipped_rejected"] += 1
+                staged_now.discard(k)
                 return
             rep["staged"] += 1
             rep["changes"].append({"etype": etype, "id": eid, "action": "stage-" + change, "reasons": reasons})
@@ -196,80 +229,123 @@ def _run(slug, seed, source, actor, dry, reason=""):
                 _append(p["staged"], {"kind": "decide", "sid": old["sid"], "status": "superseded",
                                       "by": actor, "reason": f"superseded by {batch}"})
                 rep["superseded"].append(old["sid"])
+                pending_by_key.pop(k)
             sid = f"S{batch[1:]}-{len(rep['staged_ids']) + 1:04d}"
-            _append(p["staged"], {"kind": "stage", "sid": sid, "batch": batch, "etype": etype, "id": eid,
-                                  "change": change, "based_on_version": cur["version"], "incoming": inc,
-                                  "incoming_hash": ih, "diff": _diff(cur, inc or {}) if inc else [],
-                                  "reasons": reasons})
+            _append(p["staged"], {"kind": "stage", "sid": sid, "batch": batch, "source": source, "etype": etype,
+                                  "id": eid, "change": change, "based_on_version": cur.get("version"),
+                                  "incoming": inc, "incoming_hash": ih,
+                                  "diff": _diff(cur, inc or {}) if inc else [], "reasons": reasons})
             rep["staged_ids"].append(sid)
 
         def write(etype, eid, op, cur, body):
             rep["changes"].append({"etype": etype, "id": eid, "action": op})
             if dry:
                 return
-            ev = cc.append_edit_event(etype, eid, op, cur["version"] if cur else None, body["version"],
+            ev = cc.append_edit_event(etype, eid, op, cur.get("version") if cur else None, body["version"],
                                       _actor(actor), body, why)
             rep["events"].append({"event_id": ev["event_id"], "etype": etype, "id": eid, "op": op,
-                                  "from_version": cur["version"] if cur else None, "to_version": body["version"],
+                                  "from_version": cur.get("version") if cur else None, "to_version": body["version"],
                                   "prev": cur})
             new_baseline[_key(etype, eid)] = body["version"]
+            reverted.pop(_key(etype, eid), None)
 
-        for etype, inc in _seed_items(seed):
-            if etype not in g._by_type:
-                continue
-            eid = inc["id"]
-            k = _key(etype, eid)
-            incoming_keys.add(k)
-            cur = g.get(etype, eid)
-            if cur is None:
-                rep["created"] += 1
-                write(etype, eid, "create", None, {**inc, "version": 1})
-            elif _content(cur) == _content(inc):
-                rep["unchanged"] += 1
-                new_baseline[k] = cur["version"]
-            elif k in baseline and cur.get("version") == baseline[k]:
-                rep["updated"] += 1
-                write(etype, eid, "update", cur, {**copy.deepcopy(inc), "version": cur["version"] + 1})
-            else:
-                why_staged = (["edited in Continuum since this source last imported it"] if k in baseline
-                              else ["exists in Continuum but was not created by this source"])
-                stage(etype, eid, "update", cur, {**copy.deepcopy(inc), "version": cur["version"] + 1}, why_staged)
+        if not dry:
+            _append(p["imports"], {"batch": batch, "kind": "import-start", "source": source, "actor": _actor(actor),
+                                   "reason": why})
+        try:
+            for etype, inc in _seed_items(seed):
+                if etype not in g._by_type:
+                    if etype not in rep["skipped_types"]:
+                        rep["skipped_types"].append(etype)  # a type this build does not know: reported, not imported
+                    continue
+                eid = inc["id"]
+                k = _key(etype, eid)
+                processed.add(k)
+                cur = g.get(etype, eid)
+                if cur is None:
+                    rep["created"] += 1
+                    write(etype, eid, "create", None, {**inc, "version": 1})
+                elif _content(cur) == _content(inc):
+                    rep["unchanged"] += 1
+                    new_baseline[k] = cur.get("version")
+                    reverted.pop(k, None)
+                elif k in reverted:
+                    stage(etype, eid, "update", cur, {**copy.deepcopy(inc), "version": _v(cur) + 1},
+                          [f"an earlier import of this record was reverted ({reverted[k]})"])
+                elif k in baseline and cur.get("version") == baseline[k]:
+                    rep["updated"] += 1
+                    write(etype, eid, "update", cur, {**copy.deepcopy(inc), "version": _v(cur) + 1})
+                else:
+                    why_staged = (["edited in Continuum since this source last imported it"] if k in baseline
+                                  else ["exists in Continuum but was not created by this source"])
+                    stage(etype, eid, "update", cur, {**copy.deepcopy(inc), "version": _v(cur) + 1}, why_staged)
 
-        for k, ver in baseline.items():
-            if k in incoming_keys:
-                continue
-            etype, eid = k.split("|", 1)
-            cur = g.get(etype, eid) if etype in g._by_type else None
-            if cur is None or cur.get("status") == "deprecated":
-                new_baseline.pop(k, None)
-                continue
-            if cur.get("version") == ver:
-                rep["retired"] += 1
-                write(etype, eid, "deprecate", cur, {**copy.deepcopy(cur), "status": "deprecated",
-                                                     "version": cur["version"] + 1})
-                new_baseline.pop(k, None)
-            else:
-                stage(etype, eid, "delete", cur, None, ["removed from the source, but edited in Continuum since"])
+            for k, ver in baseline.items():
+                if k in processed:
+                    continue
+                processed.add(k)
+                etype, eid = k.split("|", 1)
+                cur = g.get(etype, eid) if etype in g._by_type else None
+                if cur is None or cur.get("status") == "deprecated":
+                    new_baseline.pop(k, None)
+                    continue
+                if cur.get("version") == ver:
+                    rep["retired"] += 1
+                    write(etype, eid, "deprecate", cur, {**copy.deepcopy(cur), "status": "deprecated",
+                                                         "version": _v(cur) + 1})
+                    new_baseline.pop(k, None)
+                else:
+                    stage(etype, eid, "delete", cur, None, ["removed from the source, but edited in Continuum since"])
+
+            # an older pending change this batch no longer proposes is withdrawn, not left acceptable
+            for k, old in list(pending_by_key.items()):
+                if k in processed and k not in staged_now:
+                    if not dry:
+                        _append(p["staged"], {"kind": "decide", "sid": old["sid"], "status": "superseded", "by": actor,
+                                              "reason": f"{batch} no longer proposes this change"})
+                    rep["superseded"].append(old["sid"])
+        except Exception as e:
+            if not dry:
+                _append(p["imports"], {"batch": batch, "kind": "import-failed", "source": source,
+                                       "actor": _actor(actor), "reason": why, "error": f"{type(e).__name__}: {e}",
+                                       "events": [{k2: x[k2] for k2 in ("event_id", "etype", "id", "op",
+                                                                       "from_version", "to_version")}
+                                                  for x in rep["events"]],
+                                       "prev": {x["event_id"]: x["prev"] for x in rep["events"]}})
+            raise
 
         if dry:
             rep.pop("events")
             return rep
         bl_all[source] = new_baseline
+        bl_all.setdefault("__reverted__", {})[source] = reverted
         be.write_json(p["baselines"], bl_all)
         _append(p["imports"], {"batch": batch, "kind": "import", "source": source, "actor": _actor(actor),
                                "reason": why, **{k: rep[k] for k in ("created", "updated", "retired", "unchanged",
-                                                                     "staged", "skipped_rejected", "staged_ids",
-                                                                     "superseded")},
+                                                                     "staged", "skipped_rejected", "skipped_types",
+                                                                     "staged_ids", "superseded")},
                                "events": [{k: e[k] for k in ("event_id", "etype", "id", "op", "from_version",
                                                              "to_version")} for e in rep["events"]],
                                "prev": {e["event_id"]: e["prev"] for e in rep["events"]}})
         return {k: v for k, v in rep.items() if k != "events"} | {"events": len(rep["events"])}
 
 
+def _set_baseline(p, source, k, version):
+    be = cc.storage.get()
+    bl = be.read_json(p["baselines"], {}) or {}
+    if source:
+        if version is None:
+            bl.setdefault(source, {}).pop(k, None)
+        else:
+            bl.setdefault(source, {})[k] = version
+        (bl.get("__reverted__") or {}).get(source, {}).pop(k, None)
+        be.write_json(p["baselines"], bl)
+
+
 # --------------------------------------------------------------------------- decisions
 def accept(slug, sid, actor, expected_version: int | None = None, reason: str = "") -> dict:
-    with cc.use_model(slug, cc.current_user()):
-        p = _paths(slug)
+    p = _paths(slug)
+    with cc.use_model(slug, cc.current_user()), cc.storage.get().mutex(p["imports"]):
         s = _fold_staged(slug).get(sid)
         if not s:
             raise ImportError_(f"unknown staged change {sid}")
@@ -281,23 +357,25 @@ def accept(slug, sid, actor, expected_version: int | None = None, reason: str = 
             raise StaleError(f"{s['etype']} {s['id']} changed after this was staged (staged against "
                              f"v{s['based_on_version']}, now v{now_v}) — review it again")
         if s["change"] == "update":
-            body = {**s["incoming"], "version": now_v + 1}
+            body = {**s["incoming"], "version": _v(cur) + 1}
             op = "update"
         else:
-            body = {**copy.deepcopy(cur), "status": "deprecated", "version": now_v + 1}
+            body = {**copy.deepcopy(cur), "status": "deprecated", "version": _v(cur) + 1}
             op = "deprecate"
         cc.append_edit_event(s["etype"], s["id"], op, now_v, body["version"], _actor(actor), body,
                              f"accepted staged import change {sid}" + (f" — {reason}" if reason else ""))
         _append(p["staged"], {"kind": "decide", "sid": sid, "status": "accepted", "by": actor, "reason": reason,
                               "applied_version": body["version"]})
+        # the source's version is now the record's: the next import fast-forwards from here
+        _set_baseline(p, s.get("source"), _key(s["etype"], s["id"]), body["version"] if op == "update" else None)
         return {"sid": sid, "status": "accepted", "version": body["version"]}
 
 
 def reject(slug, sid, actor, reason: str) -> dict:
     if not (reason or "").strip():
         raise ImportError_("a reason is required to reject a staged change (ISO 9001 §7.5)")
-    with cc.use_model(slug, cc.current_user()):
-        p = _paths(slug)
+    p = _paths(slug)
+    with cc.use_model(slug, cc.current_user()), cc.storage.get().mutex(p["imports"]):
         s = _fold_staged(slug).get(sid)
         if not s:
             raise ImportError_(f"unknown staged change {sid}")
@@ -308,20 +386,27 @@ def reject(slug, sid, actor, reason: str) -> dict:
 
 
 def revert(slug, batch: str, actor: str, reason: str) -> dict:
-    """Undo a batch with compensating events. Records edited after the import are
-    skipped and reported, never overwritten."""
+    """Undo a batch (complete or failed part-way) with compensating events. Records
+    edited after the import are skipped and reported, never overwritten. Reverted
+    records are marked, so a later import of the same values is held for review
+    instead of silently re-applied."""
     if not (reason or "").strip():
         raise ImportError_("a reason is required to revert an import")
-    with cc.use_model(slug, cc.current_user()):
-        p = _paths(slug)
+    p = _paths(slug)
+    be = cc.storage.get()
+    with cc.use_model(slug, cc.current_user()), be.mutex(p["imports"]):
         logs = cc.read_log(p["imports"])
-        rec = next((e for e in logs if e.get("batch") == batch and e.get("kind") == "import"), None)
+        rec = next((e for e in reversed(logs) if e.get("batch") == batch and e.get("kind") in ("import", "import-failed")),
+                   None)
         if not rec:
             raise ImportError_(f"unknown import batch {batch}")
         if any(e.get("kind") == "revert" and e.get("batch") == batch for e in logs):
             raise ImportError_(f"import {batch} was already reverted")
         g = cc.Graph()
         done, skipped = [], []
+        bl = be.read_json(p["baselines"], {}) or {}
+        source = rec.get("source")
+        marks = bl.setdefault("__reverted__", {}).setdefault(source, {})
         for ev in reversed(rec["events"]):
             cur = g.get(ev["etype"], ev["id"])
             if not cur or cur.get("version") != ev["to_version"]:
@@ -329,14 +414,21 @@ def revert(slug, batch: str, actor: str, reason: str) -> dict:
                 continue
             prev = rec["prev"].get(ev["event_id"])
             if prev is None:  # the import created it: retire
-                body, op = {**copy.deepcopy(cur), "status": "deprecated", "version": cur["version"] + 1}, "deprecate"
+                body, op = {**copy.deepcopy(cur), "status": "deprecated", "version": _v(cur) + 1}, "deprecate"
             else:
-                body, op = {**copy.deepcopy(prev), "version": cur["version"] + 1}, ("restore" if cur.get("status") == "deprecated" else "update")
-            cc.append_edit_event(ev["etype"], ev["id"], op, cur["version"], body["version"], _actor(actor), body,
+                body = {**copy.deepcopy(prev), "version": _v(cur) + 1}
+                op = "restore" if cur.get("status") == "deprecated" else "update"
+            cc.append_edit_event(ev["etype"], ev["id"], op, cur.get("version"), body["version"], _actor(actor), body,
                                  f"revert import {batch} — {reason}")
             done.append({"etype": ev["etype"], "id": ev["id"], "op": op})
-        # pending changes staged by that batch are withdrawn with it
-        for s in _fold_staged(slug).values():
+            k = _key(ev["etype"], ev["id"])
+            if prev is None:
+                bl.setdefault(source, {}).pop(k, None)
+            else:
+                bl.setdefault(source, {})[k] = body["version"]
+            marks[k] = batch
+        be.write_json(p["baselines"], bl)
+        for s in _fold_staged(slug).values():  # pending changes staged by that batch are withdrawn with it
             if s["batch"] == batch and s["status"] == "pending":
                 _append(p["staged"], {"kind": "decide", "sid": s["sid"], "status": "superseded", "by": actor,
                                       "reason": f"import {batch} reverted"})

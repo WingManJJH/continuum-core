@@ -39,6 +39,18 @@ def _proc_worker(args):
         return "conflict"
 
 
+def _heads_worker(args):
+    tmp, log, n = args
+    cc.DATA, cc.HEADS_FILE = os.path.join(tmp, "seed.json"), os.path.join(tmp, "audit_heads.json")
+    errs = 0
+    for i in range(n):
+        try:
+            cc._append_event(os.path.join(tmp, log), {"event_id": f"e{i}", "ts": "t", "payload": {"i": i}})
+        except Exception:  # noqa: BLE001
+            errs += 1
+    return errs
+
+
 def main():
     tmp = tempfile.mkdtemp()
     shutil.copy(os.path.join(HERE, "..", "data", "seed.json"), os.path.join(tmp, "seed.json"))
@@ -94,6 +106,18 @@ def main():
         check("chain and heads anchor intact after contention", v["ok"] and v["count"] == len(cc.read_log()), str(v))
         vers = [e["to_version"] for e in cc.read_log()]
         check("versions strictly increase (no lost or duplicate write)", vers == sorted(set(vers)), str(vers))
+
+        # two processes appending to two different logs of one model share one heads file
+        with mp.get_context("spawn").Pool(2) as pool:
+            errs = pool.map(_heads_worker, [(tmp, "a.log.jsonl", 150), (tmp, "b.log.jsonl", 150)])
+        va, vb = (cc.verify_log(os.path.join(tmp, n)) for n in ("a.log.jsonl", "b.log.jsonl"))
+        check("two logs, two processes: no failed append, both heads anchors exact",
+              errs == [0, 0] and va["ok"] and vb["ok"] and va["count"] == vb["count"] == 150, f"{errs} {va} {vb}")
+        # a very large last event (a big snapshot) must not break the next append
+        big = os.path.join(tmp, "big.log.jsonl")
+        cc._append_event(big, {"event_id": "big", "payload": {"blob": "x" * 200_000}})
+        cc._append_event(big, {"event_id": "after", "payload": {}})
+        check("an event larger than the read window still chains", cc.verify_log(big)["ok"] and len(cc.read_log(big)) == 2)
 
         # documents are written atomically and read back exactly
         doc = {"a": [1, 2.5, None], "ü": "✓"}

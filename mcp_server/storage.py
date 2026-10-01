@@ -36,6 +36,7 @@ import fcntl
 import hashlib
 import json
 import os
+import tempfile
 import threading
 from contextlib import contextmanager
 
@@ -86,6 +87,20 @@ def workspace_of(path: str) -> tuple[str, str]:
     return "dir:" + hashlib.sha1(d.encode()).hexdigest()[:16], name
 
 
+def _ts(v):
+    """An event's ts as a timestamp for the `at` column, or None (-> now()) when it
+    is not ISO 8601 — the raw line keeps whatever the writer put there."""
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00")) if v else None
+    except ValueError:
+        return None
+
+
+def _int_version(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) and -2**31 < v < 2**31 else None
+
+
 def _version_status(payload, op):
     if not isinstance(payload, dict):
         return None, None
@@ -121,8 +136,13 @@ class FileBackend:
     kind = "file"
 
     def __init__(self):
-        self._tlock = threading.RLock()
+        self._guard = threading.Lock()
+        self._tlocks: dict[str, threading.RLock] = {}   # one per path: a long import never blocks other logs
         self._index: dict[str, dict] = {}   # edits-log path -> {"pos", "seed_sig", "versions"}
+
+    def _tlock(self, path):
+        with self._guard:
+            return self._tlocks.setdefault(os.path.abspath(path), threading.RLock())
 
     # ---- documents
     def read_json(self, path, default=None):
@@ -137,11 +157,17 @@ class FileBackend:
             raise
 
     def write_json(self, path, obj, indent=2):
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(obj, f, indent=indent)
-        os.replace(tmp, path)  # atomic: a reader never sees a half-written document
+        d = os.path.dirname(os.path.abspath(path))
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix="." + os.path.basename(path) + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(obj, f, indent=indent)
+            os.replace(tmp, path)  # atomic: a reader never sees a half-written document
+        except BaseException:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            raise
 
     def exists(self, path) -> bool:
         return os.path.exists(path)
@@ -178,7 +204,7 @@ class FileBackend:
     @contextmanager
     def _locked(self, path):
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with self._tlock, open(path + ".lock", "a") as lk:
+        with self._tlock(path), open(path + ".lock", "a") as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)   # across processes (run.py starts five apps)
             try:
                 yield
@@ -190,17 +216,33 @@ class FileBackend:
             with open(path, "a") as f:
                 f.write(json.dumps(obj) + "\n")
 
+    @contextmanager
+    def mutex(self, path):
+        """Hold an exclusive lock named by `path` across several operations
+        (threads and processes) — e.g. one import of a model at a time."""
+        with self._locked(path + ".mutex"):
+            yield
+
     def _last_hash(self, path):
         last = None
         if os.path.exists(path):
+            size = os.path.getsize(path)
             with open(path, "rb") as f:
-                try:  # read from the end: O(1) for long logs
-                    f.seek(-65536, os.SEEK_END)
-                except OSError:
-                    f.seek(0)
-                for line in f.read().splitlines():
-                    if line.strip():
-                        last = line
+                chunk = 65536
+                while True:  # read from the end; widen until one whole line is in view
+                    start = max(0, size - chunk)
+                    f.seek(start)
+                    data = f.read()
+                    if start > 0:  # the first line of the window may be cut: drop it
+                        nl = data.find(b"\n")
+                        data = data[nl + 1:] if nl >= 0 else b""
+                    lines = [ln for ln in data.splitlines() if ln.strip()]
+                    if lines:
+                        last = lines[-1]
+                        break
+                    if start == 0:
+                        break
+                    chunk *= 4
         if not last:
             return GENESIS_HASH
         return json.loads(last).get("hash", GENESIS_HASH)
@@ -244,19 +286,21 @@ class FileBackend:
             event["hash"] = hash_event(event)
             with open(path, "a") as f:
                 f.write(json.dumps(event) + "\n")
-            heads = self.read_json(heads_path, {}) or {}
-            cur = heads.get(os.path.basename(path), {})
-            heads[os.path.basename(path)] = {"head": event["hash"], "count": cur.get("count", 0) + 1}
-            self.write_json(heads_path, heads)
+            with self._locked(heads_path):   # one heads file per model, shared by all its logs
+                heads = self.read_json(heads_path, {}) or {}
+                cur = heads.get(os.path.basename(path), {})
+                heads[os.path.basename(path)] = {"head": event["hash"], "count": cur.get("count", 0) + 1}
+                self.write_json(heads_path, heads)
         return event
 
     def reset_log(self, path, heads_path):
         with self._locked(path):
             if os.path.exists(path):
                 os.remove(path)
-            heads = self.read_json(heads_path, {}) or {}
-            if heads.pop(os.path.basename(path), None) is not None:
-                self.write_json(heads_path, heads)
+            with self._locked(heads_path):
+                heads = self.read_json(heads_path, {}) or {}
+                if heads.pop(os.path.basename(path), None) is not None:
+                    self.write_json(heads_path, heads)
             self._index.pop(path, None)
 
     def list_workspaces(self) -> list[dict]:
@@ -360,6 +404,19 @@ class PostgresBackend:
     def read_lines(self, path) -> list[dict]:
         return [json.loads(r) for r in self.read_raw(path)]
 
+    @contextmanager
+    def mutex(self, path):
+        ws, name = workspace_of(path)
+        with self.pool.connection() as conn:
+            conn.autocommit = True
+            key = ws + "|mutex|" + name
+            conn.execute("select pg_advisory_lock(hashtextextended(%s, 1))", (key,))
+            try:
+                yield
+            finally:
+                conn.execute("select pg_advisory_unlock(hashtextextended(%s, 1))", (key,))
+                conn.autocommit = False
+
     def _lock(self, c, ws, name):
         c.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (ws + "|" + name,))
 
@@ -370,9 +427,9 @@ class PostgresBackend:
         actor = ev.get("actor") if isinstance(ev.get("actor"), dict) else ({"id": ev["actor"]} if ev.get("actor") else None)
         c.execute("""insert into node_events (workspace_id, log, seq, chained, event_id, node_type, node_id, op,
                                               actor, at, raw, event, prev_hash, hash)
-                     values (%s,%s,%s,%s,%s,%s,%s,%s,%s, coalesce(%s::timestamptz, now()), %s,%s,%s,%s)""",
+                     values (%s,%s,%s,%s,%s,%s,%s,%s,%s, coalesce(%s, now()), %s,%s,%s,%s)""",
                   (ws, name, seq, chained, ev.get("event_id"), ev.get("entity_type"), ev.get("entity_id"),
-                   ev.get("op"), Jsonb(actor) if actor else None, ev.get("ts"), raw, Jsonb(ev),
+                   ev.get("op"), Jsonb(actor) if actor else None, _ts(ev.get("ts")), raw, Jsonb(ev),
                    ev.get("prev_hash"), ev.get("hash")))
         return seq
 
@@ -399,9 +456,7 @@ class PostgresBackend:
             event["prev_hash"] = (last[0] if last and last[0] else GENESIS_HASH)
             event["hash"] = hash_event(event)
             raw = json.dumps(event)
-            self._insert(c, ws, name, raw, event, True)
-            cnt = c.execute("select count(*) from node_events where workspace_id=%s and log=%s and chained",
-                            (ws, name)).fetchone()[0]
+            cnt = self._insert(c, ws, name, raw, event, True)   # = seq: chained logs hold only chained rows
             c.execute("""insert into docs (workspace_id, name, body, updated_at)
                          values (%s, %s, jsonb_build_object(%s::text, jsonb_build_object('head', %s::text, 'count', %s::int)), now())
                          on conflict (workspace_id, name) do update
@@ -441,7 +496,7 @@ class PostgresBackend:
                      on conflict (workspace_id, node_type, id) do update set name=excluded.name, status=excluded.status,
                        version=excluded.version, attrs=excluded.attrs, source=excluded.source, updated_at=now()""",
                   (ws, etype, nid, str(attrs.get("name") or attrs.get("title") or nid)[:500], attrs.get("status"),
-                   attrs.get("version"), Jsonb(attrs), source))
+                   _int_version(attrs.get("version")), Jsonb(attrs), source))
         c.execute("delete from edges where workspace_id=%s and source_id=%s and source_type=%s", (ws, nid, etype))
         rows = [(ws, etype, nid, t, k) for t, k in self._refs(attrs)]
         if rows:
@@ -456,17 +511,35 @@ class PostgresBackend:
             self._upsert_node(c, ws, ev["entity_type"], payload, "edit")
 
     def _reproject(self, c, ws):
+        """Rebuild nodes + edges for a workspace: seed baseline, then the LAST edit
+        payload per record (set-based — one pass, bulk-loaded with COPY)."""
         c.execute("delete from edges where workspace_id=%s", (ws,))
         c.execute("delete from nodes where workspace_id=%s", (ws,))
+        final: dict[tuple, tuple] = {}
         row = c.execute("select body from docs where workspace_id=%s and name='seed.json'", (ws,)).fetchone()
         for etype, items in ((row[0] if row else {}) or {}).items():
             if isinstance(items, list):
                 for it in items:
                     if isinstance(it, dict) and it.get("id"):
-                        self._upsert_node(c, ws, etype, it, "seed")
-        for (raw,) in c.execute("select raw from node_events where workspace_id=%s and log=%s order by seq",
-                                (ws, EDITS_NAME)).fetchall():
-            self._project(c, ws, json.loads(raw))
+                        final[(etype, it["id"])] = (it, "seed")
+        for etype, op, payload in c.execute("""
+                select distinct on (node_type, node_id) node_type, op, event->'payload'
+                from node_events where workspace_id=%s and log=%s and node_type is not null
+                order by node_type, node_id, seq desc""", (ws, EDITS_NAME)).fetchall():
+            if isinstance(payload, dict) and payload.get("id"):
+                final[(etype, payload["id"])] = ({**payload, "status": "deprecated"} if op == "deprecate" else payload, "edit")
+        with c.cursor().copy("copy nodes (workspace_id, node_type, id, name, status, version, attrs, source) from stdin") as cp:
+            for (etype, nid), (attrs, src) in final.items():
+                cp.write_row((ws, etype, nid, str(attrs.get("name") or attrs.get("title") or nid)[:500], attrs.get("status"),
+                              _int_version(attrs.get("version")), json.dumps(attrs), src))
+        seen = set()
+        with c.cursor().copy("copy edges (workspace_id, source_type, source_id, target_id, edge_type) from stdin") as cp:
+            for (etype, nid), (attrs, _src) in final.items():
+                for t, k in self._refs(attrs):
+                    key = (etype, nid, t, k)
+                    if key not in seen:
+                        seen.add(key)
+                        cp.write_row((ws, etype, nid, t, k))
 
     def list_workspaces(self) -> list[dict]:
         """Registered models in the current models dir (slug = the model's folder name)."""

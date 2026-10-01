@@ -6,6 +6,59 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Independent review: 17 findings fixed
+
+### D54 — Fixes from the security and correctness reviews of D45–D53
+Two independent reviews (security of the front door; correctness of storage and imports) ran
+before delivery. Every finding was reproduced, fixed and pinned by a regression test.
+**Security.**
+
+- **Members (critical).** Member changes are scoped to the workspace the admin role was checked
+  on. Granting to another workspace, acting org-wide or signing someone out everywhere needs an
+  organization admin. Before this, a workspace admin could take over other workspaces.
+- **Model ids (critical).** A model id must be a plain slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
+  This is checked in `model_base`, the guard and grants. Before this, `../` reached outside the
+  models folder. An unknown workspace now returns 404.
+- **Approval gate (high).** The governance app's guardrail PUT, and canvas build/BPMN import
+  apply, now honour the approval gate.
+- **Open redirect (high).** `/\host`-style `next=` values are refused.
+- **OIDC.**
+  - An account is bound to the provider's subject (`oid` / `sub`) on first sign-in, so a changed
+    email claim can't take over another account.
+  - `email_verified: false` is refused.
+  - RS256 only, with the signature always verified. `cryptography` is required.
+- **Robustness.** Non-object JSON bodies return 400. A POST to an app without POST returns 405,
+  not a crash. The governance app imported `cc` for its 409 path. Share links can only be revoked
+  from their own model.
+
+**Correctness.**
+
+- **Heads anchor (high).** The file backend's heads anchor could lose updates when two processes
+  appended to different logs of one model. It is now locked per heads file and written through a
+  unique temp file.
+- **Import batches (high).**
+  - A batch writes a start record first. A failure part-way writes an `import-failed` record
+    listing what it wrote, and that record is revertible.
+  - Imports and review decisions on one model are serialized by a storage mutex (flock or
+    advisory lock), so batch ids are unique.
+- **Versionless seeds (high).** Seeds without `version` fields are normalized on import instead
+  of crashing.
+- **Baselines.**
+  - A pending change the newest import no longer proposes is superseded.
+  - Accept moves the baseline, so the next source change fast-forwards.
+  - Revert marks the records it reverted, so re-running a reverted import is held for review
+    with that reason instead of silently re-applied.
+- **Smaller fixes.**
+  - The heads count comes from `seq`, not `count(*)`.
+  - Reprojection is set-based with COPY: 3,000 edits reproject in 0.04 s.
+  - The last-hash read widens past 64 KiB lines.
+  - The integer `version` column ignores non-integer versions.
+  - A non-ISO `ts` no longer fails a Postgres append.
+- **Per-path locks.** The file backend's thread lock is now per path, so a long import never
+  blocks other logs.
+
+---
+
 ## 2026-10-01 — Canvas: Enterprise modules, import review, accounts; Studio folded in
 
 ### D53 — The UI for D45–D52, and one Studio source of record

@@ -61,7 +61,7 @@ def _restore_active_model():
     try:
         with open(_ACTIVE_FILE) as f:
             slug = f.read().strip()
-        if slug and os.path.isdir(cc.model_base(slug)):
+        if slug and slug in {m["slug"] for m in cc.list_models()}:
             cc.set_active_model(slug)
     except OSError:
         pass
@@ -311,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
                 # switch the active model (default / an imported model). Whole stack
                 # then folds that model; the choice persists across restarts.
                 slug = b.get("slug", "default")
-                if slug != "default" and not os.path.isdir(cc.model_base(slug)):
+                if slug not in {m["slug"] for m in cc.list_models()}:
                     return self._json_code({"ok": False, "error": f"unknown model {slug}"}, 400)
                 cc.set_active_model(slug)
                 try:
@@ -375,6 +375,7 @@ class Handler(BaseHTTPRequestHandler):
                 # it via the audited write path from the parsed plan the client previewed.
                 try:
                     if b.get("op") == "apply":
+                        self._gate_guard("Process")
                         res = builder.apply_build(b.get("parsed", {}), code=(b.get("code") or None),
                                                   owner=(b.get("owner") or None), actor=actor,
                                                   reason=reason or "built from instructions", store=STORE)
@@ -389,6 +390,8 @@ class Handler(BaseHTTPRequestHandler):
                 # audited write path. format="vsdx" carries the file as base64.
                 try:
                     apply = b.get("op") == "apply"
+                    if apply:
+                        self._gate_guard("Process")
                     if b.get("format") == "vsdx":
                         import base64
                         data = base64.b64decode(b.get("data_b64", ""))
