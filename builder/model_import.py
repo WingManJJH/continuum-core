@@ -28,6 +28,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
+sys.path.insert(0, HERE)
 import continuum_core as cc  # noqa: E402
 
 DEFAULT_GUARDRAIL = "gr.DEFAULT"
@@ -114,14 +115,15 @@ def build_model_seed(items: list[dict], model_name: str, sig: str = "model") -> 
             "Gateway": [], "SequenceFlow": [], "Event": [], "CorrectiveAction": []}
 
 
-def write_model(slug: str, name: str, seed: dict, source: str, description: str) -> str:
-    base = cc.model_base(slug)
-    os.makedirs(base, exist_ok=True)
-    with open(os.path.join(base, "seed.json"), "w") as f:
-        json.dump(seed, f, indent=1)
-    with open(os.path.join(base, "model.json"), "w") as f:
-        json.dump({"name": name, "source": source, "description": description}, f, indent=1)
-    return base
+def write_model(slug: str, name: str, seed: dict, source: str, description: str,
+                actor: str = "role.import.service", reason: str = "") -> str:
+    """Import `seed` as model `slug`. The first import writes the baseline; a
+    re-import is a versioned batch that never overwrites a record edited in
+    Continuum (D51 — see versioned_import.py). Returns the model directory."""
+    import versioned_import
+    write_model.last_report = versioned_import.import_model(slug, name, seed, source, description,
+                                                            actor=actor, reason=reason)
+    return cc.model_base(slug)
 
 
 def read_csv(path: str) -> list[dict]:

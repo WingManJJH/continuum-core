@@ -44,6 +44,10 @@ sys.path.insert(0, os.path.join(HERE, "..", "builder"))
 import build as builder  # noqa: E402  — build a process from instructions
 import bpc_enrich  # noqa: E402  — Jev (System One) governance enrichment
 import typesafe  # noqa: E402  — the Jev seam (availability check)
+sys.path.insert(0, os.path.join(HERE, "..", "web"))
+import guard  # noqa: E402  — sign-in, workspaces, roles (D52); no-op when CONTINUUM_AUTH=off
+import enterprise_api as ea_api  # noqa: E402  — EA / GRC modules + import review (D45/D51)
+import versioned_import as vimport  # noqa: E402
 
 STORE = gov.GovernanceStore()
 QUEUE = approvals_mod.ApprovalQueue(STORE)  # change requests over the same store
@@ -57,7 +61,7 @@ def _restore_active_model():
     try:
         with open(_ACTIVE_FILE) as f:
             slug = f.read().strip()
-        if slug and os.path.isdir(cc.model_base(slug)):
+        if slug and slug in {m["slug"] for m in cc.list_models()}:
             cc.set_active_model(slug)
     except OSError:
         pass
@@ -109,8 +113,22 @@ class Handler(BaseHTTPRequestHandler):
                 f"Changes to {policy_mod.ENTITY_LABEL.get(entity_type, entity_type)} "
                 "require approval — submit this change for review instead of saving directly.")
 
+    def _ea(self, method, u, b=None):
+        try:
+            if method == "GET":
+                return self._json(ea_api.get(STORE, u.path, parse_qs(u.query)))
+            return self._json(ea_api.post(STORE, u.path, b or {}, self._gate_guard))
+        except cc.ConflictError as e:
+            return self._json_code({"ok": False, "conflict": True, "error": str(e)}, 409)
+        except vimport.StaleError as e:
+            return self._json_code({"ok": False, "conflict": True, "error": str(e)}, 409)
+        except (gov.EditError, vimport.ImportError_, policy_mod.PolicyError, ValueError) as e:
+            return self._json_code({"ok": False, "error": str(e)}, 400)
+
     def do_GET(self):
         u = urlparse(self.path)
+        if ea_api.handles("GET", u.path):
+            return self._ea("GET", u)
         if u.path == "/api/maps":
             g = cc.Graph()
             return self._json({"model_sig": g.model_sig, "processes": all_maps(g)})
@@ -125,7 +143,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"strategy": strat.strategy(g), "xmatrix": strat.xmatrix(g)})
         if u.path == "/api/approvals":
             status = parse_qs(u.query).get("status", [None])[0] or None
-            return self._json({"approvals": QUEUE.list(status),
+            crs = QUEUE.list(status)
+            if any(c["op"] == approvals_mod.IMPORT_OP for c in crs):   # D56: show the import diff in the inbox
+                st = {x["sid"]: x for x in vimport.staged(cc.ACTIVE_MODEL, "all")}
+                for c in crs:
+                    if c["op"] == approvals_mod.IMPORT_OP:
+                        x = st.get((c.get("args") or {}).get("sid"))
+                        if x:
+                            c["import"] = {k: x[k] for k in ("sid", "batch", "source", "etype", "id", "change",
+                                                             "diff", "reasons", "status", "based_on_version")}
+            return self._json({"approvals": crs,
                                "pending": QUEUE.pending_count(),
                                "ops": sorted(approvals_mod.PROPOSABLE_OPS)})
         if u.path == "/api/approval-policy":
@@ -163,7 +190,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"links": portal.all_links(cc.Graph())})
         if u.path == "/api/portal/view":
             token = parse_qs(u.query).get("token", [""])[0]
-            view = portal.portal_view(token, cc.Graph())
+            rec = portal.get(token)
+            with cc.use_model((rec or {}).get("workspace") or cc.ACTIVE_MODEL, cc.current_user()):
+                view = portal.portal_view(token, cc.Graph())
             if view is None:
                 return self._json_code({"ok": False, "error": "This share link is unknown, "
                                         "revoked, or expired."}, 404)
@@ -176,17 +205,17 @@ class Handler(BaseHTTPRequestHandler):
             # own thread (ThreadingHTTPServer).
             def _size(p):
                 try:
-                    return os.path.getsize(p) if os.path.exists(p) else 0
-                except OSError:
+                    return cc.storage.get().size(p)   # file bytes or Postgres sequence: grows on every append
+                except Exception:  # noqa: BLE001
                     return 0
+            base = os.path.dirname(cc.EDITS_LOG)   # this request's model (per-user in multi-user mode)
             watched = [("changed", cc.EDITS_LOG), ("approvals", QUEUE.log_path),
-                       ("policy", POLICY.log_path)]
+                       ("policy", POLICY.log_path), ("imports", os.path.join(base, "staged.log.jsonl"))]
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Connection", "keep-alive")
-                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 last = {name: _size(p) for name, p in watched}
                 self.wfile.write(b"retry: 3000\ndata: hello\n\n")
@@ -240,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
                 changes=payload.get("changes", {}), actor=payload.get("actor", "role.unknown"),
                 reason=payload.get("reason", ""), reviewer=payload.get("reviewer", ""))
             return self._json({"ok": True, "guardrail": new})
+        except cc.ConflictError as e:
+            return self._json_code({"ok": False, "conflict": True, "error": str(e)}, 409)
         except (gov.EditError, policy_mod.PolicyError) as e:
             return self._json_code({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
@@ -250,8 +281,15 @@ class Handler(BaseHTTPRequestHandler):
         # add / rename / reorder / remove a step — all through the versioned,
         # hash-chained governance write path.
         u = urlparse(self.path)
-        length = int(self.headers.get("Content-Length", 0))
-        b = json.loads(self.rfile.read(length) or b"{}")
+        try:
+            length = max(0, int(self.headers.get("Content-Length", 0) or 0))
+            b = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, RecursionError, UnicodeDecodeError):
+            return self._json_code({"ok": False, "error": "invalid JSON body"}, 400)
+        if not isinstance(b, dict):
+            return self._json_code({"ok": False, "error": "the request body must be a JSON object"}, 400)
+        if ea_api.handles("POST", u.path):
+            return self._ea("POST", u, b)
         actor = b.get("actor", "role.ops.support_lead")
         reason = b.get("reason", "")
         try:
@@ -287,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
                 # switch the active model (default / an imported model). Whole stack
                 # then folds that model; the choice persists across restarts.
                 slug = b.get("slug", "default")
-                if slug != "default" and not os.path.isdir(cc.model_base(slug)):
+                if slug not in {m["slug"] for m in cc.list_models()}:
                     return self._json_code({"ok": False, "error": f"unknown model {slug}"}, 400)
                 cc.set_active_model(slug)
                 try:
@@ -351,6 +389,7 @@ class Handler(BaseHTTPRequestHandler):
                 # it via the audited write path from the parsed plan the client previewed.
                 try:
                     if b.get("op") == "apply":
+                        self._gate_guard("Process")
                         res = builder.apply_build(b.get("parsed", {}), code=(b.get("code") or None),
                                                   owner=(b.get("owner") or None), actor=actor,
                                                   reason=reason or "built from instructions", store=STORE)
@@ -365,6 +404,8 @@ class Handler(BaseHTTPRequestHandler):
                 # audited write path. format="vsdx" carries the file as base64.
                 try:
                     apply = b.get("op") == "apply"
+                    if apply:
+                        self._gate_guard("Process")
                     if b.get("format") == "vsdx":
                         import base64
                         data = base64.b64decode(b.get("data_b64", ""))
@@ -510,6 +551,8 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 return self.send_error(404)
             return self._json({"ok": True, "result": r})
+        except cc.ConflictError as e:
+            return self._json_code({"ok": False, "conflict": True, "error": str(e)}, 409)
         except (gov.EditError, approvals_mod.ApprovalError, policy_mod.PolicyError) as e:
             return self._json_code({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
@@ -520,7 +563,7 @@ def main():
     port = 8789
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    ThreadingHTTPServer((guard.host(), port), guard.protect(Handler, "canvas")).serve_forever()
 
 
 if __name__ == "__main__":

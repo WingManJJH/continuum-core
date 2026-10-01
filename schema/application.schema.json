@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/application",
+  "title": "Application",
+  "description": "A system or AI agent in the portfolio (EA building block, D45). kind=agent records the agent as a portfolio item (owner, lifecycle, criticality); its execution binding stays an AgentBinding (agent_binding_refs). LOCKED addition.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "lifecycle",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^app\\.[a-z0-9_.]+$"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "system",
+        "agent"
+      ]
+    },
+    "vendor": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "owner": {
+      "type": "string",
+      "maxLength": 160,
+      "description": "Accountable owner: a HumanRole id (role.\u2026) or a named person/team."
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "active",
+        "sunset",
+        "retired"
+      ]
+    },
+    "criticality": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "data_class": {
+      "type": "string",
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ]
+    },
+    "sunset_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 800
+    },
+    "capability_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^cap\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "app \u2014serves\u2192 capability"
+    },
+    "process_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+$"
+      },
+      "uniqueItems": true,
+      "description": "app \u2014supports\u2192 process"
+    },
+    "task_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+\\.t[0-9]+$"
+      },
+      "uniqueItems": true,
+      "description": "app \u2014supports\u2192 task"
+    },
+    "agent_binding_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^agent\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "kind=agent: the AgentBindings that execute it; each binding's task counts as supported."
+    },
+    "obligation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^obl\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "obligation \u2014applies_to\u2192 app"
+    },
+    "risk_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^rsk\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "risk \u2014affects\u2192 app"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}

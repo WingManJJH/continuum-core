@@ -22,6 +22,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 import continuum_core as cc  # noqa: E402
+sys.path.insert(0, HERE)
+from ea_store import EA_OPS  # noqa: E402
 
 MODES = ("off", "optional", "required")
 
@@ -39,6 +41,11 @@ GATED_ENTITIES = [
     ("Initiative", "Initiatives"),
     ("Correlation", "X-matrix links"),
     ("Structural", "Gateways / events / flows"),
+    ("Capability", "Capabilities"),
+    ("Application", "Applications & agents"),
+    ("Obligation", "Obligations"),
+    ("Control", "Controls"),
+    ("Risk", "Risks"),
 ]
 ENTITY_LABEL = dict(GATED_ENTITIES)
 
@@ -59,6 +66,7 @@ OP_ENTITY = {
     "add_event": "Structural", "edit_event": "Structural", "remove_event": "Structural",
     "add_flow": "Structural", "remove_flow": "Structural", "edit_flow": "Structural",
     "enable_branching": "Structural",
+    **EA_OPS,  # D45: add_/edit_/retire_<block>, record_control_test
 }
 
 # Sensible starting point: the substantive business/governance entities are
@@ -68,6 +76,8 @@ DEFAULTS = {
     "ProcessGroup": "optional", "HumanRole": "optional", "Enterprise": "optional",
     "StrategicObjective": "optional", "KPI": "optional", "Initiative": "optional",
     "Correlation": "off", "Structural": "off",
+    "Capability": "optional", "Application": "optional", "Obligation": "optional",
+    "Control": "optional", "Risk": "optional",
 }
 
 
@@ -81,18 +91,14 @@ def _policy_log() -> str:
 
 class ApprovalPolicy:
     def __init__(self, log_path: str | None = None):
-        self.log_path = log_path or _policy_log()
+        self._log_path = log_path  # None -> the active model's log, resolved per call (D49)
+
+    @property
+    def log_path(self) -> str:
+        return self._log_path or _policy_log()
 
     def _events(self) -> list[dict]:
-        if not os.path.exists(self.log_path):
-            return []
-        out = []
-        with open(self.log_path) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    out.append(cc.json.loads(line))
-        return out
+        return cc.read_log(self.log_path)
 
     def get(self) -> dict:
         """Current mode per entity — defaults, with the log's changes folded on top."""

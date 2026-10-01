@@ -77,9 +77,9 @@ def main():
     check("the drafted-branch assumption is surfaced", any("branch condition" in a for a in bplan["assumptions"]))
 
     # 2. apply -> a governed process through the audited write path
-    before = os.path.getsize(cc.EDITS_LOG) if os.path.exists(cc.EDITS_LOG) else 0
+    before = cc.storage.get().size(cc.EDITS_LOG)
     _ = build.plan_build(INSTRUCTIONS)  # planning again writes nothing
-    check("planning writes nothing", (os.path.getsize(cc.EDITS_LOG) if os.path.exists(cc.EDITS_LOG) else 0) == before)
+    check("planning writes nothing", cc.storage.get().size(cc.EDITS_LOG) == before)
 
     res = build.apply_build(pb["parsed"], code="BI.1.1", store=s)
     check("apply mints the process", res["code"] == "BI.1.1" and res["counts"]["gateways"] == 1)

@@ -9,7 +9,7 @@ let current = null; // {procId, guardrailId}
 
 // ---- load process list ----------------------------------------------------
 async function loadProcesses() {
-  processes = await api("/api/processes");
+  processes = await api("api/processes");
   const ul = $("#proc-list");
   ul.innerHTML = "";
   processes.forEach((p) => {
@@ -36,7 +36,7 @@ async function selectProcess(p) {
   current = { procId: p.id, guardrailId: p.guardrail.id };
   document.querySelectorAll(".proc-list li").forEach((li) =>
     li.classList.toggle("active", li.dataset.id === p.id));
-  const data = await api("/api/guardrail?id=" + encodeURIComponent(p.guardrail.id));
+  const data = await api("api/guardrail?id=" + encodeURIComponent(p.guardrail.id));
   fillEditor(p, data.guardrail);
   renderRisks(data.risks);
   renderHistory(data.history);
@@ -81,7 +81,7 @@ async function save(e) {
     audit_requirement: $("#f-audit").value,
   };
   $("#btn-save").disabled = true;
-  const res = await api("/api/guardrail?id=" + encodeURIComponent(current.guardrailId), {
+  const res = await api("api/guardrail?id=" + encodeURIComponent(current.guardrailId), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -130,7 +130,7 @@ function renderHistory(hist) {
 }
 
 async function loadAudit() {
-  const data = await api("/api/audit");
+  const data = await api("api/audit");
   const rows = data.rows || [];
   const integ = data.integrity || { ok: true, logs: [] };
   const el = $("#tab-audit");

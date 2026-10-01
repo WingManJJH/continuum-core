@@ -58,12 +58,9 @@ RETENTION_RULES = {
 
 def legal_holds() -> set[str]:
     """Entity ids exempt from disposition (litigation / audit hold)."""
-    if not os.path.exists(LEGAL_HOLDS_FILE):
-        return set()
     try:
-        with open(LEGAL_HOLDS_FILE) as f:
-            return set(json.load(f))
-    except (json.JSONDecodeError, OSError):
+        return set(cc.storage.get().read_json(LEGAL_HOLDS_FILE, []) or [])
+    except (json.JSONDecodeError, OSError, TypeError):
         return set()
 
 
@@ -82,16 +79,14 @@ def _parse(ts: str) -> datetime:
 
 
 def _read(path: str) -> list[dict]:
-    if not os.path.exists(path):
-        return []
-    with open(path) as f:
-        return [json.loads(x) for x in f if x.strip()]
+    return cc.storage.get().read_lines(path)
 
 
 def evaluate(as_of: datetime | None = None,
-             logs: tuple[str, ...] = (cc.EDITS_LOG, cc.EVENTS_LOG),
+             logs: tuple[str, ...] | None = None,
              holds: set[str] | None = None) -> dict:
     as_of = as_of or datetime.now(timezone.utc)
+    logs = logs or (cc.EDITS_LOG, cc.EVENTS_LOG)  # resolved live (active model / request)
     holds = holds if holds is not None else legal_holds()
     classes: dict[str, dict] = {}
     held: list[dict] = []
@@ -119,13 +114,14 @@ def evaluate(as_of: datetime | None = None,
 
 
 def apply(as_of: datetime | None = None, actor: str = "role.qms.records",
-          logs: tuple[str, ...] = (cc.EDITS_LOG, cc.EVENTS_LOG),
+          logs: tuple[str, ...] | None = None,
           holds: set[str] | None = None,
           archive_path: str = ARCHIVE, ledger_path: str = LEDGER) -> dict:
     """Disposition due, non-held records deliberately: copy to the cold archive and
     write a ledger entry. Never touches the live chained logs; never auto-destroys
     (`review` records are skipped). Idempotent — already-ledgered records are skipped."""
     as_of = as_of or datetime.now(timezone.utc)
+    logs = logs or (cc.EDITS_LOG, cc.EVENTS_LOG)
     already = {e["record_id"] for e in _read(ledger_path)}
     # index the live events so we can archive the full record by id
     events = {}
@@ -144,17 +140,15 @@ def apply(as_of: datetime | None = None, actor: str = "role.qms.records",
             if rec["id"] in already:
                 continue
             ev, logname = events[rec["id"]]
-            with open(archive_path, "a") as f:  # cold store — records preserved, not destroyed
-                f.write(json.dumps({**ev, "_archived_at": now, "_class": cls, "_action": action,
-                                    "_from_log": logname}) + "\n")
-            with open(ledger_path, "a") as f:
-                f.write(json.dumps({
+            cc.storage.get().append_line(archive_path, {  # cold store — records preserved, not destroyed
+                **ev, "_archived_at": now, "_class": cls, "_action": action, "_from_log": logname})
+            cc.storage.get().append_line(ledger_path, ({
                     "record_id": rec["id"], "entity": rec["entity"], "class": cls,
                     "action": action, "disposed_at": now, "by": actor,
                     "note": ("physical removal from the chained log is the seal-and-roll "
                              "deployment step; the chained copy is preserved")
                             if action == "dispose" else "archived to cold store",
-                }) + "\n")
+                }))
             archived += 1
             disposed_ids.append(rec["id"])
     return {"archived": archived, "ids": disposed_ids,

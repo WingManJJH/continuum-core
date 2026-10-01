@@ -1,0 +1,109 @@
+{
+ "processes": {
+  "proc_onboarding": {
+   "id": "proc_onboarding",
+   "name": "Employee Onboarding",
+   "apqcCode": "7.3",
+   "ownerRole": "HR Business Partner",
+   "status": "in_review",
+   "version": 2,
+   "maturityScore": 3,
+   "inputs": "Signed offer letter, Position requisition",
+   "outputs": "Fully provisioned, onboarded employee",
+   "kpiRefs": "Time-to-productivity, Onboarding NPS",
+   "riskRefs": "Late IT provisioning, Missed compliance training",
+   "guardrail": {
+    "allow": "Send onboarding checklist reminders, auto-schedule orientation calendar invites",
+    "deny": "Approve compensation changes, modify offer terms",
+    "escalateIf": "New-hire start date changes within 5 business days"
+   },
+   "notes": "Seeded example \u2014 adjust to match your real onboarding flow, or delete it once you've built your own.",
+   "reviewer": "HR Operations Lead",
+   "reviewDate": "2026-08-26",
+   "nextReviewDue": "2027-02-26",
+   "approvedBy": "",
+   "approvedDate": "",
+   "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" id=\"Definitions_Onboarding\" targetNamespace=\"http://continuum.app/schema/bpmn\" exporter=\"Continuum Studio\" exporterVersion=\"1.0\">\n  <bpmn:collaboration id=\"Collaboration_Onboarding\">\n    <bpmn:participant id=\"Participant_Onboarding\" name=\"Employee Onboarding\" processRef=\"Process_Onboarding\" />\n  </bpmn:collaboration>\n  <bpmn:process id=\"Process_Onboarding\" name=\"Employee Onboarding\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LaneSet_Onboarding\">\n      <bpmn:lane id=\"Lane_Candidate\" name=\"Candidate\">\n        <bpmn:flowNodeRef>StartEvent_OfferAccepted</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_SignOffer</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_HR\" name=\"HR\">\n        <bpmn:flowNodeRef>Task_PrepPaperwork</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Gateway_Split</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_ScheduleOrientation</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Gateway_Join</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_IT\" name=\"IT\">\n        <bpmn:flowNodeRef>Task_ProvisionAccounts</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_Manager\" name=\"Hiring Manager\">\n        <bpmn:flowNodeRef>Task_Welcome</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>EndEvent_Onboarded</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"StartEvent_OfferAccepted\" name=\"Offer Accepted\">\n      <bpmn:outgoing>Flow_1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_SignOffer\" name=\"Sign Offer Letter\">\n      <bpmn:incoming>Flow_1</bpmn:incoming>\n      <bpmn:outgoing>Flow_2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_PrepPaperwork\" name=\"Prepare Onboarding Paperwork\">\n      <bpmn:incoming>Flow_2</bpmn:incoming>\n      <bpmn:outgoing>Flow_3</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:parallelGateway id=\"Gateway_Split\" name=\"Split Work\">\n      <bpmn:incoming>Flow_3</bpmn:incoming>\n      <bpmn:outgoing>Flow_4</bpmn:outgoing>\n      <bpmn:outgoing>Flow_5</bpmn:outgoing>\n    </bpmn:parallelGateway>\n    <bpmn:task id=\"Task_ScheduleOrientation\" name=\"Schedule Orientation\">\n      <bpmn:incoming>Flow_4</bpmn:incoming>\n      <bpmn:outgoing>Flow_6</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_ProvisionAccounts\" name=\"Provision Accounts &amp; Equipment\">\n      <bpmn:incoming>Flow_5</bpmn:incoming>\n      <bpmn:outgoing>Flow_7</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:parallelGateway id=\"Gateway_Join\" name=\"Join\">\n      <bpmn:incoming>Flow_6</bpmn:incoming>\n      <bpmn:incoming>Flow_7</bpmn:incoming>\n      <bpmn:outgoing>Flow_8</bpmn:outgoing>\n    </bpmn:parallelGateway>\n    <bpmn:task id=\"Task_Welcome\" name=\"Conduct First-Day Welcome\">\n      <bpmn:incoming>Flow_8</bpmn:incoming>\n      <bpmn:outgoing>Flow_9</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:endEvent id=\"EndEvent_Onboarded\" name=\"Employee Onboarded\">\n      <bpmn:incoming>Flow_9</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_1\" sourceRef=\"StartEvent_OfferAccepted\" targetRef=\"Task_SignOffer\" />\n    <bpmn:sequenceFlow id=\"Flow_2\" sourceRef=\"Task_SignOffer\" targetRef=\"Task_PrepPaperwork\" />\n    <bpmn:sequenceFlow id=\"Flow_3\" sourceRef=\"Task_PrepPaperwork\" targetRef=\"Gateway_Split\" />\n    <bpmn:sequenceFlow id=\"Flow_4\" sourceRef=\"Gateway_Split\" targetRef=\"Task_ScheduleOrientation\" />\n    <bpmn:sequenceFlow id=\"Flow_5\" sourceRef=\"Gateway_Split\" targetRef=\"Task_ProvisionAccounts\" />\n    <bpmn:sequenceFlow id=\"Flow_6\" sourceRef=\"Task_ScheduleOrientation\" targetRef=\"Gateway_Join\" />\n    <bpmn:sequenceFlow id=\"Flow_7\" sourceRef=\"Task_ProvisionAccounts\" targetRef=\"Gateway_Join\" />\n    <bpmn:sequenceFlow id=\"Flow_8\" sourceRef=\"Gateway_Join\" targetRef=\"Task_Welcome\" />\n    <bpmn:sequenceFlow id=\"Flow_9\" sourceRef=\"Task_Welcome\" targetRef=\"EndEvent_Onboarded\" />\n  </bpmn:process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">\n    <bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_Onboarding\">\n      <bpmndi:BPMNShape id=\"Participant_Onboarding_di\" bpmnElement=\"Participant_Onboarding\" isHorizontal=\"true\">\n        <dc:Bounds x=\"60\" y=\"60\" width=\"1200\" height=\"560\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_Candidate_di\" bpmnElement=\"Lane_Candidate\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"60\" width=\"1170\" height=\"140\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_HR_di\" bpmnElement=\"Lane_HR\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"200\" width=\"1170\" height=\"140\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_IT_di\" bpmnElement=\"Lane_IT\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"340\" width=\"1170\" height=\"140\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_Manager_di\" bpmnElement=\"Lane_Manager\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"480\" width=\"1170\" height=\"140\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"StartEvent_OfferAccepted_di\" bpmnElement=\"StartEvent_OfferAccepted\">\n        <dc:Bounds x=\"180\" y=\"112\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"157\" y=\"151\" width=\"82\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_SignOffer_di\" bpmnElement=\"Task_SignOffer\">\n        <dc:Bounds x=\"260\" y=\"90\" width=\"100\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_PrepPaperwork_di\" bpmnElement=\"Task_PrepPaperwork\">\n        <dc:Bounds x=\"420\" y=\"230\" width=\"100\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Gateway_Split_di\" bpmnElement=\"Gateway_Split\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"560\" y=\"245\" width=\"50\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"538\" y=\"298\" width=\"60\" height=\"14\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_ScheduleOrientation_di\" bpmnElement=\"Task_ScheduleOrientation\">\n        <dc:Bounds x=\"660\" y=\"230\" width=\"100\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_ProvisionAccounts_di\" bpmnElement=\"Task_ProvisionAccounts\">\n        <dc:Bounds x=\"660\" y=\"370\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Gateway_Join_di\" bpmnElement=\"Gateway_Join\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"820\" y=\"245\" width=\"50\" height=\"50\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_Welcome_di\" bpmnElement=\"Task_Welcome\">\n        <dc:Bounds x=\"920\" y=\"510\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"EndEvent_Onboarded_di\" bpmnElement=\"EndEvent_Onboarded\">\n        <dc:Bounds x=\"1100\" y=\"532\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"1077\" y=\"571\" width=\"82\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Flow_1_di\" bpmnElement=\"Flow_1\">\n        <di:waypoint x=\"216\" y=\"130\" />\n        <di:waypoint x=\"260\" y=\"130\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_2_di\" bpmnElement=\"Flow_2\">\n        <di:waypoint x=\"360\" y=\"130\" />\n        <di:waypoint x=\"420\" y=\"270\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_3_di\" bpmnElement=\"Flow_3\">\n        <di:waypoint x=\"520\" y=\"270\" />\n        <di:waypoint x=\"560\" y=\"270\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_4_di\" bpmnElement=\"Flow_4\">\n        <di:waypoint x=\"610\" y=\"270\" />\n        <di:waypoint x=\"660\" y=\"270\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_5_di\" bpmnElement=\"Flow_5\">\n        <di:waypoint x=\"585\" y=\"295\" />\n        <di:waypoint x=\"585\" y=\"410\" />\n        <di:waypoint x=\"660\" y=\"410\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_6_di\" bpmnElement=\"Flow_6\">\n        <di:waypoint x=\"760\" y=\"270\" />\n        <di:waypoint x=\"820\" y=\"270\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_7_di\" bpmnElement=\"Flow_7\">\n        <di:waypoint x=\"780\" y=\"410\" />\n        <di:waypoint x=\"845\" y=\"410\" />\n        <di:waypoint x=\"845\" y=\"295\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_8_di\" bpmnElement=\"Flow_8\">\n        <di:waypoint x=\"845\" y=\"295\" />\n        <di:waypoint x=\"845\" y=\"440\" />\n        <di:waypoint x=\"980\" y=\"440\" />\n        <di:waypoint x=\"980\" y=\"510\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_9_di\" bpmnElement=\"Flow_9\">\n        <di:waypoint x=\"1040\" y=\"550\" />\n        <di:waypoint x=\"1100\" y=\"550\" />\n      </bpmndi:BPMNEdge>\n    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n</bpmn:definitions>\n",
+   "elementGovernance": {
+    "Task_ProvisionAccounts": {
+     "ownerRole": "IT Service Desk",
+     "inputs": "Approved requisition",
+     "outputs": "Active accounts and hardware",
+     "kpiRefs": "Provisioning cycle time",
+     "guardrail": {
+      "allow": "Create standard accounts from the approved role template",
+      "deny": "Grant admin or privileged system access",
+      "escalateIf": "Role requires non-standard system access"
+     }
+    }
+   },
+   "history": [
+    {
+     "version": 1,
+     "savedAt": "2026-08-25T10:30:00.000Z",
+     "note": "Initial import"
+    },
+    {
+     "version": 2,
+     "savedAt": "2026-08-26T14:00:00.000Z",
+     "note": "Added IT provisioning guardrail"
+    }
+   ],
+   "createdAt": "2026-08-25T10:30:00.000Z",
+   "updatedAt": "2026-08-26T14:00:00.000Z"
+  },
+  "proc_complaint": {
+   "id": "proc_complaint",
+   "name": "Customer Complaint Resolution",
+   "apqcCode": "6.2",
+   "ownerRole": "Customer Service Manager",
+   "status": "effective",
+   "version": 3,
+   "maturityScore": 4,
+   "inputs": "Customer complaint (any channel)",
+   "outputs": "Documented resolution, customer response",
+   "kpiRefs": "Mean time to resolution, First-contact resolution rate",
+   "riskRefs": "Regulatory complaint mishandling, Repeat unresolved complaints",
+   "guardrail": {
+    "allow": "Log complaint, send acknowledgement, issue goodwill credit under $50",
+    "deny": "Issue refunds above policy limit, make legal admissions",
+    "escalateIf": "Severity is High, or customer requests a manager"
+   },
+   "notes": "Seeded example demonstrating an exclusive-gateway severity split.",
+   "reviewer": "Support Operations Lead",
+   "reviewDate": "2026-08-26",
+   "nextReviewDue": "2027-02-26",
+   "approvedBy": "Customer Service Manager",
+   "approvedDate": "2026-08-28",
+   "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" id=\"Definitions_Complaint\" targetNamespace=\"http://continuum.app/schema/bpmn\" exporter=\"Continuum Studio\" exporterVersion=\"1.0\">\n  <bpmn:collaboration id=\"Collaboration_Complaint\">\n    <bpmn:participant id=\"Participant_Complaint\" name=\"Customer Complaint Resolution\" processRef=\"Process_Complaint\" />\n  </bpmn:collaboration>\n  <bpmn:process id=\"Process_Complaint\" name=\"Customer Complaint Resolution\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LaneSet_Complaint\">\n      <bpmn:lane id=\"Lane_Agent\" name=\"Support Agent\">\n        <bpmn:flowNodeRef>StartEvent_ComplaintReceived</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_LogComplaint</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Gateway_Severity</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_ResolveDirectly</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Gateway_Merge</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_RespondCustomer</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>EndEvent_Closed</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_Manager\" name=\"Duty Manager\">\n        <bpmn:flowNodeRef>Task_InvestigateResolve</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"StartEvent_ComplaintReceived\" name=\"Complaint Received\">\n      <bpmn:outgoing>Flow_1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_LogComplaint\" name=\"Log Complaint\">\n      <bpmn:incoming>Flow_1</bpmn:incoming>\n      <bpmn:outgoing>Flow_2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:exclusiveGateway id=\"Gateway_Severity\" name=\"Severity High?\">\n      <bpmn:incoming>Flow_2</bpmn:incoming>\n      <bpmn:outgoing>Flow_3</bpmn:outgoing>\n      <bpmn:outgoing>Flow_4</bpmn:outgoing>\n    </bpmn:exclusiveGateway>\n    <bpmn:task id=\"Task_ResolveDirectly\" name=\"Resolve Directly\">\n      <bpmn:incoming>Flow_3</bpmn:incoming>\n      <bpmn:outgoing>Flow_5</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_InvestigateResolve\" name=\"Investigate &amp; Resolve\">\n      <bpmn:incoming>Flow_4</bpmn:incoming>\n      <bpmn:outgoing>Flow_6</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:exclusiveGateway id=\"Gateway_Merge\">\n      <bpmn:incoming>Flow_5</bpmn:incoming>\n      <bpmn:incoming>Flow_6</bpmn:incoming>\n      <bpmn:outgoing>Flow_7</bpmn:outgoing>\n    </bpmn:exclusiveGateway>\n    <bpmn:task id=\"Task_RespondCustomer\" name=\"Respond to Customer\">\n      <bpmn:incoming>Flow_7</bpmn:incoming>\n      <bpmn:outgoing>Flow_8</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:endEvent id=\"EndEvent_Closed\" name=\"Complaint Closed\">\n      <bpmn:incoming>Flow_8</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_1\" sourceRef=\"StartEvent_ComplaintReceived\" targetRef=\"Task_LogComplaint\" />\n    <bpmn:sequenceFlow id=\"Flow_2\" sourceRef=\"Task_LogComplaint\" targetRef=\"Gateway_Severity\" />\n    <bpmn:sequenceFlow id=\"Flow_3\" name=\"Low severity\" sourceRef=\"Gateway_Severity\" targetRef=\"Task_ResolveDirectly\" />\n    <bpmn:sequenceFlow id=\"Flow_4\" name=\"High severity\" sourceRef=\"Gateway_Severity\" targetRef=\"Task_InvestigateResolve\" />\n    <bpmn:sequenceFlow id=\"Flow_5\" sourceRef=\"Task_ResolveDirectly\" targetRef=\"Gateway_Merge\" />\n    <bpmn:sequenceFlow id=\"Flow_6\" sourceRef=\"Task_InvestigateResolve\" targetRef=\"Gateway_Merge\" />\n    <bpmn:sequenceFlow id=\"Flow_7\" sourceRef=\"Gateway_Merge\" targetRef=\"Task_RespondCustomer\" />\n    <bpmn:sequenceFlow id=\"Flow_8\" sourceRef=\"Task_RespondCustomer\" targetRef=\"EndEvent_Closed\" />\n  </bpmn:process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">\n    <bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_Complaint\">\n      <bpmndi:BPMNShape id=\"Participant_Complaint_di\" bpmnElement=\"Participant_Complaint\" isHorizontal=\"true\">\n        <dc:Bounds x=\"60\" y=\"60\" width=\"1000\" height=\"320\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_Agent_di\" bpmnElement=\"Lane_Agent\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"60\" width=\"970\" height=\"160\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Lane_Manager_di\" bpmnElement=\"Lane_Manager\" isHorizontal=\"true\">\n        <dc:Bounds x=\"90\" y=\"220\" width=\"970\" height=\"160\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"StartEvent_ComplaintReceived_di\" bpmnElement=\"StartEvent_ComplaintReceived\">\n        <dc:Bounds x=\"140\" y=\"122\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"116\" y=\"161\" width=\"84\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_LogComplaint_di\" bpmnElement=\"Task_LogComplaint\">\n        <dc:Bounds x=\"220\" y=\"100\" width=\"100\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Gateway_Severity_di\" bpmnElement=\"Gateway_Severity\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"380\" y=\"115\" width=\"50\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"358\" y=\"72\" width=\"94\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_ResolveDirectly_di\" bpmnElement=\"Task_ResolveDirectly\">\n        <dc:Bounds x=\"480\" y=\"100\" width=\"110\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_InvestigateResolve_di\" bpmnElement=\"Task_InvestigateResolve\">\n        <dc:Bounds x=\"480\" y=\"260\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Gateway_Merge_di\" bpmnElement=\"Gateway_Merge\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"650\" y=\"115\" width=\"50\" height=\"50\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Task_RespondCustomer_di\" bpmnElement=\"Task_RespondCustomer\">\n        <dc:Bounds x=\"740\" y=\"100\" width=\"110\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"EndEvent_Closed_di\" bpmnElement=\"EndEvent_Closed\">\n        <dc:Bounds x=\"900\" y=\"122\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"878\" y=\"161\" width=\"80\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Flow_1_di\" bpmnElement=\"Flow_1\">\n        <di:waypoint x=\"176\" y=\"140\" />\n        <di:waypoint x=\"220\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_2_di\" bpmnElement=\"Flow_2\">\n        <di:waypoint x=\"320\" y=\"140\" />\n        <di:waypoint x=\"380\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_3_di\" bpmnElement=\"Flow_3\">\n        <di:waypoint x=\"430\" y=\"140\" />\n        <di:waypoint x=\"480\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_4_di\" bpmnElement=\"Flow_4\">\n        <di:waypoint x=\"405\" y=\"165\" />\n        <di:waypoint x=\"405\" y=\"300\" />\n        <di:waypoint x=\"480\" y=\"300\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_5_di\" bpmnElement=\"Flow_5\">\n        <di:waypoint x=\"590\" y=\"140\" />\n        <di:waypoint x=\"650\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_6_di\" bpmnElement=\"Flow_6\">\n        <di:waypoint x=\"600\" y=\"300\" />\n        <di:waypoint x=\"675\" y=\"300\" />\n        <di:waypoint x=\"675\" y=\"165\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_7_di\" bpmnElement=\"Flow_7\">\n        <di:waypoint x=\"700\" y=\"140\" />\n        <di:waypoint x=\"740\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_8_di\" bpmnElement=\"Flow_8\">\n        <di:waypoint x=\"850\" y=\"140\" />\n        <di:waypoint x=\"900\" y=\"140\" />\n      </bpmndi:BPMNEdge>\n    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n</bpmn:definitions>\n",
+   "elementGovernance": {},
+   "history": [
+    {
+     "version": 1,
+     "savedAt": "2026-08-25T10:30:00.000Z",
+     "note": "Initial import"
+    },
+    {
+     "version": 2,
+     "savedAt": "2026-08-26T14:00:00.000Z",
+     "note": "Reviewed with Support lead"
+    },
+    {
+     "version": 3,
+     "savedAt": "2026-08-28T09:00:00.000Z",
+     "note": "Approved"
+    }
+   ],
+   "createdAt": "2026-08-25T10:30:00.000Z",
+   "updatedAt": "2026-08-28T09:00:00.000Z"
+  }
+ },
+ "order": [
+  "proc_onboarding",
+  "proc_complaint"
+ ],
+ "activeId": "proc_onboarding",
+ "meta": {
+  "updatedAt": "2026-08-28T09:00:00.000Z"
+ }
+}

@@ -16,6 +16,7 @@
     <button class="toggle" id="present-btn" type="button">▶ Present</button>
     <button class="toggle" id="approvals-btn" type="button">Approvals <span id="appr-badge" class="appr-badge" hidden>0</span></button>
     <button class="toggle" id="capa-btn" type="button" title="Corrective &amp; preventive actions (CAPA / CAR register)">CARs <span id="capa-badge" class="appr-badge capa-badge" hidden>0</span></button>
+    <button class="toggle" id="imports-btn" type="button" title="Import batches and changes waiting for review">Imports <span id="imp-badge" class="appr-badge" hidden>0</span></button>
     <button class="toggle" id="history-btn" type="button">History</button>
     <button class="toggle" id="docs-btn" type="button">Documentation</button>
     <button class="toggle" id="tour-btn" type="button">Guided Tour</button>
@@ -49,6 +50,7 @@
         <button id="landscape-btn" class="add-btn ghost-btn" type="button" title="See the whole organization's process landscape">Landscape</button>
         <button id="arch-btn" class="add-btn ghost-btn" type="button" title="Navigate the L1–L5 process hierarchy (management architecture view)">Architecture</button>
         <button id="strategy-btn" class="add-btn ghost-btn" type="button" title="OKRs, the X-matrix, and how processes align to strategy">Strategy</button>
+        <button id="enterprise-btn" class="add-btn ghost-btn" type="button" title="Capabilities, applications &amp; agents, obligations, risks &amp; controls, and model health">Enterprise</button>
         <button id="share-btn" class="add-btn ghost-btn" type="button" title="Publish a read-only, shareable link to this process">Share</button>
         <button id="export-btn" class="add-btn ghost-btn" type="button" title="Download this process as BPMN 2.0 XML (opens in Camunda, bpmn.io, Signavio…)">Export BPMN</button>
         <button id="import-btn" class="add-btn ghost-btn" type="button" title="Import a BPMN 2.0 or Visio (.vsdx) diagram as a new governed process">Import</button>
@@ -250,6 +252,16 @@
     </div>
   </div>
 
+  <!-- EA / GRC record editor (capability, application, obligation, control, risk) -->
+  <div id="ea-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h2>Record</h2><button id="ea-close" class="x" type="button">&times;</button></div>
+      <p class="modal-sub">Saved as a new version — never an overwrite — with who, when and why. Changes to this kind of record may need approval under your approval policy.</p>
+      <form id="ea-form" class="ea-form"><div id="ea-form-body"></div><div id="ea-msg" class="msg" hidden></div>
+        <div class="actions"><button type="submit" class="save">Save</button></div></form>
+    </div>
+  </div>
+
   <!-- Strategy entity editor (enterprise / objective / KPI) -->
   <div id="strat-modal" class="modal" hidden>
     <div class="modal-card">
@@ -307,5 +319,7 @@
   <script src="approvals.js"></script>
   <script src="capa.js"></script>
   <script src="docs.js"></script>
+  <script src="account.js"></script>
+  <script src="enterprise.js"></script>
 </body>
 </html>

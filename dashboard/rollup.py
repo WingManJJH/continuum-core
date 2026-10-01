@@ -39,10 +39,7 @@ def _kpi_status(k: dict) -> str:
 
 def load_agent_events(path: str | None = None) -> list[dict]:
     path = path or cc.EVENTS_LOG
-    if not os.path.exists(path):
-        return []
-    with open(path) as f:
-        return [json.loads(x) for x in f if x.strip()]
+    return cc.storage.get().read_lines(path)
 
 
 class Rollup:

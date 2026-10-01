@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://continuum.dev/schema/v1/control",
+  "title": "Control",
+  "description": "A check or safeguard that satisfies obligations and mitigates risks, with its test record (GRC building block, D45). Runs in tasks or processes. LOCKED addition.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "type",
+    "frequency",
+    "last_result",
+    "version",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ctl\\.[a-z0-9_.]+$"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 800
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "preventive",
+        "detective",
+        "corrective"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "maxLength": 160,
+      "description": "Accountable owner: a HumanRole id (role.\u2026) or a named person/team."
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly",
+        "semiannual",
+        "annual"
+      ]
+    },
+    "last_tested": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "last_result": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "not_tested"
+      ]
+    },
+    "guardrail_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^gr\\.[A-Z0-9._]+$"
+    },
+    "obligation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^obl\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "control \u2014satisfies\u2192 obligation"
+    },
+    "risk_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^rsk\\.[a-z0-9_.]+$"
+      },
+      "uniqueItems": true,
+      "description": "control \u2014mitigates\u2192 risk"
+    },
+    "task_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+\\.t[0-9]+$"
+      },
+      "uniqueItems": true,
+      "description": "control \u2014implemented_in\u2192 task"
+    },
+    "process_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2}\\.[0-9.]+$"
+      },
+      "uniqueItems": true,
+      "description": "control \u2014implemented_in\u2192 process"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    }
+  }
+}

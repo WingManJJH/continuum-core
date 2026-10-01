@@ -88,7 +88,7 @@ function riskRegister(rr) {
   $("#risk").innerHTML = rows + un;
 }
 
-fetch("/api/rollup").then((r) => r.json()).then((d) => {
+fetch("api/rollup").then((r) => r.json()).then((d) => {
   metricTiles(d.metrics);
   strategy(d.strategy);
   coverage(d.coverage);

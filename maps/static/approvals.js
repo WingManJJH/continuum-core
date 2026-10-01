@@ -179,10 +179,23 @@ function renderApprovals(list, filter) {
     } else if (cr.assignee) {
       assignRow = '<div class="appr-meta">was assigned to ' + esc(_apShort(cr.assignee)) + "</div>";
     }
+    var imp = "";
+    if (cr.import) {   // a staged import change (D56): show exactly what would change
+      var I = cr.import;
+      imp = '<div class="appr-import"><span class="muted">' + esc(I.etype) + " " + esc(I.id) + " · from " + esc(I.source || "") + " (" + esc(I.batch) + ")</span>"
+        + (I.change === "delete" ? '<div class="appr-meta">The source no longer has this record. Approve to retire it; reject to keep it.</div>'
+          : '<table class="ea-table diff"><thead><tr><th>Field</th><th>Now</th><th>Incoming</th></tr></thead><tbody>'
+            + (I.diff || []).map(function (d) {
+              var f = function (v) { return v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v); };
+              return '<tr><td class="mono">' + esc(d.field) + '</td><td class="d-cur">' + esc(f(d.current)) + '</td><td class="d-inc">' + esc(f(d.incoming)) + "</td></tr>";
+            }).join("") + "</tbody></table>")
+        + '<div class="appr-meta">Approve takes the incoming version · Reject keeps ours (and won\'t ask again unless the source changes it)</div></div>';
+    }
+    if (cr.import && actions) actions = actions.replace(/<button class="ghost appr-withdraw"[^>]*>Withdraw<\/button>/, "");
     return '<div class="appr-card">'
       + '<div class="appr-top">' + badge + '<b>' + esc(cr.title || cr.op) + "</b> "
-      + '<span class="appr-op">' + esc(cr.op) + "</span></div>"
-      + '<div class="appr-arg">' + argPreview + "</div>"
+      + '<span class="appr-op">' + esc(cr.import ? "import review" : cr.op) + "</span></div>"
+      + (cr.import ? imp : '<div class="appr-arg">' + argPreview + "</div>")
       + '<div class="appr-meta">proposed by ' + esc(_apShort(cr.proposed_by)) + " · " + esc(_apTs(cr.proposed_at))
       + (cr.reason ? " — " + esc(cr.reason) : "") + "</div>"
       + assignRow

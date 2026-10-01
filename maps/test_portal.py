@@ -89,9 +89,9 @@ def main():
 
     # 9. publishing is NOT a governed-model edit (Core Model §08) — like layout,
     #    it must never mutate the graph or the audit/edit log.
-    edits_before = os.path.getsize(cc.EDITS_LOG) if os.path.exists(cc.EDITS_LOG) else 0
+    edits_before = cc.storage.get().size(cc.EDITS_LOG)
     portal.publish("SC.4.3.6", "supply chain", "role.ops.support_lead")
-    edits_after = os.path.getsize(cc.EDITS_LOG) if os.path.exists(cc.EDITS_LOG) else 0
+    edits_after = cc.storage.get().size(cc.EDITS_LOG)
     check("minting a link writes no governance edit event", edits_before == edits_after)
     check("portal is not a governed entity type", "Portal" not in cc.Graph()._by_type)
 

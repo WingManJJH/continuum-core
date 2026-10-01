@@ -36,8 +36,7 @@ def canned(state, questions):
 def main():
     logs = (cc.EDITS_LOG, cc.EVENTS_LOG)
     for p in logs:
-        if os.path.exists(p):
-            cc.reset_log(p)
+        cc.reset_log(p)
     try:
         s = gov.GovernanceStore()
 
@@ -66,8 +65,7 @@ def main():
         check("audit chain intact after enrichment", cc.verify_log(cc.EDITS_LOG)["ok"] is True)
     finally:
         for p in logs:
-            if os.path.exists(p):
-                cc.reset_log(p)
+            cc.reset_log(p)
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

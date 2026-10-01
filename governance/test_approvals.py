@@ -36,8 +36,7 @@ def a_guardrail_id(store):
 
 def _reset(paths):
     for p in paths:
-        if os.path.exists(p):
-            cc.reset_log(p)
+        cc.reset_log(p)
 
 
 def main():

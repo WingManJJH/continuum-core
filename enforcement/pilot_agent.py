@@ -56,8 +56,7 @@ def main():
     # fresh audit + escalation state for a clean demo
     cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
     _esc = os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")
-    if os.path.exists(_esc):
-        os.remove(_esc)
+    cc.storage.get().remove(_esc)
 
     ep = build_ep()
     cases = [
@@ -106,8 +105,7 @@ def main():
     # cleanup demo artifacts
     cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
     _esc = os.path.join(os.path.dirname(cc.DATA), "escalations.jsonl")
-    if os.path.exists(_esc):
-        os.remove(_esc)
+    cc.storage.get().remove(_esc)
 
 
 if __name__ == "__main__":

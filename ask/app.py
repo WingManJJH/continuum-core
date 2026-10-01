@@ -19,6 +19,8 @@ from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "web"))
+import guard  # noqa: E402  — sign-in, workspaces, roles (D52)
 sys.path.insert(0, os.path.join(HERE, "..", "mcp_server"))
 from agent import Agent  # noqa: E402
 
@@ -74,7 +76,7 @@ def main():
     port = 8791
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    ThreadingHTTPServer((guard.host(), port), guard.protect(Handler, "ask")).serve_forever()
 
 
 if __name__ == "__main__":

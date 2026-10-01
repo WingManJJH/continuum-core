@@ -6,6 +6,287 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-02 — Second independent review: 9 findings fixed
+
+### D57 — Fixes from the second security and correctness reviews (D55–D56 and everything since D54)
+
+**Security**
+
+1. **Import requests are system-only (medium).** Only an import can raise an `accept_import_change` request; `propose` refuses it otherwise.
+   - Approve and reject act only on the staged change bound to that request (the `cr_id` link).
+   - A request whose staged change was already decided, superseded or is missing settles to match it, rather than raising an error or staying pending forever.
+   - Before this, an editor could raise a decoy request against a real staged change and have it rejected.
+2. **Imported records are schema-checked (medium).** Every record of a known type must match its locked schema, or the whole import is refused before anything is written.
+   - The refusal lists up to 10 errors.
+   - Record count is capped by `CONTINUUM_IMPORT_MAX_RECORDS` (default 250k).
+   - All four real models validate.
+3. **Request bodies are bounded (medium).** `Content-Length` is checked before anything is read: 2 MB by default, 50 MB for imports, 413 above that, and 400 for a negative or non-numeric value.
+   - The role floor is checked before the body is read.
+   - Deeply nested JSON is a clean 400.
+   - Socket timeout is 60 s.
+   - `/auth/dev` bodies are capped at 4 KB.
+   - The canvas parses JSON safely in single-user mode too.
+
+**Correctness**
+
+4. **Postgres import lock no longer exhausts the connection pool (high).**
+   - An in-process lock comes first, so waiting threads hold no connection.
+   - The advisory lock runs on a dedicated connection outside the pool.
+   - The lock is re-entrant per thread.
+   - 14 concurrent imports now complete; before, 10 or more stalled for 30 s.
+5. **Stage first, then request (high).** The staged change is written first, then the inbox request, then a `link` event, so a failure in between never leaves a request pointing at nothing.
+6. **A late failure is still revertible (medium).** The baselines write and the final batch record are now inside the failure guard.
+7. **Approvals are applied exactly once (medium).** Approve, reject and withdraw run under a storage mutex and re-check the request's status inside it. Before this, a second approver could re-apply the change.
+8. **Model metadata waits for success (low).** `model.json` is updated only after the batch succeeds.
+
+All are pinned by regression tests (`test_versioned_import` 49 and `test_web` 75, on both backends).
+
+---
+
+## 2026-10-02 — One review inbox
+
+### D56 — Staged import changes are change requests in the approvals inbox
+**Decision:** when an import stages a change (D51), it also proposes a change request
+`accept_import_change {sid}` in the model's approval queue: titled with the batch, record and
+changed fields, proposed by the importer, carrying the reasons. The inbox shows the field-by-field
+diff (`/api/approvals` attaches it). **Approve** takes the incoming version
+(`GovernanceStore.accept_import_change` → the same audited accept, stale-checked); **Reject** keeps
+ours and is remembered (`reject_import_change`); an import request can't be withdrawn. Staged
+changes superseded by a newer import or withdrawn by a revert close their request (`superseded`).
+Deciding on the Imports screen mirrors the decision onto the request, so nothing shows as pending
+twice. Roles as everywhere: approver decides. `builder/test_versioned_import.py` → 43,
+`web/test_web.py` → 69, browser e2e checks the inbox card.
+
+---
+
+## 2026-10-02 — One address for all five apps
+
+### D55 — `web/gateway.py`: one origin, five apps
+**Decision:** `python run.py` now starts one server (default :8080) that mounts the canvas at `/`
+and governance, dashboard, advisor and ask under `/governance/`, `/dashboard/`, `/advisor/`,
+`/ask/`. Each app keeps its own guarded handler; the gateway strips the prefix and hands the same
+request to it (one process, one origin → one session cookie, one certificate, one proxy rule, one
+Entra redirect URI). The four small front-ends now call `api/…` relative to their page, so they
+work on their own port or under a prefix unchanged; same-named paths in two apps stay separate
+(`/governance/api/guardrail` vs the canvas's). Sign-in returns you to the app you asked for. The
+canvas header links to the other apps when served by the gateway (`/api/apps`); each app links
+back. `run.py --separate` keeps the five ports. `CONTINUUM_PUBLIC_URL` defaults to
+`http://localhost:8080`. `web/test_gateway.py` → 18; the browser e2e now runs through the gateway.
+
+---
+
+## 2026-10-01 — Independent review: 17 findings fixed
+
+### D54 — Fixes from the security and correctness reviews of D45–D53
+Two independent reviews (security of the front door; correctness of storage and imports) ran
+before delivery. Every finding was reproduced, fixed and pinned by a regression test.
+**Security.**
+
+- **Members (critical).** Member changes are scoped to the workspace the admin role was checked
+  on. Granting to another workspace, acting org-wide or signing someone out everywhere needs an
+  organization admin. Before this, a workspace admin could take over other workspaces.
+- **Model ids (critical).** A model id must be a plain slug (`^[a-z0-9][a-z0-9_-]{0,63}$`).
+  This is checked in `model_base`, the guard and grants. Before this, `../` reached outside the
+  models folder. An unknown workspace now returns 404.
+- **Approval gate (high).** The governance app's guardrail PUT, and canvas build/BPMN import
+  apply, now honour the approval gate.
+- **Open redirect (high).** `/\host`-style `next=` values are refused.
+- **OIDC.**
+  - An account is bound to the provider's subject (`oid` / `sub`) on first sign-in, so a changed
+    email claim can't take over another account.
+  - `email_verified: false` is refused.
+  - RS256 only, with the signature always verified. `cryptography` is required.
+- **Robustness.** Non-object JSON bodies return 400. A POST to an app without POST returns 405,
+  not a crash. The governance app imported `cc` for its 409 path. Share links can only be revoked
+  from their own model.
+
+**Correctness.**
+
+- **Heads anchor (high).** The file backend's heads anchor could lose updates when two processes
+  appended to different logs of one model. It is now locked per heads file and written through a
+  unique temp file.
+- **Import batches (high).**
+  - A batch writes a start record first. A failure part-way writes an `import-failed` record
+    listing what it wrote, and that record is revertible.
+  - Imports and review decisions on one model are serialized by a storage mutex (flock or
+    advisory lock), so batch ids are unique.
+- **Versionless seeds (high).** Seeds without `version` fields are normalized on import instead
+  of crashing.
+- **Baselines.**
+  - A pending change the newest import no longer proposes is superseded.
+  - Accept moves the baseline, so the next source change fast-forwards.
+  - Revert marks the records it reverted, so re-running a reverted import is held for review
+    with that reason instead of silently re-applied.
+- **Smaller fixes.**
+  - The heads count comes from `seq`, not `count(*)`.
+  - Reprojection is set-based with COPY: 3,000 edits reproject in 0.04 s.
+  - The last-hash read widens past 64 KiB lines.
+  - The integer `version` column ignores non-integer versions.
+  - A non-ISO `ts` no longer fails a Postgres append.
+- **Per-path locks.** The file backend's thread lock is now per path, so a long import never
+  blocks other logs.
+
+---
+
+## 2026-10-01 — Canvas: Enterprise modules, import review, accounts; Studio folded in
+
+### D53 — The UI for D45–D52, and one Studio source of record
+**Decision:** the canvas gains **Enterprise** (Atlas, Applications & agents, Obligations/Assure with
+ISO packs and one-click clause mapping, Risks & controls with a 5×5 heat map and control test
+recording, Vitals) with **Ripple** for any record in the side pane; **Imports** (batches, staged
+changes with field diffs, accept / keep ours, revert); and, when sign-in is on, the "You:" role
+picker becomes the account (who you are, your role on this model, the role you are recorded as,
+sign out; admins manage members and linked roles). A 409 reloads the record with a notice; a lost
+session returns to sign-in. Viewers don't see editing tools (the server enforces it regardless).
+`maps/static/enterprise.js`, `account.js`; one EventSource drives everything (`onStreamExtra`).
+Fixed on the way: the dark selected-row and guardrail-pill colours leaked into light mode under
+"theme: auto". The offline Studio (`studio/`) is built and tested here — `studio/test_studio.py`
+builds it from the original state (regression: identical output, byte-identical BPMN) and the
+published state (e2e). Playwright is pinned to the installed browser build.
+**Verification:** `web/test_browser.py` — two real browser users (admin + viewer; live update when
+an import is accepted; viewer write refused) plus single-user mode unchanged → 20;
+`studio/test_studio.py` → 53. CI installs the pinned browser deps and runs group `studio`.
+
+---
+
+## 2026-10-01 — Multi-user web app
+
+### D52 — Sign-in, workspaces and roles in front of every app
+**Finding:** every app took the actor from the request body (`payload["actor"]`), and the canvas's
+"You:" picker let anyone act as any role; the bind address was fixed to 127.0.0.1.
+**Decision:** `web/guard.protect(Handler, app)` wraps all five apps (no-op with
+`CONTINUUM_AUTH=off`, the default, so single-user local use is unchanged). With `dev` or `oidc`:
+signed HttpOnly SameSite=Lax session cookie (HMAC, 12 h, revocable — "sign out everywhere" bumps a
+per-user epoch); workspace per request (`?ws=` or last choice; an explicit workspace you lack is
+403); roles per workspace viewer < editor < approver < admin (reads / changes / review decisions /
+members, policy, imports); **identity only from the session** — `actor`, `reviewer`, `proposed_by`
+in any body are replaced with the person's governed actor (their linked HumanRole, else a stable
+`role.member.<domain>.<name>` id), and the email is stamped on every event (D49). Writes must be
+JSON and same-origin (CSRF). The first person in an empty directory (or `CONTINUUM_ADMIN_EMAILS`)
+is organization admin. Users, grants, revokes and sign-ins are a chained access log in the system
+space (files or Postgres). OIDC: code flow + PKCE (S256), state and nonce in a signed short-lived
+cookie, RS256 signature verified against the issuer JWKS, iss/aud/exp/nonce checked, `alg=none`
+refused, optional allowed email domains; works with Microsoft Entra ID (issuer
+`https://login.microsoftonline.com/<tenant>/v2.0`) or any OIDC provider. Conflicts surface as 409.
+Portal share links open the model they were published from. `CONTINUUM_HOST` sets the bind address.
+`web/test_web.py` → 52, over real HTTP, both backends (including 8 simultaneous saves and a mock
+OIDC provider).
+
+---
+
+## 2026-10-01 — Versioned imports
+
+### D51 — An import never overwrites a record
+**Finding:** `builder/model_import.write_model` rewrote a model's `seed.json` on every import:
+an edit made in Continuum could be silently masked or silently mask the import, and the §7.5
+baseline itself was rewritten.
+**Decision:** the first import of a model writes its baseline; every re-import is a numbered batch
+of ordinary change-control events (`builder/versioned_import.py`) against a per-source baseline
+(the version each record had when that source last wrote it). New → create; identical → nothing;
+untouched since the source wrote it → fast-forward; edited in Continuum since → **staged** with a
+field diff, record untouched; gone from the source → retired if untouched, staged if edited.
+Accept is refused (409) if the record moved after staging; reject is remembered while record and
+incoming version are unchanged; a newer import supersedes older pending changes; any batch can be
+reverted with compensating events, skipping (and reporting) records edited after it. Models
+imported earlier use their seed as the baseline. Every existing importer (BPC/OC, Sunrise, SYSPRO)
+goes through it unchanged via `write_model`. State lives in the model's own chained logs, so it
+works on files and Postgres. Ported from the Node platform's review fixes (generation-safe
+baselines are implicit here: records are never deleted, so versions only increase).
+`builder/test_versioned_import.py` → 27, both backends.
+
+---
+
+## 2026-10-01 — Postgres backend (Supabase schema lineage)
+
+### D50 — Optimistic concurrency on every governed write
+**Finding:** two editors who opened the same record could both save; the second silently won
+(both events chained, the earlier change lost from current state).
+**Decision:** `append_edit_event` carries `expect = (type, id, from_version, op)`; the backend
+checks it inside the append lock — files: an incremental seed+log version index; Postgres: the
+`nodes` projection — and raises `ConflictError` (HTTP 409 in the apps) with nothing written.
+Creating an id that already exists is refused the same way. Proven under contention: 10–12
+threads and 6 processes racing from one read → exactly one write, chain intact, no version
+written twice (`mcp_server/test_storage.py`, `db/test_postgres.py`).
+
+### D49 — Per-request model, not a process-global one
+**Finding:** `set_active_model()` repointed the whole process, so in a multi-user app one user
+switching model switched everyone; layout was one file shared by every model; approval/policy
+queues froze the model they were built on.
+**Decision:** `cc.DATA` / `EDITS_LOG` / … resolve per thread first (`cc.use_model(slug, user)`),
+falling back to the process default (tests and tools that assign them keep working). The signed-in
+user is stamped on every event's actor (`actor.user`). Layout is per model; approval and policy
+logs resolve live; retention defaults resolve live.
+
+### D48 — One storage interface; Postgres on the Supabase lineage
+**Decision:** every read and write goes through `mcp_server/storage.py` — documents and append-only
+logs addressed by the same paths as before (directory = workspace, file = record), so callers did
+not change. `CONTINUUM_DATABASE_URL` selects Postgres. Schema `db/migrations/` descends from the
+Aug 28 Supabase design (`nodes`, `edges`, `node_events`, traversal CTEs, RLS) with these changes:
+workspace-scoped tables (tenancy, which that design named as the gap); `node_events` is the source
+of truth with the app as the append point (only the app can form the canonical hash-chained event;
+`raw` keeps exact bytes so chains re-verify) and a trigger making it append-only; `nodes`/`edges`
+are a rebuildable projection; RLS policies scope rows to `continuum.workspace` (replacing the
+starter "any authenticated user" policies); `guardrails` / `agent_actions` become views; `node_type`
+is open (types are enforced by the JSON Schemas). Seeds on disk are adopted on first read; history
+moves only via `db/import_files.py` (byte-for-byte, chains verified, never merges two histories).
+The file backend gained flock-serialized appends and atomic document writes.
+**Verification:** 39 of 41 existing suites replay unchanged on Postgres (the 2 that tamper with
+JSONL bytes have Postgres equivalents); `db/test_postgres.py` → 27; CI runs both backends.
+
+---
+
+## 2026-10-01 — EA / GRC building blocks in the governed model
+
+### D47 — MCP server folds live; Ripple and Vitals are agent tools
+**Finding:** `mcp_server/server.py` folded the graph once at start-up, so an agent kept acting under
+the old guardrail until the server restarted — contrary to "live the moment it is saved".
+**Decision:** fold on every tool call (`_g()`), as every web app already does. New tools
+`get_impact` (Ripple) and `get_vitals`, compact text renders. The budgeted `get_task_context`
+render is unchanged (token budgets hold). `mcp_server/test_server_tools.py` → 6.
+
+### D46 — Python is the rules engine of record; the JS core is parity-gated
+**Decision:** Ripple, Assure, Vitals and Atlas are ported to `enterprise/rules.py`. The browser JS
+core (`studio/core/`) stays only for the offline Studio. `enterprise/test_parity.py` runs both on
+one fixture (the Studio seed, widened with a failing control, a retired system in use, an
+accepted risk, a capability cycle and an overdue review) and requires identical results for every
+Ripple start node (107), Assure, Vitals and Atlas. BFS path *choice* between equal-depth parents is
+order-dependent and not compared; reach, depth, counts, KPIs, guardrails and summaries are.
+Result objects keep the JS contract (camelCase) so canvas and Studio render one payload.
+continuum-core mapping: a process is evidence when `active` and its `custom.next_review_due`
+has not lapsed (continuum-core has no separate approved status — approvals gate the change).
+
+### D45 — Capability, Application, Obligation, Control, Risk as locked schemas
+**Decision:** five new entities in the continuum-core style (ids `cap.` `app.` `obl.` `ctl.` `rsk.`;
+`version` + `status`; snapshot-per-event writes). Relationships are stored once, on the new record
+(`process_refs`, `task_refs`, `capability_refs` …) so no Phase 1 schema changed. Applications carry
+`kind: system | agent`; an agent's execution stays an `AgentBinding` (`agent_binding_refs`); a
+binding no agent Application owns still reads as an agent. Legacy `RiskControl` reads as a risk +
+control pair; `split_risk_control` converts one and retires it. Write paths
+(`governance/ea_store.py`, mixed into `GovernanceStore`): validated, every ref checked (unknown or
+retired refused, capability cycles refused), versioned, retired not deleted, reason + role actor
+required, and approvable (`add_/edit_/retire_<block>`, `record_control_test`; one policy entity per
+block, default *optional*). ISO 9001:2015 (28) and ISO 9004:2018 (33) obligation packs
+(`enterprise/packs/`, own-wording summaries, no standard text), seeded idempotently.
+`EditError` moved to `governance/errors.py` (re-exported by `store`) to break an import cycle.
+`enterprise/test_enterprise.py` → 44.
+
+---
+
+## 2026-10-01 — Consolidation: one codebase (continuum-core)
+
+### D44 — One standard test run; continuum-core is the single codebase of record
+**Context:** a separate EA/GRC build (JS core, Node/Postgres platform) and the Aug 28
+`continuum-platform` repo (Studio, Node MCP server, Supabase schema) overlapped continuum-core.
+Jeffrey directed: one codebase (this repo); the multi-user app is built here; port the EA/GRC
+features; move storage to Postgres on the Supabase schema; all work in git with a standard set
+of tests. Full analysis: `docs/consolidation-analysis.md`.
+**Decision:** `tests/run_all.py` is the single suite registry and the only command CI runs.
+Optional groups (`postgres`, `js`, `harness`) run when their prerequisite exists and are reported
+SKIPPED otherwise; CI sets `CONTINUUM_REQUIRE_ALL=1` so a skip fails the build. CI gains a
+Postgres 16 service and Node 20.
+
+---
+
 ## 2026-09-16 — X-matrix: editable link strengths + fidelity styling
 
 ### D43 — Click-to-cycle governed cell overrides + rotated-label Nexus fidelity
@@ -953,3 +1234,22 @@ engineering ticket" lands or needs reframing.
 three columns (spontaneous frame / A-B framing winner / Fail-A · Fail-B · Supported).
 **Applied in:** `design-partner/call-log.md` (ready-to-fill tracker + rollup). The calls
 themselves are a human action; the instrument is in place.
+
+## D58 — Models moved to Supabase (2026-10-01)
+
+**Decision.** The five drive models live in the Supabase project `continuum` (SMRTR org, Free plan, us-west-2, ref `jpsawqudfdwkrjfqvzvs`).
+- The Data API (PostgREST) is off; the app connects straight to Postgres.
+- Connections go through the Session pooler on port 5432. Advisory locks need a real session, so the Transaction pooler (6543) is not used.
+- The password is passed via `PGPASSWORD`, never in a URL or a file.
+
+**Evidence.**
+- Migrations 0001–0003 applied, and every hash chain re-verified after the copy.
+- Node counts match the rehearsal load exactly: default 104, msft-bpc 4,856, msft-oc 510, sunrise 310, syspro 14.
+- RLS is on for docs, node_events, nodes and edges.
+
+**Fixes found on the way.**
+- `requirements.txt` now names the `pool` extra.
+- `import_files.py` closes its pool, which removes a shutdown warning on Python 3.14.
+- macOS bash 3.2 mis-parses quoted `$( … )` blocks containing `{a,b}`, so the load script avoids them.
+
+**Follow-up.** Add a non-owner `continuum_app` login role. The `postgres` user bypasses RLS.

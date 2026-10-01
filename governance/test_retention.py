@@ -58,8 +58,8 @@ def main():
     ev(cc.EDITS_LOG, "gr.CO.3.2.7", "GuardrailPolicy", "2026-09-01T00:00:00Z")  # recent -> not due
     ev(cc.EDITS_LOG, "CO.3.2.7", "Process", "2016-01-01T00:00:00Z")            # old -> _default review
 
-    live_events_before = len(open(cc.EVENTS_LOG).read().splitlines())
-    live_edits_before = len(open(cc.EDITS_LOG).read().splitlines())
+    live_events_before = len(cc.read_log(cc.EVENTS_LOG))
+    live_edits_before = len(cc.read_log(cc.EDITS_LOG))
 
     plan = ret.evaluate(AS_OF, logs=LOGS, holds=holds)
     cls = plan["classes"]
@@ -78,8 +78,8 @@ def main():
     check("apply skips the review-class record", res["skipped_review"] == 1)
     check("apply skips the held record", res["skipped_on_hold"] == 1)
 
-    arch = [json.loads(x) for x in open(archive)]
-    led = [json.loads(x) for x in open(ledger)]
+    arch = cc.read_log(archive)
+    led = cc.read_log(ledger)
     check("cold archive holds the 3 records (preserved, not destroyed)", len(arch) == 3)
     check("ledger records each disposition with actor + action", len(led) == 3
           and all(l["by"] == "role.qms.records" and l["action"] in ("archive", "dispose") for l in led))
@@ -87,8 +87,8 @@ def main():
           any("seal-and-roll" in l["note"] for l in led if l["action"] == "dispose"))
 
     # the live hash-chained logs must be untouched, and still verify
-    check("live events log unchanged", len(open(cc.EVENTS_LOG).read().splitlines()) == live_events_before)
-    check("live edits log unchanged", len(open(cc.EDITS_LOG).read().splitlines()) == live_edits_before)
+    check("live events log unchanged", len(cc.read_log(cc.EVENTS_LOG)) == live_events_before)
+    check("live edits log unchanged", len(cc.read_log(cc.EDITS_LOG)) == live_edits_before)
     check("live chains still intact after disposition", cc.verify_log(cc.EVENTS_LOG)["ok"]
           and cc.verify_log(cc.EDITS_LOG)["ok"])
 

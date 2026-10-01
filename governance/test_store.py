@@ -26,8 +26,7 @@ def check(name, cond):
 
 def main():
     # start from a clean edit log
-    if os.path.exists(cc.EDITS_LOG):
-        cc.reset_log(cc.EDITS_LOG)
+    cc.reset_log(cc.EDITS_LOG)
     s = gov.GovernanceStore()
 
     before = s.guardrail("gr.CO.3.2.7")

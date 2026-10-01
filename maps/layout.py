@@ -16,17 +16,28 @@ import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAYOUT_PATH = os.path.normpath(os.path.join(HERE, "..", "data", "layout.json"))
+LAYOUT_PATH = None  # None -> per model: <model dir>/layout.json (D49). Tests may pin a path.
+
+
+def _path() -> str:
+    if LAYOUT_PATH:
+        return LAYOUT_PATH
+    import continuum_core as cc
+    return os.path.join(os.path.dirname(cc.DATA), "layout.json")
+
+
+def _store():
+    import continuum_core as cc
+    return cc.storage.get()
 
 _MAX = 20000  # clamp coordinates to a sane canvas so a bad client can't wander off
 
 
 def load_all() -> dict:
     try:
-        with open(LAYOUT_PATH) as f:
-            data = json.load(f)
+        data = _store().read_json(_path(), {})
         return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (json.JSONDecodeError, OSError):
         return {}
 
 
@@ -52,9 +63,7 @@ def save_process(pid: str, positions: dict) -> dict:
         raise ValueError("process id required")
     allp = load_all()
     allp[str(pid)] = _clean(positions)
-    os.makedirs(os.path.dirname(LAYOUT_PATH), exist_ok=True)
-    with open(LAYOUT_PATH, "w") as f:
-        json.dump(allp, f, indent=2)
+    _store().write_json(_path(), allp)
     return allp[str(pid)]
 
 
@@ -63,5 +72,4 @@ def reset_process(pid: str) -> None:
     allp = load_all()
     if str(pid) in allp:
         del allp[str(pid)]
-        with open(LAYOUT_PATH, "w") as f:
-            json.dump(allp, f, indent=2)
+        _store().write_json(_path(), allp)

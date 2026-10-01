@@ -37,8 +37,7 @@ TRIGGER = {"risk_score": 0.99, "amount": 10 ** 9, "vendor_risk": 0.99, "deal_siz
 
 def _clean():
     cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
-    if os.path.exists(ESCALATIONS):
-        os.remove(ESCALATIONS)
+    cc.storage.get().remove(ESCALATIONS)
 
 
 def main():

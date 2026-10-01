@@ -50,17 +50,14 @@ def _now() -> datetime:
 
 def _load_all() -> dict:
     try:
-        with open(PORTAL_PATH) as f:
-            data = json.load(f)
+        data = cc.storage.get().read_json(PORTAL_PATH, {})
         return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (json.JSONDecodeError, OSError):
         return {}
 
 
 def _save_all(data: dict) -> None:
-    os.makedirs(os.path.dirname(PORTAL_PATH), exist_ok=True)
-    with open(PORTAL_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    cc.storage.get().write_json(PORTAL_PATH, data)
 
 
 def _expired(rec: dict, now: datetime | None = None) -> bool:
@@ -108,6 +105,7 @@ def publish(target: str, title: str, created_by: str, *,
         "created_at": _now().isoformat(),
         "expires_at": expires_at,
         "model_sig": g.model_sig,
+        "workspace": cc.ACTIVE_MODEL,   # D52: the link opens the model it was published from
         "revoked": False,
     }
     allp = _load_all()
@@ -128,8 +126,8 @@ def revoke(token: str) -> bool:
     """Turn a share link off. Idempotent; returns True if a link was revoked."""
     allp = _load_all()
     rec = allp.get(token or "")
-    if rec is None or rec.get("revoked"):
-        return False
+    if rec is None or rec.get("revoked") or rec.get("workspace", "default") != cc.ACTIVE_MODEL:
+        return False  # unknown, already off, or another model's link
     rec["revoked"] = True
     rec["revoked_at"] = _now().isoformat()
     _save_all(allp)
@@ -151,6 +149,8 @@ def all_links(g: cc.Graph | None = None) -> list[dict]:
     g = g or cc.Graph()
     out = []
     for rec in _load_all().values():
+        if rec.get("workspace", "default") != cc.ACTIVE_MODEL:
+            continue  # each model lists only its own links
         out.append({
             "token": rec["token"],
             "target": rec["target"],
