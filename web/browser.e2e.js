@@ -61,6 +61,8 @@ async function singleUser(browser) {
     await A.page.click(".cap-card .ea-chip.k-process");
     await A.page.waitForSelector(".ripple .rsum");
     ok((await A.page.textContent(".ripple .rsum")).startsWith("A change to"), "clicking a process shows its Ripple in the side pane");
+    await A.page.waitForTimeout(2500);   // a live refresh (SSE) arrives in this window
+    ok(await A.page.isVisible(".ripple .rsum"), "the Ripple stays open through a live refresh");
     await shot(A.page, "02-atlas-ripple");
 
     // Obligations: add ISO 9001, map a clause

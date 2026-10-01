@@ -1,6 +1,6 @@
 # Consolidation analysis: continuum-core and the EA/GRC build
 
-**Date:** 2026-10-01 · **Owner:** Jeffrey Hunt · **Status:** decided (direction from Jeffrey, 2026-10-01)
+**Date:** 2026-10-01 · **Owner:** Jeffrey Hunt · **Status:** implemented on branch `feat/consolidation-ea-grc-postgres-multiuser` (see §8)
 
 ## 1. Summary
 
@@ -118,3 +118,28 @@ It runs the 38 existing suites, the new suites, the harness, the JS parity check
 | Global state (module singletons, active model) leaks between users | Per-request workspace context; a test with two concurrent users |
 | JS and Python rules drift | Shared fixtures in CI; Python is the system of record |
 | Scope is large | Each step is a working, tested commit; the order puts value first (EA/GRC, then Postgres, then multi-user) |
+
+## 8. Status (2026-10-01): built
+
+Each step of §6 was done as reviewed commits on `feat/consolidation-ea-grc-postgres-multiuser`, recorded in DECISIONS.md D44–D54.
+
+| Step | Result |
+|---|---|
+| 1 Standard test run | `tests/run_all.py` is the one registry. CI runs it with Postgres 16, Node 20 and Playwright |
+| 2 Five building blocks | New schemas and governed write paths, approvable. ISO 9001 (28 clauses) and ISO 9004 (33 clauses) packs |
+| 3 Rules in Python | `enterprise/rules.py`. Parity with the JS core is proven on 107 Ripple start nodes, Assure, Vitals and Atlas |
+| 4 Postgres | `mcp_server/storage.py` + `db/migrations`. 39 of 41 existing suites replay unchanged on Postgres; the contract suite covers the rest |
+| 5 Versioned imports | `builder/versioned_import.py`. A re-import never overwrites a record |
+| 6 Multi-user | `web/guard.py` + `web/auth.py`: sign-in (dev / OIDC with Entra ID), roles per model, identity from the session only |
+| 7 UI | Canvas **Enterprise** and **Imports** views, Ripple side pane, account and members |
+| 8 Studio | Built and tested from `studio/`. The Node platform and the `continuum-platform` Studio source are superseded and can be archived |
+
+An independent security review and a correctness review found 17 issues. All were fixed and pinned by tests (D54).
+
+**Final run:** every group passes on both backends. The `harness` group needs the tiktoken download, which CI performs.
+
+**Not done here:**
+
+- GitHub push and PR: no credentials, and `main` is PR-gated. The branch is delivered as a git bundle.
+- Production Entra app registration and a hosted deployment.
+- QMS-advisor review of the clause titles.

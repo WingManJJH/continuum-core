@@ -171,7 +171,19 @@ function renderVitalsTab() {
 }
 
 // ------------------------------------------------------------------ Ripple (right pane)
+// A live refresh re-renders the side pane; while a Ripple is open in an Enterprise
+// or Imports view, keep showing it (refreshed) instead of the process properties.
+(function () {
+  var orig = window.renderProps;
+  if (typeof orig !== "function") return;
+  window.renderProps = function () {
+    if ((state.view === "enterprise" || state.view === "imports") && EA.rippleId) return showRipple(EA.rippleId);
+    return orig.apply(this, arguments);
+  };
+})();
+
 function showRipple(id) {
+  EA.rippleId = id;
   eaGet("/api/ripple?id=" + encodeURIComponent(id)).then(function (d) {
     var r = d.ripple, el = document.getElementById("props");
     if (!r || !r.start) { el.innerHTML = '<div class="muted">Nothing to show for ' + esc(id) + ".</div>"; return; }
