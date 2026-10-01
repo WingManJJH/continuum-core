@@ -388,13 +388,15 @@ def _append_event(log_path: str, event: dict, expect: tuple | None = None) -> di
     return storage.get().append_chained(log_path, event, _p("HEADS_FILE"), expect=expect, seed_path=_p("DATA"))
 
 
-def verify_log(log_path: str) -> dict:
+def verify_log(log_path: str, heads_path: str | None = None) -> dict:
     """Re-walk a log and confirm the chain is intact. Returns a structured result
-    with the first break (if any) and the heads-anchor check."""
+    with the first break (if any) and the heads-anchor check (heads_path defaults
+    to the active model's)."""
     name = os.path.basename(log_path)
     be = storage.get()
+    _heads = (lambda: be.read_json(heads_path, {}) or {}) if heads_path else _read_heads
     if not be.exists(log_path):
-        heads = _read_heads().get(name)
+        heads = _heads().get(name)
         if heads and heads.get("count", 0) > 0:
             return {"log": name, "ok": False, "count": 0, "exists": False,
                     "break": {"reason": "log missing but heads records "
@@ -422,7 +424,7 @@ def verify_log(log_path: str) -> dict:
         count += 1
 
     result = {"log": name, "ok": True, "count": count, "exists": True, "head": prev}
-    heads = _read_heads().get(name)
+    heads = _heads().get(name)
     if heads:
         if heads.get("count") != count or heads.get("head") != prev:
             result["ok"] = False

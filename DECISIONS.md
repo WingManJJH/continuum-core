@@ -6,6 +6,31 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Multi-user web app
+
+### D52 — Sign-in, workspaces and roles in front of every app
+**Finding:** every app took the actor from the request body (`payload["actor"]`), and the canvas's
+"You:" picker let anyone act as any role; the bind address was fixed to 127.0.0.1.
+**Decision:** `web/guard.protect(Handler, app)` wraps all five apps (no-op with
+`CONTINUUM_AUTH=off`, the default, so single-user local use is unchanged). With `dev` or `oidc`:
+signed HttpOnly SameSite=Lax session cookie (HMAC, 12 h, revocable — "sign out everywhere" bumps a
+per-user epoch); workspace per request (`?ws=` or last choice; an explicit workspace you lack is
+403); roles per workspace viewer < editor < approver < admin (reads / changes / review decisions /
+members, policy, imports); **identity only from the session** — `actor`, `reviewer`, `proposed_by`
+in any body are replaced with the person's governed actor (their linked HumanRole, else a stable
+`role.member.<domain>.<name>` id), and the email is stamped on every event (D49). Writes must be
+JSON and same-origin (CSRF). The first person in an empty directory (or `CONTINUUM_ADMIN_EMAILS`)
+is organization admin. Users, grants, revokes and sign-ins are a chained access log in the system
+space (files or Postgres). OIDC: code flow + PKCE (S256), state and nonce in a signed short-lived
+cookie, RS256 signature verified against the issuer JWKS, iss/aud/exp/nonce checked, `alg=none`
+refused, optional allowed email domains; works with Microsoft Entra ID (issuer
+`https://login.microsoftonline.com/<tenant>/v2.0`) or any OIDC provider. Conflicts surface as 409.
+Portal share links open the model they were published from. `CONTINUUM_HOST` sets the bind address.
+`web/test_web.py` → 52, over real HTTP, both backends (including 8 simultaneous saves and a mock
+OIDC provider).
+
+---
+
 ## 2026-10-01 — Versioned imports
 
 ### D51 — An import never overwrites a record

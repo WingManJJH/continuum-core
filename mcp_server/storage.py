@@ -43,6 +43,8 @@ GENESIS_HASH = "0" * 64
 _HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.normpath(os.path.join(_HERE, "..", "data"))
 MODELS_DIR = os.path.join(DATA_ROOT, "models")
+SYSTEM_DIR = os.path.join(DATA_ROOT, "_system")   # users, memberships, sign-in audit (not a model)
+_DEFAULT_SYSTEM_DIR = SYSTEM_DIR                     # tests may repoint SYSTEM_DIR at a temp dir
 EDITS_NAME = "edits.log.jsonl"
 
 
@@ -73,6 +75,8 @@ def workspace_of(path: str) -> tuple[str, str]:
     d, name = os.path.split(os.path.normpath(os.path.abspath(path)))
     if d == DATA_ROOT:
         return "default", name
+    if d == _DEFAULT_SYSTEM_DIR:
+        return "_system", name
     mdir = os.path.normpath(os.path.abspath(models_dir_hook()))
     if os.path.dirname(d) == mdir:
         # a model slug — namespaced by its models dir when that is not the

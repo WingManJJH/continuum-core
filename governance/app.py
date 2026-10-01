@@ -21,6 +21,8 @@ from urllib.parse import urlparse, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "web"))
+import guard  # noqa: E402  — sign-in, workspaces, roles (D52)
 import store as gov  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
@@ -73,6 +75,8 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/api/audit":
                 return self._json({"rows": STORE.audit(), "integrity": STORE.integrity()})
             return self._static(u.path)
+        except cc.ConflictError as e:
+            return self._json({"ok": False, "conflict": True, "error": str(e)}, 409)
         except gov.EditError as e:
             return self._json({"error": str(e)}, 404)
         except Exception as e:  # noqa: BLE001
@@ -94,6 +98,8 @@ class Handler(BaseHTTPRequestHandler):
                 reviewer=payload.get("reviewer", ""),
             )
             return self._json({"ok": True, "guardrail": new})
+        except cc.ConflictError as e:
+            return self._json({"ok": False, "conflict": True, "error": str(e)}, 409)
         except gov.EditError as e:
             return self._json({"ok": False, "error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
@@ -104,7 +110,7 @@ def main():
     port = 8787
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv = ThreadingHTTPServer((guard.host(), port), guard.protect(Handler, "governance"))
     print(f"Continuum Governance on http://localhost:{port}")
     srv.serve_forever()
 
