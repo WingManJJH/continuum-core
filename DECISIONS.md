@@ -1260,7 +1260,7 @@ themselves are a human action; the instrument is in place.
 - `continuum_app`: LOGIN only, with no superuser, createdb, createrole, replication or BYPASSRLS.
 - DML on the five Continuum tables (and on future tables of the owner, via default privileges).
 - `db/app_role.py` creates the role and `--check` proves it.
-- On Supabase it also revokes the default `anon`/`authenticated` grants on these tables.
+- On Supabase it also revokes the default `anon`/`authenticated`/`service_role` grants on these tables.
 
 **Why.** The owner bypasses row-level security. With the owner login, the 0003 workspace policies were documentation, not enforcement.
 
