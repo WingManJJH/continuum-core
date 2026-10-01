@@ -12,6 +12,17 @@ concurrency:                 # one run per ref; cancel a superseded in-progress 
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: continuum
+          POSTGRES_PASSWORD: continuum
+          POSTGRES_DB: continuum_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U continuum" --health-interval 5s
+          --health-timeout 5s --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -30,52 +41,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r mcp_server/requirements.txt   # mcp, tiktoken, jsonschema
 
-      - name: Harness — schemas, token budgets, traceability, scenario
-        run: |
-          python mcp_server/token_budget.py --validate
-          python mcp_server/traceability.py
-          python mcp_server/scenario.py
+      - name: Set up Node (JS/Python rules parity)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Test suites (470 assertions)
-        run: |
-          python governance/test_store.py
-          python enforcement/test_enforce.py
-          python signal/test_conformance.py
-          python dashboard/test_rollup.py
-          python audit/test_audit_chain.py
-          python audit/test_anchor.py
-          python audit/test_history.py
-          python governance/test_retention.py
-          python governance/test_taskedit.py
-          python governance/test_authoring.py
-          python governance/test_binding.py
-          python governance/test_flow.py
-          python governance/test_subprocess.py
-          python governance/test_event.py
-          python governance/test_role.py
-          python governance/test_graphedit.py
-          python governance/test_group.py
-          python governance/test_approvals.py
-          python governance/test_approval_policy.py
-          python governance/test_capa.py
-          python governance/test_capa_enrich.py
-          python maps/test_mapdata.py
-          python maps/test_layout.py
-          python maps/test_landscape.py
-          python maps/test_architecture.py
-          python maps/test_strategy.py
-          python maps/test_portal.py
-          python bpmn/test_export.py
-          python bpmn/test_import.py
-          python bpmn/test_visio.py
-          python builder/test_build.py
-          python builder/test_bpc_import.py
-          python builder/test_importers.py
-          python builder/test_bpc_enrich.py
-          python mcp_server/test_typesafe.py
-          python advisor/test_advisor.py
-          python ask/test_agent.py
-          python test_run.py
-
-      - name: All green
-        run: echo "ALL GREEN -- 470 assertions + 3 harness checks"
+      - name: All suites — one standard run (tests/run_all.py)
+        env:
+          CONTINUUM_TEST_DATABASE_URL: postgresql://continuum:continuum@localhost:5432/continuum_test
+          CONTINUUM_REQUIRE_ALL: "1"     # a skipped group fails CI, never passes silently
+        run: python tests/run_all.py

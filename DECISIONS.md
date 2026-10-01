@@ -6,6 +6,21 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Consolidation: one codebase (continuum-core)
+
+### D44 — One standard test run; continuum-core is the single codebase of record
+**Context:** a separate EA/GRC build (JS core, Node/Postgres platform) and the Aug 28
+`continuum-platform` repo (Studio, Node MCP server, Supabase schema) overlapped continuum-core.
+Jeffrey directed: one codebase (this repo); the multi-user app is built here; port the EA/GRC
+features; move storage to Postgres on the Supabase schema; all work in git with a standard set
+of tests. Full analysis: `docs/consolidation-analysis.md`.
+**Decision:** `tests/run_all.py` is the single suite registry and the only command CI runs.
+Optional groups (`postgres`, `js`, `harness`) run when their prerequisite exists and are reported
+SKIPPED otherwise; CI sets `CONTINUUM_REQUIRE_ALL=1` so a skip fails the build. CI gains a
+Postgres 16 service and Node 20.
+
+---
+
 ## 2026-09-16 — X-matrix: editable link strengths + fidelity styling
 
 ### D43 — Click-to-cycle governed cell overrides + rotated-label Nexus fidelity
