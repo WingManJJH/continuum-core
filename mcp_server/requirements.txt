@@ -4,4 +4,4 @@
 mcp>=2.0.0          # server.py — MCP stdio server (the §07 agent-facing surface); uses MCPServer (2.x)
 tiktoken>=0.7.0     # token_budget.py — real tokenizer for §08 validation
 jsonschema>=4.20.0  # token_budget.py --validate — seed graph vs. locked schemas
-psycopg[binary]>=3.1  # storage.py — Postgres backend (optional at runtime: only when CONTINUUM_DATABASE_URL is set)
+psycopg[binary,pool]>=3.1  # storage.py — Postgres backend (optional at runtime: only when CONTINUUM_DATABASE_URL is set)
