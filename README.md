@@ -67,6 +67,9 @@ pip install -r mcp_server/requirements.txt        # mcp, tiktoken, jsonschema
 python3 run.py                                    # governance :8787 · dashboard :8788 · canvas :8789 · advisor :8790 · ask :8791
 python3 run.py --only ask,advisor                 # or a subset · --list to list · set CONTINUUM_LLM_API_KEY for live LLM
 
+# Multi-user: sign-in, roles per model, Postgres — see docs/multi-user.md and docs/postgres.md
+CONTINUUM_AUTH=dev python3 run.py                 # local multi-user test (type an email to sign in)
+
 # Every suite, one command (the standard test run CI uses — D44)
 python3 tests/run_all.py                          # --list · --only core,enterprise · --skip harness
 # optional groups: postgres (CONTINUUM_TEST_DATABASE_URL), js (node), harness (tiktoken encoding)

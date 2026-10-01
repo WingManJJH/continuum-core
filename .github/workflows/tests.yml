@@ -46,6 +46,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Browser test dependencies (Playwright + bpmn-js, pinned)
+        run: |
+          cd studio/test && npm ci
+          npx playwright install --with-deps chromium
+
       - name: All suites — one standard run (tests/run_all.py)
         env:
           CONTINUUM_TEST_DATABASE_URL: postgresql://continuum:continuum@localhost:5432/continuum_test

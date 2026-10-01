@@ -133,6 +133,8 @@ def protect(Handler, app: str):
             if u.path.startswith("/auth/"):
                 return self._auth_route(method, u)
             if auth.mode() == "off":
+                if u.path == "/api/me":
+                    return _json(self, {"ok": True, "auth": "off"})  # single-user: the UI keeps its role picker
                 if inner is None:
                     return self.send_error(405)
                 return inner()

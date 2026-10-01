@@ -7,6 +7,8 @@ SUITES = [
     ("enterprise", "mcp_server/test_server_tools.py", []),
     ("js", "enterprise/test_parity.py", []),
     ("js", "studio/core/core.test.js", []),
+    ("studio", "studio/test_studio.py", []),
+    ("studio", "web/test_browser.py", []),
     ("postgres", "db/test_postgres.py", []),
     ("postgres", "@replay", []),
 ]

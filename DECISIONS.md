@@ -6,6 +6,27 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Canvas: Enterprise modules, import review, accounts; Studio folded in
+
+### D53 — The UI for D45–D52, and one Studio source of record
+**Decision:** the canvas gains **Enterprise** (Atlas, Applications & agents, Obligations/Assure with
+ISO packs and one-click clause mapping, Risks & controls with a 5×5 heat map and control test
+recording, Vitals) with **Ripple** for any record in the side pane; **Imports** (batches, staged
+changes with field diffs, accept / keep ours, revert); and, when sign-in is on, the "You:" role
+picker becomes the account (who you are, your role on this model, the role you are recorded as,
+sign out; admins manage members and linked roles). A 409 reloads the record with a notice; a lost
+session returns to sign-in. Viewers don't see editing tools (the server enforces it regardless).
+`maps/static/enterprise.js`, `account.js`; one EventSource drives everything (`onStreamExtra`).
+Fixed on the way: the dark selected-row and guardrail-pill colours leaked into light mode under
+"theme: auto". The offline Studio (`studio/`) is built and tested here — `studio/test_studio.py`
+builds it from the original state (regression: identical output, byte-identical BPMN) and the
+published state (e2e). Playwright is pinned to the installed browser build.
+**Verification:** `web/test_browser.py` — two real browser users (admin + viewer; live update when
+an import is accepted; viewer write refused) plus single-user mode unchanged → 20;
+`studio/test_studio.py` → 53. CI installs the pinned browser deps and runs group `studio`.
+
+---
+
 ## 2026-10-01 — Multi-user web app
 
 ### D52 — Sign-in, workspaces and roles in front of every app

@@ -118,7 +118,10 @@ function renderCenter() {
   var landB = document.getElementById("landscape-btn"); if (landB) landB.classList.toggle("active", state.view === "landscape");
   var archB = document.getElementById("arch-btn"); if (archB) archB.classList.toggle("active", state.view === "architecture");
   var stratB = document.getElementById("strategy-btn"); if (stratB) stratB.classList.toggle("active", state.view === "strategy");
-  toggleProcTools(state.view === "landscape" || state.view === "architecture" || state.view === "strategy");
+  var extra = window.CENTER_VIEWS && window.CENTER_VIEWS[state.view];   // enterprise / imports views (D45, D51)
+  ["enterprise", "imports"].forEach(function (v) { var b = document.getElementById(v + "-btn"); if (b) b.classList.toggle("active", state.view === v); });
+  toggleProcTools(state.view === "landscape" || state.view === "architecture" || state.view === "strategy" || !!extra);
+  if (extra) { renderCrumbs(); extra(); return; }
   if (state.view === "landscape") {
     renderCrumbs();
     $("#canvas").innerHTML = state.landscape ? renderLandscape(state.landscape) : '<div class="muted" style="padding:24px">loading…</div>';
@@ -1740,6 +1743,7 @@ function refreshLive() {
     if (e.data === "changed") { refreshLive(); }                       // model edit
     else if (e.data === "approvals") { if (typeof onApprovalsChanged === "function") onApprovalsChanged(); }
     else if (e.data === "policy") { if (typeof onPolicyChanged === "function") onPolicyChanged(); }
+    if (typeof onStreamExtra === "function") onStreamExtra(e.data);           // enterprise / imports (D45, D51)
   };
   es.onerror = function () { setLive(false); };   // EventSource auto-reconnects
 })();

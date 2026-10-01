@@ -13,6 +13,8 @@ Optional groups run when their prerequisite is present, and are reported as
 SKIPPED (never silently passed) when it is not:
   - `postgres`  needs CONTINUUM_TEST_DATABASE_URL (a throwaway database)
   - `js`        needs `node` on PATH (JS/Python rules parity)
+  - `studio`    needs node + studio/test/node_modules (Playwright): the offline
+                Studio build + regression + e2e, and the multi-user browser e2e
   - `harness`   needs the tiktoken encoding (downloaded on first use)
 Set CONTINUUM_REQUIRE_ALL=1 (CI does) to turn any SKIPPED into a failure.
 """
@@ -98,6 +100,11 @@ def _skip_reason(group: str) -> str | None:
         return "CONTINUUM_TEST_DATABASE_URL not set"
     if group == "js" and not shutil.which("node"):
         return "node not on PATH"
+    if group == "studio":
+        if not shutil.which("node"):
+            return "node not on PATH"
+        if not os.path.isdir(os.path.join(ROOT, "studio", "test", "node_modules", "playwright")):
+            return "browser test deps missing (cd studio/test && npm ci && npx playwright install chromium)"
     if group == "harness":
         try:
             import tiktoken  # noqa: F401
