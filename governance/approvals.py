@@ -69,7 +69,11 @@ class ApprovalQueue:
 
     def __init__(self, store, log_path: str | None = None):
         self.store = store
-        self.log_path = log_path or _proposals_log()
+        self._log_path = log_path  # None -> the active model's log, resolved per call (D49)
+
+    @property
+    def log_path(self) -> str:
+        return self._log_path or _proposals_log()
 
     # --- helpers -----------------------------------------------------------
     def _method(self, op: str):
@@ -83,15 +87,7 @@ class ApprovalQueue:
         return params, [n for n in params if n not in _INJECTED]
 
     def _events(self) -> list[dict]:
-        if not os.path.exists(self.log_path):
-            return []
-        out = []
-        with open(self.log_path) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    out.append(cc.json.loads(line))
-        return out
+        return cc.read_log(self.log_path)
 
     def _fold(self) -> dict:
         """Latest state per Change Request id, in creation order."""

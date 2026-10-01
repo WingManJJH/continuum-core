@@ -6,6 +6,45 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Postgres backend (Supabase schema lineage)
+
+### D50 — Optimistic concurrency on every governed write
+**Finding:** two editors who opened the same record could both save; the second silently won
+(both events chained, the earlier change lost from current state).
+**Decision:** `append_edit_event` carries `expect = (type, id, from_version, op)`; the backend
+checks it inside the append lock — files: an incremental seed+log version index; Postgres: the
+`nodes` projection — and raises `ConflictError` (HTTP 409 in the apps) with nothing written.
+Creating an id that already exists is refused the same way. Proven under contention: 10–12
+threads and 6 processes racing from one read → exactly one write, chain intact, no version
+written twice (`mcp_server/test_storage.py`, `db/test_postgres.py`).
+
+### D49 — Per-request model, not a process-global one
+**Finding:** `set_active_model()` repointed the whole process, so in a multi-user app one user
+switching model switched everyone; layout was one file shared by every model; approval/policy
+queues froze the model they were built on.
+**Decision:** `cc.DATA` / `EDITS_LOG` / … resolve per thread first (`cc.use_model(slug, user)`),
+falling back to the process default (tests and tools that assign them keep working). The signed-in
+user is stamped on every event's actor (`actor.user`). Layout is per model; approval and policy
+logs resolve live; retention defaults resolve live.
+
+### D48 — One storage interface; Postgres on the Supabase lineage
+**Decision:** every read and write goes through `mcp_server/storage.py` — documents and append-only
+logs addressed by the same paths as before (directory = workspace, file = record), so callers did
+not change. `CONTINUUM_DATABASE_URL` selects Postgres. Schema `db/migrations/` descends from the
+Aug 28 Supabase design (`nodes`, `edges`, `node_events`, traversal CTEs, RLS) with these changes:
+workspace-scoped tables (tenancy, which that design named as the gap); `node_events` is the source
+of truth with the app as the append point (only the app can form the canonical hash-chained event;
+`raw` keeps exact bytes so chains re-verify) and a trigger making it append-only; `nodes`/`edges`
+are a rebuildable projection; RLS policies scope rows to `continuum.workspace` (replacing the
+starter "any authenticated user" policies); `guardrails` / `agent_actions` become views; `node_type`
+is open (types are enforced by the JSON Schemas). Seeds on disk are adopted on first read; history
+moves only via `db/import_files.py` (byte-for-byte, chains verified, never merges two histories).
+The file backend gained flock-serialized appends and atomic document writes.
+**Verification:** 39 of 41 existing suites replay unchanged on Postgres (the 2 that tamper with
+JSONL bytes have Postgres equivalents); `db/test_postgres.py` → 27; CI runs both backends.
+
+---
+
 ## 2026-10-01 — EA / GRC building blocks in the governed model
 
 ### D47 — MCP server folds live; Ripple and Vitals are agent tools

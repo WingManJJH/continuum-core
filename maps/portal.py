@@ -50,17 +50,14 @@ def _now() -> datetime:
 
 def _load_all() -> dict:
     try:
-        with open(PORTAL_PATH) as f:
-            data = json.load(f)
+        data = cc.storage.get().read_json(PORTAL_PATH, {})
         return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (json.JSONDecodeError, OSError):
         return {}
 
 
 def _save_all(data: dict) -> None:
-    os.makedirs(os.path.dirname(PORTAL_PATH), exist_ok=True)
-    with open(PORTAL_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    cc.storage.get().write_json(PORTAL_PATH, data)
 
 
 def _expired(rec: dict, now: datetime | None = None) -> bool:

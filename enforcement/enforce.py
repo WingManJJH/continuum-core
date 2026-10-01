@@ -99,11 +99,7 @@ class EnforcementPoint:
             "assigned_to": verdict.get("to"), "gr": verdict["gr"],
             "reason": verdict["reason"], "facts": facts, "status": "open",
         }
-        with open(ESCALATIONS, "a") as f:
-            f.write(json.dumps(rec) + "\n")
+        cc.storage.get().append_line(ESCALATIONS, rec)
 
     def escalation_queue(self) -> list[dict]:
-        if not os.path.exists(ESCALATIONS):
-            return []
-        with open(ESCALATIONS) as f:
-            return [json.loads(x) for x in f if x.strip()]
+        return cc.storage.get().read_lines(ESCALATIONS)

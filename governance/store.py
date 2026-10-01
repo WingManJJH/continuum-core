@@ -996,15 +996,7 @@ class GovernanceStore(EnterpriseWrites):
     # --- helpers -----------------------------------------------------------
     @staticmethod
     def _read_log(path: str) -> list[dict]:
-        if not os.path.exists(path):
-            return []
-        out = []
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    out.append(json.loads(line))
-        return out
+        return cc.read_log(path)
 
 
 if __name__ == "__main__":

@@ -22,15 +22,7 @@ import continuum_core as cc  # noqa: E402
 
 def _events(log_path: str | None = None) -> list[dict]:
     path = log_path or cc.EDITS_LOG
-    out = []
-    if not os.path.exists(path):
-        return out
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                out.append(json.loads(line))
-    return out
+    return cc.storage.get().read_lines(path)
 
 
 def _actor(ev: dict) -> str:

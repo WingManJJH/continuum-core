@@ -67,18 +67,11 @@ class LocalNotary(Notary):
         self.path = path
 
     def publish(self, record: dict) -> None:
-        with open(self.path, "a") as f:
-            f.write(json.dumps(record) + "\n")
+        cc.storage.get().append_line(self.path, record)
 
     def latest(self) -> dict | None:
-        if not os.path.exists(self.path):
-            return None
-        last = None
-        with open(self.path) as f:
-            for line in f:
-                if line.strip():
-                    last = line
-        return json.loads(last) if last else None
+        rows = cc.storage.get().read_lines(self.path)
+        return rows[-1] if rows else None
 
 
 class ExternalNotary(Notary):
@@ -110,13 +103,9 @@ def _head_at(log_path: str, n: int) -> str | None:
         return cc.GENESIS_HASH
     prev = cc.GENESIS_HASH
     seen = 0
-    if not os.path.exists(log_path):
+    if not cc.storage.get().exists(log_path):
         return None
-    with open(log_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+    for line in cc.storage.get().read_raw(log_path):
             ev = json.loads(line)
             if ev.get("prev_hash") != prev or cc.hash_event(ev) != ev.get("hash"):
                 return None

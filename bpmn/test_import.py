@@ -52,14 +52,14 @@ def main():
     xml = bpmn.export_process(P)
 
     # 1. parse / dry-run reads the file without writing
-    before = os.path.getsize(cc.EDITS_LOG)
+    before = cc.storage.get().size(cc.EDITS_LOG)
     plan = imp.plan_import(xml)
     check("plan_import reads the process name", plan["name"] == src["name"])
     check("plan counts steps + gateways + events + flows",
           plan["counts"]["steps"] == len(src["tasks"]) and plan["counts"]["gateways"] == len(src["gateways"])
           and plan["counts"]["events"] == len(src["events"]) and plan["counts"]["flows"] == len(src["flows"]))
     check("plan spots the agent (service) task", plan["counts"]["agent_steps"] >= 1)
-    check("dry-run writes NOTHING to the audit log", os.path.getsize(cc.EDITS_LOG) == before)
+    check("dry-run writes NOTHING to the audit log", cc.storage.get().size(cc.EDITS_LOG) == before)
 
     # 2. apply: a new process, reconstructed, through the audited write path
     res = imp.apply_import(xml, code="IM.1.1", actor=A, store=s)

@@ -18,22 +18,74 @@ import ast
 import hashlib
 import json
 import os
+import sys
+import threading
+import types
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.normpath(os.path.join(HERE, "..", "data"))         # data/ (default model lives here)
 MODELS_DIR = os.path.join(DATA_ROOT, "models")                        # data/models/<slug>/ (alternate models)
-ACTIVE_MODEL = "default"                                               # which model the stack is folding right now
 
-# The active model's file paths. These are reassigned by set_active_model(); the
-# functions below resolve their path arguments to the LIVE value of these globals
-# (default arg = None), so switching a model repoints the whole stack in-process —
-# and, as a bonus, this is what lets tests point at a temp dir cleanly.
-DATA = os.path.join(DATA_ROOT, "seed.json")
-EVENTS_LOG = os.path.join(DATA_ROOT, "events.log.jsonl")              # agent actions (§04/§06)
-EDITS_LOG = os.path.join(DATA_ROOT, "edits.log.jsonl")               # change control (Phase 2 governance edits, ISO 9001 §7.5)
-HEADS_FILE = os.path.join(DATA_ROOT, "audit_heads.json")             # per-log chain head + count (truncation/rollback detection)
+import storage  # noqa: E402  (D48: file or Postgres backend behind every read/write below)
+from storage import ConflictError  # noqa: E402,F401  (re-exported: a stale edit)
+
+storage.models_dir_hook = lambda: MODELS_DIR  # live: tests and tools may repoint cc.MODELS_DIR
+
+# The active model's paths. `cc.DATA`, `cc.EDITS_LOG`, … read like module globals
+# (and tests may still assign them), but resolve per THREAD first: a web request
+# runs inside `use_model(slug)`, so two users on two models never see each
+# other's model (D49). Outside a request they are the process-wide defaults,
+# repointed by set_active_model(). Inside this module, use _p("NAME").
+_G = {
+    "ACTIVE_MODEL": "default",                                         # which model the stack is folding right now
+    "DATA": os.path.join(DATA_ROOT, "seed.json"),
+    "EVENTS_LOG": os.path.join(DATA_ROOT, "events.log.jsonl"),         # agent actions (§04/§06)
+    "EDITS_LOG": os.path.join(DATA_ROOT, "edits.log.jsonl"),          # change control (ISO 9001 §7.5)
+    "HEADS_FILE": os.path.join(DATA_ROOT, "audit_heads.json"),        # per-log chain head + count (truncation/rollback)
+}
+_TL = threading.local()
+
+
+def _p(name: str):
+    ov = getattr(_TL, "paths", None)
+    return ov[name] if ov and name in ov else _G[name]
+
+
+def _paths_for(slug: str | None) -> dict:
+    base = model_base(slug)
+    return {"ACTIVE_MODEL": slug or "default", "DATA": os.path.join(base, "seed.json"),
+            "EVENTS_LOG": os.path.join(base, "events.log.jsonl"), "EDITS_LOG": os.path.join(base, "edits.log.jsonl"),
+            "HEADS_FILE": os.path.join(base, "audit_heads.json")}
+
+
+@contextmanager
+def use_model(slug: str | None, user: dict | None = None):
+    """Run the enclosed code against model `slug` on this thread only (a web
+    request). `user` (the signed-in person) is recorded on every event written."""
+    prev_p, prev_u = getattr(_TL, "paths", None), getattr(_TL, "user", None)
+    _TL.paths, _TL.user = _paths_for(slug), user
+    try:
+        yield _TL.paths["ACTIVE_MODEL"]
+    finally:
+        _TL.paths, _TL.user = prev_p, prev_u
+
+
+def current_user() -> dict | None:
+    return getattr(_TL, "user", None)
+
+
+class _CoreModule(types.ModuleType):
+    pass
+
+
+for _name in _G:
+    setattr(_CoreModule, _name, property(lambda self, n=_name: _p(n),
+                                          lambda self, v, n=_name: _G.__setitem__(n, v)))
+sys.modules[__name__].__class__ = _CoreModule
+
 GENESIS_HASH = "0" * 64                                                # prev_hash of the first event in a log
 
 
@@ -43,38 +95,24 @@ def model_base(slug: str) -> str:
 
 
 def set_active_model(slug: str) -> str:
-    """Repoint the whole stack at model `slug` (a directory of seed + logs). Every
-    read (Graph fold) and write (append_*_event) then targets that model. Returns
-    the resolved slug. 'default' is the original data/ model."""
-    global ACTIVE_MODEL, DATA, EVENTS_LOG, EDITS_LOG, HEADS_FILE
-    base = model_base(slug)
-    ACTIVE_MODEL = slug or "default"
-    DATA = os.path.join(base, "seed.json")
-    EVENTS_LOG = os.path.join(base, "events.log.jsonl")
-    EDITS_LOG = os.path.join(base, "edits.log.jsonl")
-    HEADS_FILE = os.path.join(base, "audit_heads.json")
-    return ACTIVE_MODEL
+    """Repoint the process-wide default at model `slug` (a directory of seed +
+    logs). Web requests use use_model() instead, so this never leaks across users.
+    Returns the resolved slug. 'default' is the original data/ model."""
+    _G.update(_paths_for(slug))
+    return _G["ACTIVE_MODEL"]
 
 
 def list_models() -> list[dict]:
-    """Registered models: the built-in default plus every data/models/<slug>/ that
-    has a model.json. Each entry: {slug, name, description, source, active}."""
+    """Registered models: the built-in default plus every data/models/<slug>/ (or
+    Postgres workspace) that has a model.json. Each: {slug, name, description, source, active}."""
+    active = _p("ACTIVE_MODEL")
     out = [{"slug": "default", "name": "Default model", "source": "seed",
             "description": "The original governed model (data/seed.json).",
-            "active": ACTIVE_MODEL == "default"}]
-    if os.path.isdir(MODELS_DIR):
-        for slug in sorted(os.listdir(MODELS_DIR)):
-            meta_path = os.path.join(MODELS_DIR, slug, "model.json")
-            if not os.path.isfile(meta_path):
-                continue
-            try:
-                with open(meta_path) as f:
-                    m = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                m = {}
-            out.append({"slug": slug, "name": m.get("name", slug),
-                        "description": m.get("description", ""), "source": m.get("source", ""),
-                        "active": ACTIVE_MODEL == slug})
+            "active": active == "default"}]
+    for m in storage.get().list_workspaces():
+        out.append({"slug": m["slug"], "name": m.get("name", m["slug"]),
+                    "description": m.get("description", ""), "source": m.get("source", ""),
+                    "active": active == m["slug"]})
     return out
 
 REASON_CODES = {
@@ -96,9 +134,10 @@ class Graph:
 
     def __init__(self, path: str | None = None, apply_edits: bool = True):
         if path is None:
-            path = DATA          # resolve live, so set_active_model() takes effect
-        with open(path) as f:
-            raw = json.load(f)
+            path = _p("DATA")    # resolve live (per request / set_active_model)
+        raw = storage.get().read_json(path)
+        if raw is None:
+            raise FileNotFoundError(path)
         self.model_sig: str = raw.get("model_sig", "dev")
         self._by_type: dict[str, dict[str, dict]] = {}
         for etype in (
@@ -120,24 +159,19 @@ class Graph:
 
     def apply_edit_log(self, log_path: str | None = None) -> None:
         if log_path is None:
-            log_path = EDITS_LOG
-        if not os.path.exists(log_path):
-            return
-        with open(log_path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                ev = json.loads(line)
-                et, eid, op = ev["entity_type"], ev["entity_id"], ev["op"]
-                # every governance edit carries the full entity in payload
-                # (snapshot-per-event), so overlaying it folds create/update/
-                # restore/deprecate uniformly — a deprecated entity keeps its
-                # bumped version and status:deprecated from the payload.
-                if op in ("create", "update", "restore", "deprecate") and ev.get("payload"):
-                    self._by_type[et][eid] = ev["payload"]
-                elif op == "deprecate" and eid in self._by_type[et]:
-                    self._by_type[et][eid]["status"] = "deprecated"
+            log_path = _p("EDITS_LOG")
+        for ev in storage.get().read_lines(log_path):
+            et, eid, op = ev["entity_type"], ev["entity_id"], ev["op"]
+            # every governance edit carries the full entity in payload
+            # (snapshot-per-event), so overlaying it folds create/update/
+            # restore/deprecate uniformly — a deprecated entity keeps its
+            # bumped version and status:deprecated from the payload.
+            if et not in self._by_type:
+                continue  # a type this build does not know (newer writer): ignore, never crash
+            if op in ("create", "update", "restore", "deprecate") and ev.get("payload"):
+                self._by_type[et][eid] = ev["payload"]
+            elif op == "deprecate" and eid in self._by_type[et]:
+                self._by_type[et][eid]["status"] = "deprecated"
 
     def get(self, etype: str, _id: str) -> dict | None:
         return self._by_type[etype].get(_id)
@@ -307,31 +341,18 @@ def _canonical(event: dict) -> str:
 def hash_event(event: dict) -> str:
     """SHA-256 over the event with its own `hash` field excluded (but including
     `prev_hash`, so the link is part of what's signed)."""
-    body = {k: v for k, v in event.items() if k != "hash"}
-    return hashlib.sha256(_canonical(body).encode("utf-8")).hexdigest()
+    return storage.hash_event(event)
 
 
 def _last_hash(log_path: str) -> str:
     """Hash of the last event already in the log, or GENESIS if the log is new."""
-    if not os.path.exists(log_path):
-        return GENESIS_HASH
-    last = None
-    with open(log_path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                last = line
-    if not last:
-        return GENESIS_HASH
-    return json.loads(last).get("hash", GENESIS_HASH)
+    rows = storage.get().read_lines(log_path)
+    return rows[-1].get("hash", GENESIS_HASH) if rows else GENESIS_HASH
 
 
 def _read_heads() -> dict:
-    if not os.path.exists(HEADS_FILE):
-        return {}
     try:
-        with open(HEADS_FILE) as f:
-            return json.load(f)
+        return storage.get().read_json(_p("HEADS_FILE"), {}) or {}
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -339,15 +360,13 @@ def _read_heads() -> dict:
 def _write_head(log_path: str, head: str, count: int) -> None:
     heads = _read_heads()
     heads[os.path.basename(log_path)] = {"head": head, "count": count}
-    with open(HEADS_FILE, "w") as f:
-        json.dump(heads, f, indent=2)
+    storage.get().write_json(_p("HEADS_FILE"), heads)
 
 
 def _drop_head(log_path: str) -> None:
     heads = _read_heads()
     if heads.pop(os.path.basename(log_path), None) is not None:
-        with open(HEADS_FILE, "w") as f:
-            json.dump(heads, f, indent=2)
+        storage.get().write_json(_p("HEADS_FILE"), heads)
 
 
 def reset_log(log_path: str) -> None:
@@ -355,27 +374,26 @@ def reset_log(log_path: str) -> None:
     file alone would leave the anchor pointing at events that no longer exist —
     indistinguishable from tampering — so demos/tests/reset paths must use this,
     not a bare os.remove(), when clearing a log for a fresh run."""
-    if os.path.exists(log_path):
-        os.remove(log_path)
-    _drop_head(log_path)
+    storage.get().reset_log(log_path, _p("HEADS_FILE"))
 
 
-def _append_event(log_path: str, event: dict) -> dict:
-    """Chain `event` onto `log_path`: set prev_hash + hash, append, advance head."""
-    event["prev_hash"] = _last_hash(log_path)
-    event["hash"] = hash_event(event)
-    with open(log_path, "a") as f:
-        f.write(json.dumps(event) + "\n")
-    heads = _read_heads().get(os.path.basename(log_path), {})
-    _write_head(log_path, event["hash"], heads.get("count", 0) + 1)
-    return event
+def _append_event(log_path: str, event: dict, expect: tuple | None = None) -> dict:
+    """Chain `event` onto `log_path`: set prev_hash + hash, append, advance head —
+    atomically, serialized across threads and processes. `expect` =
+    (entity_type, entity_id, from_version, op) turns on the optimistic-concurrency
+    check: a stale from_version raises ConflictError and nothing is written."""
+    u = current_user()
+    if u and isinstance(event.get("actor"), dict) and "user" not in event["actor"]:
+        event["actor"] = {**event["actor"], "user": u.get("email") or u.get("id")}
+    return storage.get().append_chained(log_path, event, _p("HEADS_FILE"), expect=expect, seed_path=_p("DATA"))
 
 
 def verify_log(log_path: str) -> dict:
     """Re-walk a log and confirm the chain is intact. Returns a structured result
     with the first break (if any) and the heads-anchor check."""
     name = os.path.basename(log_path)
-    if not os.path.exists(log_path):
+    be = storage.get()
+    if not be.exists(log_path):
         heads = _read_heads().get(name)
         if heads and heads.get("count", 0) > 0:
             return {"log": name, "ok": False, "count": 0, "exists": False,
@@ -385,27 +403,23 @@ def verify_log(log_path: str) -> dict:
 
     prev = GENESIS_HASH
     count = 0
-    with open(log_path) as f:
-        for i, line in enumerate(f):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                ev = json.loads(line)
-            except json.JSONDecodeError:
-                return {"log": name, "ok": False, "count": count,
-                        "break": {"index": i, "reason": "line is not valid JSON"}}
-            if ev.get("prev_hash") != prev:
-                return {"log": name, "ok": False, "count": count,
-                        "break": {"index": i, "event_id": ev.get("event_id"),
-                                  "reason": "prev_hash does not link to the previous "
-                                            "event (reorder, insertion, or deletion)"}}
-            if hash_event(ev) != ev.get("hash"):
-                return {"log": name, "ok": False, "count": count,
-                        "break": {"index": i, "event_id": ev.get("event_id"),
-                                  "reason": "content hash mismatch (event was modified)"}}
-            prev = ev["hash"]
-            count += 1
+    for i, line in enumerate(be.read_raw(log_path)):
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            return {"log": name, "ok": False, "count": count,
+                    "break": {"index": i, "reason": "line is not valid JSON"}}
+        if ev.get("prev_hash") != prev:
+            return {"log": name, "ok": False, "count": count,
+                    "break": {"index": i, "event_id": ev.get("event_id"),
+                              "reason": "prev_hash does not link to the previous "
+                                        "event (reorder, insertion, or deletion)"}}
+        if hash_event(ev) != ev.get("hash"):
+            return {"log": name, "ok": False, "count": count,
+                    "break": {"index": i, "event_id": ev.get("event_id"),
+                              "reason": "content hash mismatch (event was modified)"}}
+        prev = ev["hash"]
+        count += 1
 
     result = {"log": name, "ok": True, "count": count, "exists": True, "head": prev}
     heads = _read_heads().get(name)
@@ -420,10 +434,15 @@ def verify_log(log_path: str) -> dict:
     return result
 
 
+def read_log(log_path: str | None = None) -> list[dict]:
+    """Every event in a log (default: the active model's change log), oldest first."""
+    return storage.get().read_lines(log_path or _p("EDITS_LOG"))
+
+
 def verify_audit(logs: tuple[str, ...] | None = None) -> dict:
     """Verify every audit log. overall.ok is True only if all chains are intact."""
     if logs is None:
-        logs = (EDITS_LOG, EVENTS_LOG)
+        logs = (_p("EDITS_LOG"), _p("EVENTS_LOG"))
     results = [verify_log(p) for p in logs]
     return {"ok": all(r["ok"] for r in results), "logs": results}
 
@@ -434,7 +453,7 @@ def log_action(g: Graph, task_id: str, action: str, outcome: str,
     """Append an immutable, hash-chained action event (§04: agent cites the
     guardrail version it acted under) and return a compact ack. Also the raw feed
     the signal layer aggregates in §06."""
-    event = _append_event(EVENTS_LOG, {
+    event = _append_event(_p("EVENTS_LOG"), {
         "event_id": "evt_" + _ulidish(),
         "ts": datetime.now(timezone.utc).isoformat(),
         "entity_type": "Task",
@@ -456,12 +475,16 @@ def log_action(g: Graph, task_id: str, action: str, outcome: str,
 def append_edit_event(entity_type: str, entity_id: str, op: str,
                       from_version: int | None, to_version: int,
                       actor: dict, payload: dict, reason: str,
-                      log_path: str | None = None) -> dict:
+                      log_path: str | None = None, check_version: bool = True) -> dict:
     """Append an immutable, hash-chained change-control event (ISO 9001 §7.5).
     This is the write path Phase-2 governance edits go through — a new version,
-    never an overwrite. Returns the event. Stdlib-only so the core stays light."""
+    never an overwrite. Returns the event.
+
+    Optimistic concurrency (D50): the write is refused with ConflictError when
+    `from_version` is no longer the record's current version — someone else
+    saved first — so no edit silently overwrites another."""
     if log_path is None:
-        log_path = EDITS_LOG     # resolve live (respects the active model)
+        log_path = _p("EDITS_LOG")   # resolve live (respects the active model)
     return _append_event(log_path, {
         "event_id": "evt_" + _ulidish(),
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -473,7 +496,7 @@ def append_edit_event(entity_type: str, entity_id: str, op: str,
         "actor": actor,
         "reason": reason,
         "payload": payload,
-    })
+    }, expect=(entity_type, entity_id, from_version, op) if check_version else None)
 
 
 def render_process_summary(g: Graph, process_id: str) -> str:

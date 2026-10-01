@@ -17,3 +17,4 @@ data/portal.json
 # Alternate models (generated locally, e.g. imported Microsoft BPC / SYSPRO / Sunrise)
 data/models/
 data/active_model.txt
+*.lock

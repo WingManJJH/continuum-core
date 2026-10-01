@@ -91,18 +91,14 @@ def _policy_log() -> str:
 
 class ApprovalPolicy:
     def __init__(self, log_path: str | None = None):
-        self.log_path = log_path or _policy_log()
+        self._log_path = log_path  # None -> the active model's log, resolved per call (D49)
+
+    @property
+    def log_path(self) -> str:
+        return self._log_path or _policy_log()
 
     def _events(self) -> list[dict]:
-        if not os.path.exists(self.log_path):
-            return []
-        out = []
-        with open(self.log_path) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    out.append(cc.json.loads(line))
-        return out
+        return cc.read_log(self.log_path)
 
     def get(self) -> dict:
         """Current mode per entity — defaults, with the log's changes folded on top."""

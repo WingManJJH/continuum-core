@@ -75,6 +75,12 @@ SUITES: list[tuple[str, str, list[str]]] = [
 
 COUNT = re.compile(r"(\d+)\s+passed,\s+(\d+)\s+failed")
 
+# Suites that inspect or tamper with the bytes of the JSONL files themselves
+# (byte-level tamper / truncation detection). Their Postgres counterparts are in
+# db/test_postgres.py; every other core / enterprise suite is replayed on Postgres.
+FILE_ONLY = {"audit/test_audit_chain.py", "audit/test_anchor.py"}
+REPLAY_GROUPS = {"core", "enterprise"}
+
 
 def _register_extra():
     """Suites added after D44 register themselves in tests/suites_extra.py so this
@@ -114,7 +120,15 @@ def main(argv=None) -> int:
         return {s.strip() for s in spec.split(",") if s.strip()} if spec else set()
 
     only, skip = sel(a.only), sel(a.skip)
-    chosen = [s for s in SUITES
+    # "@replay" (group postgres) = every core / enterprise suite again, on Postgres
+    expanded = []
+    for g, p, extra in SUITES:
+        if p == "@replay":
+            expanded += [("postgres", q, [*x, "@pg"]) for (h, q, x) in SUITES
+                         if h in REPLAY_GROUPS and q not in FILE_ONLY and q != "@replay"]
+        else:
+            expanded.append((g, p, extra))
+    chosen = [s for s in expanded
               if (not only or s[0] in only or s[1] in only)
               and not (s[0] in skip or s[1] in skip)]
     if a.list:
@@ -127,17 +141,28 @@ def main(argv=None) -> int:
     failed, skipped = [], []
     t0 = time.time()
     reasons: dict[str, str | None] = {}
+    migrated: list = []
     for group, path, extra in chosen:
         if group not in reasons:
             reasons[group] = _skip_reason(group)
         if reasons[group]:
             skipped.append((path, reasons[group]))
-            print(f"SKIP  {path}  ({reasons[group]})")
+            if not a.quiet or group != "postgres":
+                print(f"SKIP  {path}  ({reasons[group]})")
             continue
+        env = dict(os.environ)
+        env.pop("CONTINUUM_DATABASE_URL", None)       # file backend unless the suite asks for Postgres
+        if group == "postgres":
+            env["CONTINUUM_DATABASE_URL"] = os.environ["CONTINUUM_TEST_DATABASE_URL"]
+            if not migrated:
+                subprocess.run([sys.executable, os.path.join(ROOT, "db", "migrate.py")], env=env,
+                               check=True, capture_output=True)
+                migrated.append(True)
+        extra = [x for x in extra if x != "@pg"]
+        label = path + ("  [postgres]" if group == "postgres" else "")
         cmd = ["node", os.path.join(ROOT, path)] if path.endswith((".js", ".mjs")) else \
               [sys.executable, os.path.join(ROOT, path), *extra]
-        r = subprocess.run(cmd, cwd=ROOT,
-                           capture_output=True, text=True)
+        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
         out = r.stdout + r.stderr
         m = COUNT.findall(out)
         p_, f_ = (int(m[-1][0]), int(m[-1][1])) if m else (0, 0)
@@ -145,11 +170,11 @@ def main(argv=None) -> int:
         total_p += p_
         total_f += f_
         if not ok:
-            failed.append(path)
-            print(f"FAIL  {path}  ({p_} passed, {f_} failed, exit {r.returncode})")
+            failed.append(label)
+            print(f"FAIL  {label}  ({p_} passed, {f_} failed, exit {r.returncode})")
             print("      " + "\n      ".join(out.strip().splitlines()[-25:]))
         elif not a.quiet:
-            print(f"ok    {path}  ({p_} passed)" if m else f"ok    {path}")
+            print(f"ok    {label}  ({p_} passed)" if m else f"ok    {label}")
 
     secs = time.time() - t0
     print()

@@ -24,8 +24,7 @@ def check(name, cond):
 
 def clean():
     cc.reset_log(cc.EVENTS_LOG)            # log + heads anchor together
-    if os.path.exists(ESCALATIONS):
-        os.remove(ESCALATIONS)
+    cc.storage.get().remove(ESCALATIONS)
 
 
 def main():
@@ -68,7 +67,7 @@ def main():
     check("rate limit: tool ran only up to the cap", calls2["n"] == cap)
 
     # audit trail captured every outcome kind
-    events = [__import__("json").loads(x) for x in open(cc.EVENTS_LOG)] if os.path.exists(cc.EVENTS_LOG) else []
+    events = cc.read_log(cc.EVENTS_LOG)
     outcomes = {e["payload"]["outcome"] for e in events}
     check("audit recorded rate_limited + success", {"success", "rate_limited"} <= outcomes)
 

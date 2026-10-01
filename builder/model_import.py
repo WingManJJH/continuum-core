@@ -116,11 +116,9 @@ def build_model_seed(items: list[dict], model_name: str, sig: str = "model") -> 
 
 def write_model(slug: str, name: str, seed: dict, source: str, description: str) -> str:
     base = cc.model_base(slug)
-    os.makedirs(base, exist_ok=True)
-    with open(os.path.join(base, "seed.json"), "w") as f:
-        json.dump(seed, f, indent=1)
-    with open(os.path.join(base, "model.json"), "w") as f:
-        json.dump({"name": name, "source": source, "description": description}, f, indent=1)
+    cc.storage.get().write_json(os.path.join(base, "seed.json"), seed, indent=1)
+    cc.storage.get().write_json(os.path.join(base, "model.json"),
+                                {"name": name, "source": source, "description": description}, indent=1)
     return base
 
 
