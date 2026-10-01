@@ -15,13 +15,15 @@ export CONTINUUM_OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0
 export CONTINUUM_OIDC_CLIENT_ID=<application (client) id>
 export CONTINUUM_OIDC_CLIENT_SECRET=<client secret>
 export CONTINUUM_OIDC_ALLOWED_DOMAINS=yourcompany.com           # optional
-export CONTINUUM_PUBLIC_URL=https://continuum.yourcompany.com     # redirect URI = <this>/auth/callback
+export CONTINUUM_PUBLIC_URL=https://continuum.yourcompany.com     # redirect URI = <this>/auth/callback (default http://localhost:8080)
 export CONTINUUM_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))")
 export CONTINUUM_ADMIN_EMAILS=you@yourcompany.com                 # organization admins
 export CONTINUUM_HOST=0.0.0.0                                     # behind your TLS reverse proxy
 
-python run.py
+python run.py                     # one address: http://localhost:8080 (canvas /, /governance/, /dashboard/, /advisor/, /ask/)
 ```
+
+All five apps are served from **one address** by `web/gateway.py`. That means one sign-in, one TLS certificate, one reverse-proxy rule, and one Entra redirect URI. Use `python run.py --separate` if you need the original five ports.
 
 For local testing with several people, use `CONTINUUM_AUTH=dev`. You type an email to sign in, and nothing else changes.
 

@@ -927,3 +927,5 @@ body.signed-in[data-cc-role="viewer"] #new-proc, body.signed-in[data-cc-role="vi
 body.signed-in[data-cc-role="viewer"] #add-step, body.signed-in[data-cc-role="viewer"] #import-btn,
 body.signed-in[data-cc-role="viewer"] #build-btn { display: none !important; }
 @media (max-width: 900px) { .risk-layout { grid-template-columns: 1fr; } .m-add { grid-template-columns: 1fr; } .ea-head { flex-direction: column; } }
+
+.app-nav { display: flex; gap: 6px; } .app-nav a { text-decoration: none; }

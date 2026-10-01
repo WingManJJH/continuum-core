@@ -123,3 +123,16 @@ function confirmInline(btn, label) {
   setTimeout(function () { btn.removeAttribute("data-armed"); btn.textContent = old; }, 4000);
   return false;
 }
+
+// One address (D55): when served by the gateway, the header links to the other apps.
+fetch("/api/apps").then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+  if (!d || !d.apps) return;
+  var spacer = document.querySelector("header .spacer"); if (!spacer) return;
+  var nav = document.createElement("nav");
+  nav.className = "app-nav";
+  nav.setAttribute("aria-label", "Continuum apps");
+  nav.innerHTML = d.apps.filter(function (a) { return a.name !== "canvas"; }).map(function (a) {
+    return '<a class="toggle" href="' + esc(a.href) + '">' + esc(a.title) + "</a>";
+  }).join("");
+  spacer.parentNode.insertBefore(nav, spacer);
+}).catch(function () {});

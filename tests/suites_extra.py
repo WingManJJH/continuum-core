@@ -3,6 +3,7 @@ SUITES = [
     ("core", "mcp_server/test_storage.py", []),
     ("core", "builder/test_versioned_import.py", []),
     ("core", "web/test_web.py", []),
+    ("core", "web/test_gateway.py", []),
     ("enterprise", "enterprise/test_enterprise.py", []),
     ("enterprise", "mcp_server/test_server_tools.py", []),
     ("js", "enterprise/test_parity.py", []),

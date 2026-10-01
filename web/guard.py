@@ -146,7 +146,7 @@ def protect(Handler, app: str):
                     return inner() if inner else self.send_error(405)  # static assets + token-gated portal
                 if u.path.startswith("/api/"):
                     return _json(self, {"ok": False, "error": "sign in required", "signin": "/auth/login"}, 401)
-                return _send(self, 302, b"", "text/plain", location="/auth/login?" + urlencode({"next": self.path}))
+                return _send(self, 302, b"", "text/plain", location="/auth/login?" + urlencode({"next": getattr(self, "cc_prefix", "") + self.path}))
             if method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
                 if origin and urlparse(origin).netloc != self.headers.get("Host", ""):

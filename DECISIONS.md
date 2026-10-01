@@ -6,6 +6,22 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-02 — One address for all five apps
+
+### D55 — `web/gateway.py`: one origin, five apps
+**Decision:** `python run.py` now starts one server (default :8080) that mounts the canvas at `/`
+and governance, dashboard, advisor and ask under `/governance/`, `/dashboard/`, `/advisor/`,
+`/ask/`. Each app keeps its own guarded handler; the gateway strips the prefix and hands the same
+request to it (one process, one origin → one session cookie, one certificate, one proxy rule, one
+Entra redirect URI). The four small front-ends now call `api/…` relative to their page, so they
+work on their own port or under a prefix unchanged; same-named paths in two apps stay separate
+(`/governance/api/guardrail` vs the canvas's). Sign-in returns you to the app you asked for. The
+canvas header links to the other apps when served by the gateway (`/api/apps`); each app links
+back. `run.py --separate` keeps the five ports. `CONTINUUM_PUBLIC_URL` defaults to
+`http://localhost:8080`. `web/test_gateway.py` → 18; the browser e2e now runs through the gateway.
+
+---
+
 ## 2026-10-01 — Independent review: 17 findings fixed
 
 ### D54 — Fixes from the security and correctness reviews of D45–D53

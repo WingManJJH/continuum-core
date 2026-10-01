@@ -5,7 +5,7 @@ function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function 
 var SUBJECTS = {};
 var kindSel = $("#kind"), subjSel = $("#subject"), contentBox = $("#content"), thread = $("#thread");
 
-fetch("/api/subjects").then(function (r) { return r.json(); }).then(function (d) { SUBJECTS = d; syncComposer(); });
+fetch("api/subjects").then(function (r) { return r.json(); }).then(function (d) { SUBJECTS = d; syncComposer(); });
 
 function syncComposer() {
   var k = kindSel.value;
@@ -105,7 +105,7 @@ $("#analyze").addEventListener("click", function () {
   } else { body.id = subjSel.value; label = "Analyze " + subjSel.value + " against best practices"; }
   addUser(label);
   btn.disabled = true;
-  fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+  fetch("api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(function (r) { return r.json(); })
     .then(function (r) { btn.disabled = false; addAnalysis(r); })
     .catch(function (e) { btn.disabled = false; addAnalysis({ error: String(e) }); });

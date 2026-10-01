@@ -70,3 +70,5 @@ table.mini td.lo { color: var(--amber); font-weight: 600; }
 .risk-row .tid { font-family: var(--mono); font-size: 11px; flex: none; }
 .risk-row .rtxt { color: var(--muted); }
 .rnote { font-size: 11px; margin-top: 4px; }
+
+.home-link { color: inherit; text-decoration: none; } .home-link:hover { text-decoration: underline; }

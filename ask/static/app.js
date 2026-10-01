@@ -5,7 +5,7 @@ function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function 
 var thread = $("#thread"), qBox = $("#q");
 var KW = /\b(FROM|FOLLOW|WHERE|AND|NOT|SELECT|ORDER BY|LIMIT|GET|IS|ABSENT|PRESENT|INTERSECTS|ASC|DESC|EQ|NE|LT|GT|IN)\b/g;
 
-fetch("/api/examples").then(function (r) { return r.json(); }).then(function (d) {
+fetch("api/examples").then(function (r) { return r.json(); }).then(function (d) {
   $("#chips").innerHTML = (d.examples || []).map(function (e) {
     return '<button class="chip" type="button">' + esc(e) + "</button>";
   }).join("");
@@ -86,7 +86,7 @@ function submit() {
   if (!q) { qBox.focus(); return; }
   addUser(q);
   var btn = $("#ask"); btn.disabled = true; qBox.value = "";
-  fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) })
+  fetch("api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) })
     .then(function (r) { return r.json(); })
     .then(function (r) { btn.disabled = false; addAnswer(r); })
     .catch(function (e) { btn.disabled = false; addAnswer({ error: String(e) }); });

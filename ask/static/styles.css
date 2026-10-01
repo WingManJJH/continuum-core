@@ -99,3 +99,5 @@ pre.cql .kw { color: var(--accent); font-weight: 600; }
 .go { font: inherit; font-weight: 600; padding: 9px 20px; border-radius: 9px; border: 1px solid var(--accent);
   background: var(--accent); color: var(--accent-ink); cursor: pointer; }
 .go:disabled { opacity: .55; cursor: default; }
+
+.home-link { color: inherit; text-decoration: none; } .home-link:hover { text-decoration: underline; }

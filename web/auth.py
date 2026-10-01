@@ -300,7 +300,7 @@ def oidc_config() -> dict:
 
 
 def public_url() -> str:
-    return os.environ.get("CONTINUUM_PUBLIC_URL", "http://localhost:8789").rstrip("/")
+    return os.environ.get("CONTINUUM_PUBLIC_URL", "http://localhost:8080").rstrip("/")   # the gateway (D55)
 
 
 def oidc_begin(next_url: str) -> tuple[str, str]:

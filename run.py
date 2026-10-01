@@ -2,8 +2,9 @@
 """
 run.py — start all five Continuum web apps at once.
 
-    python3 run.py                    # start every app
-    python3 run.py --only ask,advisor # start a subset
+    python3 run.py                    # one address for everything: http://localhost:8080 (D55)
+    python3 run.py --separate         # the original five ports (8787-8791)
+    python3 run.py --only ask,advisor # a subset on their own ports
     python3 run.py --list             # list apps and exit
 
 Each app runs as a subprocess; its output is line-prefixed with the app name, and
@@ -75,6 +76,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Start all five Continuum web apps.")
     ap.add_argument("--only", help="comma-separated subset, e.g. ask,advisor")
     ap.add_argument("--list", action="store_true", help="list apps and exit")
+    ap.add_argument("--separate", action="store_true", help="run each app on its own port (8787-8791)")
+    ap.add_argument("--port", type=int, default=int(os.environ.get("CONTINUUM_PORT", "8080")),
+                    help="gateway port (default 8080)")
     args = ap.parse_args(argv)
 
     try:  # stream output even when piped/backgrounded, not just to a TTY
@@ -86,6 +90,18 @@ def main(argv=None) -> int:
         for name, _path, port, desc in APPS:
             print(f"  {name:>10}  http://localhost:{port}  {desc}")
         return 0
+
+    if not args.separate and not args.only:
+        if port_busy(args.port):
+            print(f"Port {args.port} is already in use (Continuum already running?)  http://localhost:{args.port}")
+            return 1
+        print(f"Continuum on http://localhost:{args.port}  (canvas /, governance /governance/, dashboard /dashboard/, "
+              f"advisor /advisor/, ask /ask/)  Ctrl-C to stop")
+        try:
+            return subprocess.call([sys.executable, "-u", os.path.join(HERE, "web", "gateway.py"), "--port", str(args.port)],
+                                   cwd=HERE, env=os.environ.copy())
+        except KeyboardInterrupt:
+            return 0
 
     try:
         apps = select_apps(args.only)

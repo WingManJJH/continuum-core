@@ -50,10 +50,9 @@ def main():
         seed = json.load(open(os.path.join(ROOT, "data", "seed.json")))
         import model_import
         model_import.write_model("acme", "Acme Corp", seed, "Seed", "browser test model")
-        import app as canvas
-        import guard
+        import gateway
         import versioned_import as vi
-        srv = serve(guard.protect(canvas.Handler, "canvas"))
+        srv = serve(gateway.make_gateway(gateway.build_handlers()))   # the one address (D55)
         port = srv.server_address[1]
 
         # a staged import waiting for review, so the review screen has content

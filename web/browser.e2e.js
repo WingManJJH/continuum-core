@@ -126,6 +126,11 @@ async function singleUser(browser) {
     ok(r === 403, "a viewer's write is refused by the server (403)");
     await shot(B.page, "07-viewer-live");
 
+    // one address: the header links to the other apps, same session
+    await A.page.click(".app-nav a[href='/governance/']");
+    await A.page.waitForSelector("text=Governance", { timeout: 10000 });
+    ok(A.page.url().endsWith("/governance/"), "the header opens Governance at the same address, already signed in");
+    await A.page.goBack();
     ok(A.page.errors.length === 0, "no console errors for alice (" + A.page.errors.join(" | ") + ")");
     ok(B.page.errors.length === 0, "no console errors for bob (" + B.page.errors.join(" | ") + ")");
     await A.ctx.close(); await B.ctx.close();
