@@ -22,7 +22,7 @@ python db/app_role.py --url <owner URL> --check  # report: no superuser/BYPASSRL
 export CONTINUUM_DATABASE_URL=postgresql://continuum_app@db-host:5432/continuum   # password via PGPASSWORD
 ```
 
-`continuum_app` can log in and read/write rows in the Continuum tables, and nothing else. It does not own tables, so the workspace policies apply to it. It cannot run DDL, alter roles, or bypass the append-only trigger. On Supabase the pooler user is `continuum_app.<project-ref>`, and `app_role.py` also revokes the platform's default `anon`/`authenticated` grants on these tables.
+`continuum_app` can log in and read/write rows in the Continuum tables, and nothing else. It does not own tables, so the workspace policies apply to it. It cannot run DDL, alter roles, or bypass the append-only trigger. On Supabase the pooler user is `continuum_app.<project-ref>`, and `app_role.py` also revokes the platform's default `anon`/`authenticated`/`service_role` grants on these tables.
 
 If the database login is wrong or missing, startup stops with a single line (`Continuum did not start: cannot connect to Postgres: …`) instead of retrying.
 

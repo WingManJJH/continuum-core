@@ -13,8 +13,8 @@ What `continuum_app` gets — and nothing more:
     migration doesn't silently lock the app out
 It never owns a table, so the row-level-security policies from 0003 apply to it.
 
-On Supabase this also revokes the platform's default grants to `anon` and
-`authenticated` on the Continuum tables: the Data API is off, but nothing other
+On Supabase this also revokes the platform's default grants to `anon`,
+`authenticated` and `service_role` on the Continuum tables: the Data API is off, but nothing other
 than Continuum should be able to reach these rows.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ import sys
 
 ROLE = "continuum_app"
 TABLES = ("workspaces", "docs", "node_events", "nodes", "edges")
-API_ROLES = ("anon", "authenticated")
+API_ROLES = ("anon", "authenticated", "service_role")  # Supabase Data API roles (service_role bypasses RLS)
 
 
 def ensure(conn, password: str) -> list[str]:
