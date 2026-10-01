@@ -92,13 +92,16 @@ def main(argv=None) -> int:
     pg = storage.PostgresBackend(a.url)
     storage.use(pg)
     ok = True
-    for slug, base in model_dirs(a.only):
-        r = import_dir(pg, slug, base, a.dry_run)
-        good = all(r["verified"].values())
-        ok &= good
-        print(f"{'DRY ' if a.dry_run else ''}{slug:<14} -> {r['workspace']:<14} docs {len(r['docs'])}  "
-              + "  ".join(f"{k} {v}" for k, v in r["logs"].items())
-              + ("" if a.dry_run else f"  chains {'verified' if good else 'BROKEN'}"))
+    try:
+        for slug, base in model_dirs(a.only):
+            r = import_dir(pg, slug, base, a.dry_run)
+            good = all(r["verified"].values())
+            ok &= good
+            print(f"{'DRY ' if a.dry_run else ''}{slug:<14} -> {r['workspace']:<14} docs {len(r['docs'])}  "
+                  + "  ".join(f"{k} {v}" for k, v in r["logs"].items())
+                  + ("" if a.dry_run else f"  chains {'verified' if good else 'BROKEN'}"))
+    finally:
+        pg.close()  # close the pool before interpreter shutdown (no PythonFinalizationError on 3.14)
     return 0 if ok else 1
 
 

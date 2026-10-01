@@ -1234,3 +1234,22 @@ engineering ticket" lands or needs reframing.
 three columns (spontaneous frame / A-B framing winner / Fail-A · Fail-B · Supported).
 **Applied in:** `design-partner/call-log.md` (ready-to-fill tracker + rollup). The calls
 themselves are a human action; the instrument is in place.
+
+## D58 — Models moved to Supabase (2026-10-01)
+
+**Decision.** The five drive models live in the Supabase project `continuum` (SMRTR org, Free plan, us-west-2, ref `jpsawqudfdwkrjfqvzvs`).
+- The Data API (PostgREST) is off; the app connects straight to Postgres.
+- Connections go through the Session pooler on port 5432. Advisory locks need a real session, so the Transaction pooler (6543) is not used.
+- The password is passed via `PGPASSWORD`, never in a URL or a file.
+
+**Evidence.**
+- Migrations 0001–0003 applied, and every hash chain re-verified after the copy.
+- Node counts match the rehearsal load exactly: default 104, msft-bpc 4,856, msft-oc 510, sunrise 310, syspro 14.
+- RLS is on for docs, node_events, nodes and edges.
+
+**Fixes found on the way.**
+- `requirements.txt` now names the `pool` extra.
+- `import_files.py` closes its pool, which removes a shutdown warning on Python 3.14.
+- macOS bash 3.2 mis-parses quoted `$( … )` blocks containing `{a,b}`, so the load script avoids them.
+
+**Follow-up.** Add a non-owner `continuum_app` login role. The `postgres` user bypasses RLS.
