@@ -115,6 +115,26 @@ def _seed_items(seed: dict):
                     yield etype, r
 
 
+def _queue():
+    """The one approvals inbox (D56)."""
+    gov = os.path.normpath(os.path.join(HERE, "..", "governance"))
+    if gov not in sys.path:
+        sys.path.insert(0, gov)
+    import approvals
+    import store
+    return approvals.ApprovalQueue(store.GovernanceStore())
+
+
+def _review_actor(actor):
+    return actor if isinstance(actor, str) and actor.startswith("role.") else "role.import.service"
+
+
+def _close_cr(stage, by, reason):
+    cr_id = (stage or {}).get("cr_id")
+    if cr_id:
+        _queue().close(cr_id, "superseded", _review_actor(by), reason)
+
+
 def _actor(actor):
     return {"kind": "human", "id": actor}
 
@@ -132,7 +152,7 @@ def _fold_staged(slug) -> dict:
         if ev["kind"] == "stage":
             out[ev["sid"]] = {**{k: ev.get(k) for k in ("sid", "batch", "source", "etype", "id", "change",
                                                         "based_on_version", "incoming", "diff", "reasons",
-                                                        "incoming_hash")},
+                                                        "incoming_hash", "cr_id")},
                               "staged_at": ev["ts"], "status": "pending", "decision": None}
         elif ev["sid"] in out:
             out[ev["sid"]]["status"] = ev["status"]
@@ -228,13 +248,22 @@ def _run(slug, seed, source, actor, dry, reason=""):
             if old:
                 _append(p["staged"], {"kind": "decide", "sid": old["sid"], "status": "superseded",
                                       "by": actor, "reason": f"superseded by {batch}"})
+                _close_cr(old, actor, f"superseded by import {batch}")
                 rep["superseded"].append(old["sid"])
                 pending_by_key.pop(k)
             sid = f"S{batch[1:]}-{len(rep['staged_ids']) + 1:04d}"
+            diff = _diff(cur, inc or {}) if inc else []
+            fields = ", ".join(d["field"] for d in diff[:4]) + ("…" if len(diff) > 4 else "")
+            cr = _queue().propose(
+                "accept_import_change", {"sid": sid}, proposed_by=_review_actor(actor),
+                reason="; ".join(reasons) + f" (import {batch} from {source})",
+                title=(f"Import {batch}: retire {etype} {eid}" if change == "delete"
+                       else f"Import {batch}: {etype} {eid}" + (f" — {fields}" if fields else "")),
+                target=eid)
             _append(p["staged"], {"kind": "stage", "sid": sid, "batch": batch, "source": source, "etype": etype,
                                   "id": eid, "change": change, "based_on_version": cur.get("version"),
-                                  "incoming": inc, "incoming_hash": ih,
-                                  "diff": _diff(cur, inc or {}) if inc else [], "reasons": reasons})
+                                  "incoming": inc, "incoming_hash": ih, "diff": diff, "reasons": reasons,
+                                  "cr_id": cr["id"]})
             rep["staged_ids"].append(sid)
 
         def write(etype, eid, op, cur, body):
@@ -303,6 +332,7 @@ def _run(slug, seed, source, actor, dry, reason=""):
                     if not dry:
                         _append(p["staged"], {"kind": "decide", "sid": old["sid"], "status": "superseded", "by": actor,
                                               "reason": f"{batch} no longer proposes this change"})
+                        _close_cr(old, actor, f"import {batch} no longer proposes this change")
                     rep["superseded"].append(old["sid"])
         except Exception as e:
             if not dry:
@@ -343,7 +373,7 @@ def _set_baseline(p, source, k, version):
 
 
 # --------------------------------------------------------------------------- decisions
-def accept(slug, sid, actor, expected_version: int | None = None, reason: str = "") -> dict:
+def accept(slug, sid, actor, expected_version: int | None = None, reason: str = "", via_queue: bool = False) -> dict:
     p = _paths(slug)
     with cc.use_model(slug, cc.current_user()), cc.storage.get().mutex(p["imports"]):
         s = _fold_staged(slug).get(sid)
@@ -368,10 +398,13 @@ def accept(slug, sid, actor, expected_version: int | None = None, reason: str = 
                               "applied_version": body["version"]})
         # the source's version is now the record's: the next import fast-forwards from here
         _set_baseline(p, s.get("source"), _key(s["etype"], s["id"]), body["version"] if op == "update" else None)
-        return {"sid": sid, "status": "accepted", "version": body["version"]}
+        if s.get("cr_id") and not via_queue:   # decided from the Imports screen: the inbox shows it decided too
+            _queue().mirror(s["cr_id"], "approved", _review_actor(actor), reason or "accepted from Imports",
+                            {"id": s["id"], "version": body["version"]})
+        return {"sid": sid, "status": "accepted", "version": body["version"], "id": s["id"]}
 
 
-def reject(slug, sid, actor, reason: str) -> dict:
+def reject(slug, sid, actor, reason: str, via_queue: bool = False) -> dict:
     if not (reason or "").strip():
         raise ImportError_("a reason is required to reject a staged change (ISO 9001 §7.5)")
     p = _paths(slug)
@@ -382,6 +415,8 @@ def reject(slug, sid, actor, reason: str) -> dict:
         if s["status"] != "pending":
             raise ImportError_(f"staged change {sid} is already {s['status']}")
         _append(p["staged"], {"kind": "decide", "sid": sid, "status": "rejected", "by": actor, "reason": reason})
+        if s.get("cr_id") and not via_queue:
+            _queue().mirror(s["cr_id"], "rejected", _review_actor(actor), reason)
         return {"sid": sid, "status": "rejected"}
 
 
@@ -432,6 +467,7 @@ def revert(slug, batch: str, actor: str, reason: str) -> dict:
             if s["batch"] == batch and s["status"] == "pending":
                 _append(p["staged"], {"kind": "decide", "sid": s["sid"], "status": "superseded", "by": actor,
                                       "reason": f"import {batch} reverted"})
+                _close_cr(s, actor, f"import {batch} reverted")
         _append(p["imports"], {"batch": batch, "kind": "revert", "actor": _actor(actor), "reason": reason,
                                "reverted": len(done), "skipped": skipped})
         return {"batch": batch, "reverted": len(done), "skipped": skipped}

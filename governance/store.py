@@ -50,14 +50,14 @@ EDITABLE_PROCESS_FIELDS = ["name", "owner_role", "parent_ref", "objective_refs",
 
 
 from errors import EditError  # noqa: E402,F401  (one class shared by every write path)
-from ea_store import EnterpriseWrites  # noqa: E402  (D45 — EA/GRC write paths)
+from ea_store import EnterpriseWrites, ImportReviewOps  # noqa: E402  (D45 EA/GRC; D56 import review)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class GovernanceStore(EnterpriseWrites):
+class GovernanceStore(EnterpriseWrites, ImportReviewOps):
     def __init__(self):
         with open(os.path.join(SCHEMA_DIR, "guardrail-policy.schema.json")) as f:
             self._gr_validator = Draft202012Validator(json.load(f))

@@ -110,6 +110,12 @@ async function singleUser(browser) {
     await A.page.waitForSelector(".stg");
     ok(await A.page.isVisible(".diff >> text=Match POs — our wording"), "staged import shows our value next to the incoming one");
     await shot(A.page, "06-import-review");
+    await A.page.click("#approvals-btn");
+    await A.page.waitForSelector(".appr-import .diff", { timeout: 10000 });
+    ok(await A.page.isVisible(".appr-import >> text=Match purchase orders (vendor)"), "the same change waits in the Approvals inbox, with its diff");
+    await shot(A.page, "06b-approvals-inbox");
+    await A.page.keyboard.press("Escape");
+    await A.page.evaluate(() => { const m = document.getElementById("appr-modal"); if (m) m.hidden = true; });
 
     // --- bob: viewer, live updates
     const B = await user(browser, "bob@example.com", "Bob");

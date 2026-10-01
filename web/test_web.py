@@ -236,6 +236,19 @@ def run(port, seed):
     check("accept with a stale version is 409", st == 409 and js["conflict"])
     st, js, _, _ = alice.req("GET", "/api/imports?ws=acme")
     check("import batches list who did it", js["batches"][0]["user"] == "alice@example.com")
+    st, js, _, _ = alice.req("GET", "/api/approvals?ws=acme&status=pending")
+    imp = [c for c in js["approvals"] if c["op"] == "accept_import_change"]
+    check("staged import changes are in the approvals inbox, with their diff", len(imp) == 2
+          and any(c["import"]["diff"] and c["import"]["id"] == "CO.3.2.7" for c in imp))
+    cr = next(c for c in imp if c["import"]["id"] == "CO.3.2.7")
+    st, js, _, _ = bob.req("POST", "/api/approvals?ws=acme", {"op": "approve", "id": cr["id"]})
+    check("an editor can't approve it in the inbox either", st == 403)
+    st, js, _, _ = alice.req("POST", "/api/approvals?ws=acme", {"op": "approve", "id": cr["id"], "decision_reason": "ok"})
+    st2, js2, _, _ = carol.req("GET", "/api/maps?ws=acme")
+    check("approving it in the inbox takes the incoming version", st == 200 and js["cr"]["status"] == "approved"
+          and any(p["name"] == "KYC (source)" for p in js2["processes"]))
+    st, js, _, _ = alice.req("GET", "/api/staged?ws=acme&status=all")
+    check("…and the Imports screen shows it accepted", next(x for x in js["staged"] if x["id"] == "CO.3.2.7")["status"] == "accepted")
 
     # review fixes (D54): members are scoped to the workspace the admin role was checked on
     erin = Client(port)

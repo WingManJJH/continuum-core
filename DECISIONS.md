@@ -6,6 +6,22 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-02 — One review inbox
+
+### D56 — Staged import changes are change requests in the approvals inbox
+**Decision:** when an import stages a change (D51), it also proposes a change request
+`accept_import_change {sid}` in the model's approval queue: titled with the batch, record and
+changed fields, proposed by the importer, carrying the reasons. The inbox shows the field-by-field
+diff (`/api/approvals` attaches it). **Approve** takes the incoming version
+(`GovernanceStore.accept_import_change` → the same audited accept, stale-checked); **Reject** keeps
+ours and is remembered (`reject_import_change`); an import request can't be withdrawn. Staged
+changes superseded by a newer import or withdrawn by a revert close their request (`superseded`).
+Deciding on the Imports screen mirrors the decision onto the request, so nothing shows as pending
+twice. Roles as everywhere: approver decides. `builder/test_versioned_import.py` → 43,
+`web/test_web.py` → 69, browser e2e checks the inbox card.
+
+---
+
 ## 2026-10-02 — One address for all five apps
 
 ### D55 — `web/gateway.py`: one origin, five apps

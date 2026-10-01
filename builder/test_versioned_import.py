@@ -199,6 +199,7 @@ def run(seed0):
           and any("import B" in e["reason"] for e in evs))
     check("batches are listed with who / when / counts", [b["batch"] for b in vi.batches(slug)][:2] == ["B0001", "B0002"])
     review_fixes(seed0, s)
+    one_inbox(seed0, s)
 
 
 def review_fixes(seed0, s):
@@ -304,6 +305,63 @@ def review_fixes(seed0, s):
     with cc.use_model(slug):
         check("all import logs still verify", all(cc.verify_log(os.path.join(cc.model_base(slug), n))["ok"]
               for n in ("edits.log.jsonl", "imports.log.jsonl", "staged.log.jsonl")))
+
+
+def one_inbox(seed0, s):
+    """D56: every staged import change is also a change request in the approvals inbox."""
+    import approvals
+    slug = "inbox"
+    vi.import_model(slug, "Inbox", seed0, SRC, actor=A)
+    with cc.use_model(slug):
+        s.edit_process("CO.3.2.7", {"name": "ours"}, A, "edit")
+        s.edit_process("FN.9.3.1", {"name": "ours FN"}, A, "edit")
+        s.edit_process("SC.4.3.6", {"name": "ours SC"}, A, "edit")
+    s1 = copy.deepcopy(seed0)
+    for pid in ("CO.3.2.7", "FN.9.3.1", "SC.4.3.6"):
+        proc(s1, pid)["name"] = "theirs " + pid
+    vi.import_model(slug, "Inbox", s1, SRC, actor=A)
+    with cc.use_model(slug):
+        q = approvals.ApprovalQueue(s)
+        crs = {c["target"]: c for c in q.list("pending") if c["op"] == "accept_import_change"}
+        check("each staged change is a pending request in the approvals inbox", set(crs) == {"CO.3.2.7", "FN.9.3.1", "SC.4.3.6"}
+              and all(c["title"].startswith("Import B") for c in crs.values()))
+        q.approve(crs["CO.3.2.7"]["id"], reviewer="role.qms.iso_advisor", decision_reason="ok")
+        g = cc.Graph()
+        st = {x["id"]: x for x in vi.staged(slug, "all")}
+        check("approving in the inbox applies the incoming version", g.get("Process", "CO.3.2.7")["name"] == "theirs CO.3.2.7"
+              and st["CO.3.2.7"]["status"] == "accepted")
+        q.reject(crs["FN.9.3.1"]["id"], reviewer="role.qms.iso_advisor", decision_reason="keep ours")
+        st = {x["id"]: x for x in vi.staged(slug, "all")}
+        check("rejecting in the inbox keeps ours and is remembered", cc.Graph().get("Process", "FN.9.3.1")["name"] == "ours FN"
+              and st["FN.9.3.1"]["status"] == "rejected")
+        try:
+            q.withdraw(crs["SC.4.3.6"]["id"], actor=crs["SC.4.3.6"]["proposed_by"])
+            refused = False
+        except approvals.ApprovalError:
+            refused = True
+        check("an import request can't be withdrawn (approve or reject it)", refused)
+    vi.accept(slug, st["SC.4.3.6"]["sid"], "role.qms.iso_advisor")
+    with cc.use_model(slug):
+        cr = approvals.ApprovalQueue(s).get(crs["SC.4.3.6"]["id"])
+    check("deciding on the Imports screen also closes the inbox request", cr["status"] == "approved")
+    with cc.use_model(slug):
+        s.edit_process("PD.2.4.1", {"name": "ours PD"}, A, "edit")
+    s2 = copy.deepcopy(s1)
+    proc(s2, "PD.2.4.1")["name"] = "theirs PD"
+    r2 = vi.import_model(slug, "Inbox", s2, SRC, actor=A)
+    s3 = copy.deepcopy(s2)
+    proc(s3, "PD.2.4.1")["name"] = "theirs PD v2"
+    vi.import_model(slug, "Inbox", s3, SRC, actor=A)
+    with cc.use_model(slug):
+        pd = [c for c in approvals.ApprovalQueue(s).list(None) if c["target"] == "PD.2.4.1"]
+    check("a superseded staged change closes its inbox request (one pending, one superseded)",
+          sorted(c["status"] for c in pd) == ["pending", "superseded"])
+    vi.revert(slug, vi.batches(slug)[-1]["batch"], A, "undo")
+    with cc.use_model(slug):
+        pd = [c for c in approvals.ApprovalQueue(s).list(None) if c["target"] == "PD.2.4.1"]
+    check("reverting the batch withdraws its pending inbox request", all(c["status"] != "pending" for c in pd))
+    with cc.use_model(slug):
+        check("the proposals log verifies", cc.verify_log(os.path.join(cc.model_base(slug), "proposals.log.jsonl"))["ok"])
 
 
 if __name__ == "__main__":

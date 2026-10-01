@@ -12,6 +12,7 @@ import copy
 import json
 import os
 import re
+import sys
 
 import continuum_core as cc
 from jsonschema import Draft202012Validator
@@ -255,6 +256,33 @@ class EnterpriseWrites:
         cc.append_edit_event("RiskControl", rc_id, "deprecate", rc["version"], new["version"],
                              {"kind": "human", "id": actor}, new, f"{reason.strip()} (split into {risk['id']} + {ctl['id']})")
         return {"risk": risk, "control": ctl, "retired": rc_id}
+
+
+class ImportReviewOps:
+    """Staged import changes decided in the one approvals inbox (D56). The queue
+    calls these with actor = the importer and reviewer = the person deciding."""
+
+    @staticmethod
+    def _vi():
+        p = os.path.normpath(os.path.join(HERE, "..", "builder"))
+        if p not in sys.path:
+            sys.path.insert(0, p)
+        import versioned_import
+        return versioned_import
+
+    def accept_import_change(self, sid, actor, reason, reviewer=""):
+        vi = self._vi()
+        try:
+            return vi.accept(cc.ACTIVE_MODEL, sid, reviewer or actor, reason=reason, via_queue=True)
+        except vi.ImportError_ as e:
+            raise EditError(str(e)) from e
+
+    def reject_import_change(self, sid, actor, reason):
+        vi = self._vi()
+        try:
+            return vi.reject(cc.ACTIVE_MODEL, sid, actor, reason, via_queue=True)
+        except vi.ImportError_ as e:
+            raise EditError(str(e)) from e
 
 
 EA_OPS = {

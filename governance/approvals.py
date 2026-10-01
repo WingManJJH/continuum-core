@@ -50,7 +50,9 @@ PROPOSABLE_OPS = {
     "add_event", "edit_event", "remove_event",
     "add_flow", "remove_flow", "edit_flow", "enable_branching",
     *EA_OPS,  # D45
+    "accept_import_change",  # D56: a staged import change, decided here like any other
 }
+IMPORT_OP = "accept_import_change"
 
 # Injected by the gate at apply time — never accepted from the caller's args.
 _INJECTED = {"actor", "reason", "reviewer"}
@@ -221,6 +223,11 @@ class ApprovalQueue:
             raise ApprovalError("reviewer must be a role")
         if not decision_reason or not decision_reason.strip():
             raise ApprovalError("a reason is required to reject a change")
+        if cr["op"] == IMPORT_OP:  # "keep ours": the staged import change is rejected (and remembered)
+            try:
+                self.store.reject_import_change(cr["args"].get("sid", ""), reviewer, decision_reason.strip())
+            except EditError as exc:
+                raise ApprovalError(f"could not reject: {exc}") from exc
         self._append({
             "kind": "decide", "cr_id": cr_id, "status": "rejected",
             "by": reviewer, "decision_reason": decision_reason.strip(),
@@ -233,11 +240,47 @@ class ApprovalQueue:
             raise ApprovalError(f"request is already {cr['status']}")
         if actor != cr["proposed_by"]:
             raise ApprovalError("only the proposer can withdraw a request")
+        if cr["op"] == IMPORT_OP:
+            raise ApprovalError("an import change is decided by approving (take the incoming version) "
+                                "or rejecting (keep ours)")
         self._append({
             "kind": "decide", "cr_id": cr_id, "status": "withdrawn",
             "by": actor, "decision_reason": decision_reason.strip(),
         })
         return self.get(cr_id)
+
+    def close(self, cr_id: str, status: str, by: str, decision_reason: str) -> dict | None:
+        """System close of a pending request whose subject went away — a staged
+        import change superseded by a newer import or withdrawn by a revert."""
+        if status != "superseded":
+            raise ApprovalError("only 'superseded' can be set by the system")
+        crs = self._fold()
+        cr = crs.get(cr_id)
+        if not cr or cr["status"] != "pending":
+            return cr
+        self._append({"kind": "decide", "cr_id": cr_id, "status": status, "by": by,
+                      "decision_reason": decision_reason})
+        return self.get(cr_id)
+
+    def mirror(self, cr_id: str, status: str, by: str, decision_reason: str, applied=None) -> dict | None:
+        """Record on the request a decision that was taken on its subject directly
+        (an import change accepted or rejected from the Imports screen), so the inbox
+        never shows as pending something already decided."""
+        if status not in ("approved", "rejected"):
+            raise ApprovalError("mirror status is approved or rejected")
+        cr = self._fold().get(cr_id)
+        if not cr or cr["status"] != "pending":
+            return cr
+        self._append({"kind": "decide", "cr_id": cr_id, "status": status, "by": by, "decision_reason": decision_reason,
+                      "self_approved": by == cr["proposed_by"], "applied": applied})
+        return self.get(cr_id)
+
+    def for_import(self, sid: str) -> dict | None:
+        """The change request carrying a staged import change, if any."""
+        for cr in self._fold().values():
+            if cr["op"] == IMPORT_OP and (cr.get("args") or {}).get("sid") == sid:
+                return cr
+        return None
 
     @staticmethod
     def _summarize(result):

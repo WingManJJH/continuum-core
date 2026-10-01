@@ -364,7 +364,7 @@ CENTER_VIEWS.imports = function () {
       + "<td>" + (b.created || 0) + "</td><td>" + (b.updated || 0) + "</td><td>" + (b.retired || 0) + "</td><td>" + (b.staged || 0) + "</td>"
       + "<td>" + (canAdmin && b.kind === "import" && !B.some(function (x) { return x.kind === "revert" && x.batch === b.batch; }) ? '<button class="add-btn ghost-btn" data-revert="' + esc(b.batch) + '">Revert</button>' : "") + "</td></tr>";
   }).join("") + "</tbody></table>" : '<div class="ea-empty">No imports yet.</div>';
-  c.innerHTML = '<div class="ea"><div class="ea-head"><div><h3>Imports</h3><p class="muted">Every import is a numbered batch. An import never overwrites a record edited in Continuum: the incoming version waits here for review.</p></div>'
+  c.innerHTML = '<div class="ea"><div class="ea-head"><div><h3>Imports</h3><p class="muted">Every import is a numbered batch. An import never overwrites a record edited in Continuum: the incoming version waits for review — here, and in the Approvals inbox alongside every other change.</p></div>'
     + (canAdmin ? '<label class="add-btn ghost-btn filebtn">Import a model export (.json)…<input id="imp-file" type="file" accept=".json,application/json" hidden></label>' : "") + "</div>"
     + '<div id="imp-preview"></div><h3 class="sub-h">Waiting for review (' + S.length + ")</h3>" + staged + '<h3 class="sub-h">Batches</h3>' + batches + "</div>";
   wireImports();

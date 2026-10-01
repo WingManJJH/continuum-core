@@ -143,7 +143,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"strategy": strat.strategy(g), "xmatrix": strat.xmatrix(g)})
         if u.path == "/api/approvals":
             status = parse_qs(u.query).get("status", [None])[0] or None
-            return self._json({"approvals": QUEUE.list(status),
+            crs = QUEUE.list(status)
+            if any(c["op"] == approvals_mod.IMPORT_OP for c in crs):   # D56: show the import diff in the inbox
+                st = {x["sid"]: x for x in vimport.staged(cc.ACTIVE_MODEL, "all")}
+                for c in crs:
+                    if c["op"] == approvals_mod.IMPORT_OP:
+                        x = st.get((c.get("args") or {}).get("sid"))
+                        if x:
+                            c["import"] = {k: x[k] for k in ("sid", "batch", "source", "etype", "id", "change",
+                                                             "diff", "reasons", "status", "based_on_version")}
+            return self._json({"approvals": crs,
                                "pending": QUEUE.pending_count(),
                                "ops": sorted(approvals_mod.PROPOSABLE_OPS)})
         if u.path == "/api/approval-policy":
