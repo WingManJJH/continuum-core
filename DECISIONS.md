@@ -6,6 +6,28 @@ something concrete. Newest first.
 
 ---
 
+## 2026-10-01 — Versioned imports
+
+### D51 — An import never overwrites a record
+**Finding:** `builder/model_import.write_model` rewrote a model's `seed.json` on every import:
+an edit made in Continuum could be silently masked or silently mask the import, and the §7.5
+baseline itself was rewritten.
+**Decision:** the first import of a model writes its baseline; every re-import is a numbered batch
+of ordinary change-control events (`builder/versioned_import.py`) against a per-source baseline
+(the version each record had when that source last wrote it). New → create; identical → nothing;
+untouched since the source wrote it → fast-forward; edited in Continuum since → **staged** with a
+field diff, record untouched; gone from the source → retired if untouched, staged if edited.
+Accept is refused (409) if the record moved after staging; reject is remembered while record and
+incoming version are unchanged; a newer import supersedes older pending changes; any batch can be
+reverted with compensating events, skipping (and reporting) records edited after it. Models
+imported earlier use their seed as the baseline. Every existing importer (BPC/OC, Sunrise, SYSPRO)
+goes through it unchanged via `write_model`. State lives in the model's own chained logs, so it
+works on files and Postgres. Ported from the Node platform's review fixes (generation-safe
+baselines are implicit here: records are never deleted, so versions only increase).
+`builder/test_versioned_import.py` → 27, both backends.
+
+---
+
 ## 2026-10-01 — Postgres backend (Supabase schema lineage)
 
 ### D50 — Optimistic concurrency on every governed write
