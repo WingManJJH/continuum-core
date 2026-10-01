@@ -14,12 +14,17 @@ python db/import_files.py                            # move file history into Po
 python run.py                                        # every app now reads and writes Postgres
 ```
 
-Use a **non-owner role** for the app, so row-level security is a real second line behind the application:
+Run the app as a **non-owner role**, so row-level security is a real second line behind the application (D59). Migrations and imports run as the owner; the apps never do:
 
-```sql
-create role continuum_app login password '…';
--- run db/migrate.py as the owner; it grants DML to continuum_app when that role exists
+```bash
+python db/app_role.py --url <owner URL>          # creates/updates continuum_app; prompts for its password
+python db/app_role.py --url <owner URL> --check  # report: no superuser/BYPASSRLS, DML only, RLS on, anon/authenticated locked out
+export CONTINUUM_DATABASE_URL=postgresql://continuum_app@db-host:5432/continuum   # password via PGPASSWORD
 ```
+
+`continuum_app` can log in and read/write rows in the Continuum tables, and nothing else. It does not own tables, so the workspace policies apply to it. It cannot run DDL, alter roles, or bypass the append-only trigger. On Supabase the pooler user is `continuum_app.<project-ref>`, and `app_role.py` also revokes the platform's default `anon`/`authenticated` grants on these tables.
+
+If the database login is wrong or missing, startup stops with a single line (`Continuum did not start: cannot connect to Postgres: …`) instead of retrying.
 
 ## What is stored where
 
@@ -42,6 +47,9 @@ create role continuum_app login password '…';
 ```bash
 export CONTINUUM_TEST_DATABASE_URL=postgresql://…/continuum_test     # a throwaway database
 python tests/run_all.py
+# as the app role (what production runs): migrations use the owner URL, suites the app URL
+CONTINUUM_TEST_DATABASE_OWNER_URL=postgresql://owner@…/continuum_test \
+CONTINUUM_TEST_DATABASE_URL=postgresql://continuum_app:…@…/continuum_test python tests/run_all.py
 ```
 
 This runs the Postgres contract suite (`db/test_postgres.py`) and replays every core and enterprise suite on Postgres. The only exceptions are the two suites that tamper with JSONL bytes directly; their Postgres equivalents are in the contract suite.

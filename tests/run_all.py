@@ -11,7 +11,8 @@ registry: CI calls it, so a suite added here is a suite CI runs.
 
 Optional groups run when their prerequisite is present, and are reported as
 SKIPPED (never silently passed) when it is not:
-  - `postgres`  needs CONTINUUM_TEST_DATABASE_URL (a throwaway database)
+  - `postgres`  needs CONTINUUM_TEST_DATABASE_URL (a throwaway database); to run the suites
+                as the app role, also set CONTINUUM_TEST_DATABASE_OWNER_URL (used for migrations)
   - `js`        needs `node` on PATH (JS/Python rules parity)
   - `studio`    needs node + studio/test/node_modules (Playwright): the offline
                 Studio build + regression + e2e, and the multi-user browser e2e
@@ -162,8 +163,11 @@ def main(argv=None) -> int:
         if group == "postgres":
             env["CONTINUUM_DATABASE_URL"] = os.environ["CONTINUUM_TEST_DATABASE_URL"]
             if not migrated:
-                subprocess.run([sys.executable, os.path.join(ROOT, "db", "migrate.py")], env=env,
-                               check=True, capture_output=True)
+                # Migrations need the owner; the suites may run as the least-privilege
+                # app role (D59) — set CONTINUUM_TEST_DATABASE_OWNER_URL for that.
+                owner = os.environ.get("CONTINUUM_TEST_DATABASE_OWNER_URL") or env["CONTINUUM_DATABASE_URL"]
+                subprocess.run([sys.executable, os.path.join(ROOT, "db", "migrate.py"), "--url", owner],
+                               env=env, check=True, capture_output=True)
                 migrated.append(True)
         extra = [x for x in extra if x != "@pg"]
         label = path + ("  [postgres]" if group == "postgres" else "")

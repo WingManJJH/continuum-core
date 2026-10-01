@@ -48,8 +48,25 @@ def main():
     finally:
         cc.MODELS_DIR, storage.SYSTEM_DIR = saved
         shutil.rmtree(tmp, ignore_errors=True)
+    startup_fails_fast()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)
+
+
+def startup_fails_fast():
+    """D59: an unreachable or refused database stops startup in one line, quickly."""
+    import subprocess
+    import time
+    env = dict(os.environ, CONTINUUM_DATABASE_URL="postgresql://nobody@127.0.0.1:1/none?connect_timeout=2")
+    env.pop("PGPASSWORD", None)
+    t0 = time.time()
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "web", "gateway.py"), "--port", "0"],
+                       env=env, capture_output=True, text=True, timeout=60)
+    check("a bad database login stops startup with exit 1, in seconds",
+          r.returncode == 1 and time.time() - t0 < 20, f"rc={r.returncode} {time.time() - t0:.1f}s")
+    check("…with one clear line, not a traceback",
+          r.stderr.startswith("Continuum did not start: cannot connect to Postgres") and "Traceback" not in r.stderr,
+          r.stderr[-300:])
 
 
 def run(port):

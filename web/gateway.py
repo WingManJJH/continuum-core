@@ -127,7 +127,17 @@ def main(argv=None) -> int:
     port = int(os.environ.get("CONTINUUM_PORT", "8080"))
     if "--port" in argv:
         port = int(argv[argv.index("--port") + 1])
-    srv = ThreadingHTTPServer((guard.host(), port), make_gateway(build_handlers()))
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mcp_server"))
+        import storage
+        storage.get()                   # connect now: a bad database login fails here, in one line
+        handlers = build_handlers()
+    except Exception as e:  # noqa: BLE001 — one clear line for the operator, not a traceback
+        if type(e).__name__ == "DatabaseUnavailable":
+            print(f"Continuum did not start: {e}", file=sys.stderr)
+            return 1
+        raise
+    srv = ThreadingHTTPServer((guard.host(), port), make_gateway(handlers))
     print(f"Continuum on http://localhost:{port}  ·  /governance/ /dashboard/ /advisor/ /ask/")
     srv.serve_forever()
     return 0

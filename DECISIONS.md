@@ -1253,3 +1253,32 @@ themselves are a human action; the instrument is in place.
 - macOS bash 3.2 mis-parses quoted `$( … )` blocks containing `{a,b}`, so the load script avoids them.
 
 **Follow-up.** Add a non-owner `continuum_app` login role. The `postgres` user bypasses RLS.
+
+## D59 — Continuum runs as a least-privilege database login (2026-10-01)
+
+**Decision.** The apps connect as `continuum_app`; migrations and imports run as the owner.
+- `continuum_app`: LOGIN only, with no superuser, createdb, createrole, replication or BYPASSRLS.
+- DML on the five Continuum tables (and on future tables of the owner, via default privileges).
+- `db/app_role.py` creates the role and `--check` proves it.
+- On Supabase it also revokes the default `anon`/`authenticated` grants on these tables.
+
+**Why.** The owner bypasses row-level security. With the owner login, the 0003 workspace policies were documentation, not enforcement.
+
+**Found by running the whole suite as the app role.**
+- `_reproject` bulk-loaded with COPY, and Postgres refuses COPY FROM under RLS. Every model load would have failed for a non-owner.
+- It now uses one `INSERT … SELECT FROM unnest(…)` per table.
+- `tests/run_all.py` accepts `CONTINUUM_TEST_DATABASE_OWNER_URL` (used for migrations), so the suites can run as the app role.
+- `db/test_postgres.py` adds 8 app-role checks:
+  - non-owner and not BYPASSRLS;
+  - no workspace set → no rows;
+  - another workspace → no rows;
+  - its own log is readable;
+  - UPDATE and DELETE refused;
+  - cannot set `session_replication_role`;
+  - cannot write into another workspace.
+
+**Fail fast.** A missing or wrong database password now stops startup in one line (`Continuum did not start: cannot connect to Postgres: …`), instead of 30 s of pool retries and a traceback.
+
+**Evidence.**
+- All 93 suites (1,795 assertions) pass running as `continuum_app` with password auth (scram).
+- The Postgres group also passes as the owner.

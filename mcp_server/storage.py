@@ -49,6 +49,10 @@ _DEFAULT_SYSTEM_DIR = SYSTEM_DIR                     # tests may repoint SYSTEM_
 EDITS_NAME = "edits.log.jsonl"
 
 
+class DatabaseUnavailable(RuntimeError):
+    """The configured Postgres can't be reached or refuses the login."""
+
+
 class ConflictError(RuntimeError):
     """The record changed since the writer read it (stale from_version)."""
 
@@ -322,6 +326,7 @@ class PostgresBackend:
         import psycopg  # noqa: F401  (fail fast with a clear error if not installed)
         from psycopg_pool import ConnectionPool
         self.url = url
+        self._probe(url)
         self._mutex_guard = threading.Lock()
         self._mutex_locks: dict[str, threading.RLock] = {}
         self._mutex_depth = threading.local()
@@ -330,6 +335,22 @@ class PostgresBackend:
 
     def close(self):
         self.pool.close()
+
+    @staticmethod
+    def _probe(url: str):
+        """Connect once before opening the pool, so a wrong or missing password is
+        one clear line at startup, not a pool retrying for 30 s and a traceback."""
+        import psycopg
+        try:
+            psycopg.connect(url, connect_timeout=10).close()
+        except psycopg.OperationalError as e:
+            msg = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
+            hint = ""
+            if "no password supplied" in msg:
+                hint = " — set PGPASSWORD (or start with the start script, which asks for it)"
+            elif "password authentication failed" in msg:
+                hint = " — the password is wrong for this user"
+            raise DatabaseUnavailable(f"cannot connect to Postgres: {msg}{hint}") from None
 
     @contextmanager
     def tx(self, ws: str | None):
@@ -533,7 +554,7 @@ class PostgresBackend:
 
     def _reproject(self, c, ws):
         """Rebuild nodes + edges for a workspace: seed baseline, then the LAST edit
-        payload per record (set-based — one pass, bulk-loaded with COPY)."""
+        payload per record (set-based — one pass, two INSERT … unnest statements)."""
         c.execute("delete from edges where workspace_id=%s", (ws,))
         c.execute("delete from nodes where workspace_id=%s", (ws,))
         final: dict[tuple, tuple] = {}
@@ -549,18 +570,26 @@ class PostgresBackend:
                 order by node_type, node_id, seq desc""", (ws, EDITS_NAME)).fetchall():
             if isinstance(payload, dict) and payload.get("id"):
                 final[(etype, payload["id"])] = ({**payload, "status": "deprecated"} if op == "deprecate" else payload, "edit")
-        with c.cursor().copy("copy nodes (workspace_id, node_type, id, name, status, version, attrs, source) from stdin") as cp:
-            for (etype, nid), (attrs, src) in final.items():
-                cp.write_row((ws, etype, nid, str(attrs.get("name") or attrs.get("title") or nid)[:500], attrs.get("status"),
-                              _int_version(attrs.get("version")), json.dumps(attrs), src))
-        seen = set()
-        with c.cursor().copy("copy edges (workspace_id, source_type, source_id, target_id, edge_type) from stdin") as cp:
-            for (etype, nid), (attrs, _src) in final.items():
-                for t, k in self._refs(attrs):
-                    key = (etype, nid, t, k)
-                    if key not in seen:
-                        seen.add(key)
-                        cp.write_row((ws, etype, nid, t, k))
+        # Set-based INSERT … SELECT FROM unnest(arrays): one statement per table.
+        # Not COPY — Postgres refuses COPY FROM under row-level security, and the
+        # app runs as a non-owner role that RLS applies to (D59).
+        nodes = [(etype, nid, str(attrs.get("name") or attrs.get("title") or nid)[:500], attrs.get("status"),
+                  _int_version(attrs.get("version")), json.dumps(attrs), src)
+                 for (etype, nid), (attrs, src) in final.items()]
+        if nodes:
+            c.execute("""insert into nodes (workspace_id, node_type, id, name, status, version, attrs, source)
+                         select %s, t, i, n, st, v, a::jsonb, src
+                         from unnest(%s::text[], %s::text[], %s::text[], %s::text[], %s::int[], %s::text[], %s::text[])
+                              as u(t, i, n, st, v, a, src)""", (ws, *map(list, zip(*nodes))))
+        seen: dict[tuple, None] = {}
+        for (etype, nid), (attrs, _src) in final.items():
+            for t, k in self._refs(attrs):
+                seen.setdefault((etype, nid, t, k))
+        if seen:
+            c.execute("""insert into edges (workspace_id, source_type, source_id, target_id, edge_type)
+                         select %s, st, si, ti, et
+                         from unnest(%s::text[], %s::text[], %s::text[], %s::text[]) as u(st, si, ti, et)""",
+                      (ws, *map(list, zip(*seen))))
 
     def list_workspaces(self) -> list[dict]:
         """Registered models in the current models dir (slug = the model's folder name)."""

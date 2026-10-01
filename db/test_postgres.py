@@ -84,7 +84,10 @@ def main():
     pg = storage.get()
     check("backend is Postgres", pg.kind == "postgres")
     import psycopg
-    admin = psycopg.connect(URL, autocommit=True)
+    # The "DBA" who can bypass triggers is the owner; the suites themselves may run as
+    # the least-privilege app role (D59) when CONTINUUM_TEST_DATABASE_OWNER_URL is set.
+    OWNER = os.environ.get("CONTINUUM_TEST_DATABASE_OWNER_URL") or URL
+    admin = psycopg.connect(OWNER, autocommit=True)
 
     # 1. identical chains on both backends
     with TempModel() as m:
@@ -104,6 +107,39 @@ def main():
               "update node_events set raw = raw where workspace_id=%s", (m.ws,)))
         check("DELETE on node_events is refused", raises(psycopg.Error, admin.execute,
               "delete from node_events where workspace_id=%s", (m.ws,)))
+
+        # 2b. the app role (D59): RLS isolates workspaces, and the trigger still refuses edits
+        if OWNER != URL:
+            app = psycopg.connect(URL, autocommit=False)
+            role = app.execute("select current_user, rolbypassrls from pg_roles where rolname=current_user").fetchone()
+            check("suites run as a non-owner role without BYPASSRLS", role[0] != "continuum" and not role[1])
+            with app.transaction():
+                n_none = app.execute("select count(*) from node_events").fetchone()[0]
+            check("app role with no workspace set sees no log rows", n_none == 0)
+            with app.transaction():
+                app.execute("select set_config('continuum.workspace', %s, true)", ("someone-else",))
+                n_other = app.execute("select count(*) from node_events where workspace_id=%s", (m.ws,)).fetchone()[0]
+            check("app role scoped to another workspace cannot read this one", n_other == 0)
+            with app.transaction():
+                app.execute("select set_config('continuum.workspace', %s, true)", (m.ws,))
+                n_own = app.execute("select count(*) from node_events where workspace_id=%s and log='events.log.jsonl'", (m.ws,)).fetchone()[0]
+            check("app role scoped to its workspace reads its own log", n_own == 5)
+            def _scoped(sql_):
+                with app.transaction():
+                    app.execute("select set_config('continuum.workspace', %s, true)", (m.ws,))
+                    app.execute(sql_, (m.ws,))
+            check("app role: UPDATE on its own log is refused", raises(psycopg.Error, _scoped,
+                  "update node_events set raw = raw where workspace_id=%s"))
+            check("app role: DELETE on its own log is refused", raises(psycopg.Error, _scoped,
+                  "delete from node_events where workspace_id=%s"))
+            check("app role cannot bypass the trigger", raises(psycopg.Error, _scoped,
+                  "select set_config('session_replication_role', 'replica', true), %s"))
+            def _cross():
+                with app.transaction():
+                    app.execute("select set_config('continuum.workspace', %s, true)", ("someone-else",))
+                    app.execute("insert into docs (workspace_id, name, body) values (%s, 'x.json', '{}')", (m.ws,))
+            check("app role cannot write into another workspace (RLS with check)", raises(psycopg.Error, _cross))
+            app.close()
 
         # 3. tamper detection still works for someone who bypasses the trigger (DBA)
         with admin.transaction():
